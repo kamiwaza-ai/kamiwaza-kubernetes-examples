@@ -1,0 +1,76 @@
+# Minimal tree + demo users for ldap-bootstrap-import. Richer lab data: ldap-samples/bootstrap.ldif (docs/OPERATOR_GUIDE.md §4).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openldap-bootstrap
+  namespace: ldap
+data:
+  bootstrap.ldif: |
+    dn: ou=people,dc=kamiwaza,dc=local
+    objectClass: organizationalUnit
+    ou: people
+
+    dn: ou=groups,dc=kamiwaza,dc=local
+    objectClass: organizationalUnit
+    ou: groups
+
+    dn: uid=alice,ou=people,dc=kamiwaza,dc=local
+    objectClass: inetOrgPerson
+    objectClass: posixAccount
+    uid: alice
+    cn: Alice Administrator
+    givenName: Alice
+    sn: Administrator
+    displayName: Alice Administrator
+    mail: alice@users.example.invalid
+    uidNumber: 1001
+    gidNumber: 1001
+    homeDirectory: /home/alice
+    # Lab only — use SSHA or ldaps in production.
+    userPassword: kamiwaza
+
+    dn: uid=bob,ou=people,dc=kamiwaza,dc=local
+    objectClass: inetOrgPerson
+    objectClass: posixAccount
+    uid: bob
+    cn: Bob User
+    givenName: Bob
+    sn: User
+    displayName: Bob User
+    mail: bob@users.example.invalid
+    uidNumber: 1002
+    gidNumber: 1002
+    homeDirectory: /home/bob
+    userPassword: kamiwaza
+
+    dn: uid=carol,ou=people,dc=kamiwaza,dc=local
+    objectClass: inetOrgPerson
+    objectClass: posixAccount
+    uid: carol
+    cn: Carol Engineer
+    givenName: Carol
+    sn: Engineer
+    displayName: Carol Engineer
+    mail: carol@users.example.invalid
+    uidNumber: 1003
+    gidNumber: 1003
+    homeDirectory: /home/carol
+    userPassword: kamiwaza
+
+    dn: cn=admin,ou=groups,dc=kamiwaza,dc=local
+    objectClass: groupOfNames
+    objectClass: extensibleObject
+    cn: admin
+    member: uid=alice,ou=people,dc=kamiwaza,dc=local
+    memberUid: alice
+
+    dn: cn=user,ou=groups,dc=kamiwaza,dc=local
+    objectClass: groupOfNames
+    objectClass: extensibleObject
+    cn: user
+    member: uid=alice,ou=people,dc=kamiwaza,dc=local
+    member: uid=bob,ou=people,dc=kamiwaza,dc=local
+    member: uid=carol,ou=people,dc=kamiwaza,dc=local
+    memberUid: alice
+    memberUid: bob
+    memberUid: carol

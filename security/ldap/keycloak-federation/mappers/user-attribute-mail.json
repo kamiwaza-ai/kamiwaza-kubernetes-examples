@@ -1,0 +1,10 @@
+{
+  "name": "ldap-attribute-mail",
+  "providerId": "user-attribute-ldap-mapper",
+  "providerType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+  "config": {
+    "ldap.attribute": ["mail"],
+    "user.model.attribute": ["email"],
+    "read.only": ["true"]
+  }
+}

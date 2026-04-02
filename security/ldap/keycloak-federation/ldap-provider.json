@@ -1,0 +1,24 @@
+{
+  "name": "Enterprise LDAP",
+  "providerId": "ldap",
+  "providerType": "org.keycloak.storage.UserStorageProvider",
+  "config": {
+    "priority": ["0"],
+    "fullSyncPeriod": ["-1"],
+    "changedSyncPeriod": ["-1"],
+    "importEnabled": ["true"],
+    "batchSizeForSync": ["1000"],
+    "editMode": ["READ_ONLY"],
+    "syncRegistrations": ["false"],
+    "vendor": ["other"],
+    "usernameLDAPAttribute": ["uid"],
+    "rdnLDAPAttribute": ["uid"],
+    "uuidLDAPAttribute": ["entryUUID"],
+    "userObjectClasses": ["inetOrgPerson", "posixAccount"],
+    "connectionUrl": ["ldap://openldap.ldap.svc.cluster.local:389"],
+    "usersDn": ["ou=people,dc=kamiwaza,dc=local"],
+    "authType": ["simple"],
+    "bindDn": ["cn=admin,dc=kamiwaza,dc=local"],
+    "connectionPooling": ["true"]
+  }
+}

@@ -1,0 +1,53 @@
+# Imports openldap-bootstrap ConfigMap into slapd. Optional manual path: ldap-samples/bootstrap.ldif (OPERATOR_GUIDE §4).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ldap-bootstrap-import
+  namespace: ldap
+spec:
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: osixia/openldap:1.5.0
+          command:
+            - sh
+            - -lc
+            - |
+              set -eu
+              echo "Waiting for OpenLDAP service..."
+              until ldapsearch -x -H ldap://openldap.ldap.svc.cluster.local:389 \
+                -D "cn=admin,dc=kamiwaza,dc=local" -w "$LDAP_ADMIN_PASSWORD" \
+                -b "dc=kamiwaza,dc=local" -s base "(objectClass=*)" dn >/dev/null 2>&1; do
+                sleep 3
+              done
+              echo "Importing bootstrap LDIF (idempotent)..."
+              set +e
+              OUT="$(ldapadd -x -c -H ldap://openldap.ldap.svc.cluster.local:389 \
+                -D "cn=admin,dc=kamiwaza,dc=local" -w "$LDAP_ADMIN_PASSWORD" \
+                -f /bootstrap/bootstrap.ldif 2>&1)"
+              RC=$?
+              set -e
+              echo "$OUT"
+              if [ "$RC" -ne 0 ] && [ "$RC" -ne 68 ]; then
+                echo "ldapadd failed with exit code $RC" >&2
+                exit "$RC"
+              fi
+              echo "LDAP bootstrap import finished."
+          env:
+            - name: LDAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openldap-secret
+                  key: admin-password
+          volumeMounts:
+            - name: bootstrap-ldif
+              mountPath: /bootstrap
+              readOnly: true
+      volumes:
+        - name: bootstrap-ldif
+          configMap:
+            name: openldap-bootstrap

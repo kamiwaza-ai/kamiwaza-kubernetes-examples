@@ -1,0 +1,40 @@
+# Copy this block, replace placeholders, save as e.g. my-user.ldif.
+# Apply with ldapmodify — see ../docs/OPERATOR_GUIDE.md §8.
+#
+# The optional "demo-engineering" block only works if cn=demo-engineering exists.
+
+dn: uid=<uid>,ou=people,dc=kamiwaza,dc=local
+changetype: add
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: <uid>
+cn: <First Last>
+sn: <Last>
+givenName: <First>
+displayName: <First Last>
+mail: <uid>@users.example.invalid
+uidNumber: <unique_uid_number>
+gidNumber: <unique_gid_number>
+homeDirectory: /home/<uid>
+title: <title>
+departmentNumber: <department>
+employeeType: active
+manager: uid=<manager_uid>,ou=people,dc=kamiwaza,dc=local
+# Lab default; replace with an SSHA hash for production.
+userPassword: kamiwaza
+
+dn: cn=user,ou=groups,dc=kamiwaza,dc=local
+changetype: modify
+add: member
+member: uid=<uid>,ou=people,dc=kamiwaza,dc=local
+-
+add: memberUid
+memberUid: <uid>
+
+dn: cn=demo-engineering,ou=groups,dc=kamiwaza,dc=local
+changetype: modify
+add: member
+member: uid=<uid>,ou=people,dc=kamiwaza,dc=local
+-
+add: memberUid
+memberUid: <uid>

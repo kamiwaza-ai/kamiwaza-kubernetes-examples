@@ -1,0 +1,29 @@
+# Merge into deploy/cluster/values/overrides.yaml (Helmfile merges overrides last).
+# Apply the ConfigMap first: kubectl apply -k security/consent-banner/
+# (from this repo root after clone).
+
+core:
+  scheduler:
+    extraVolumes:
+      - name: consent-html
+        configMap:
+          name: consent-configmap
+          items:
+            - key: consent.html
+              path: consent.html
+    extraVolumeMounts:
+      - name: consent-html
+        mountPath: /app/config/security/consent.html
+        subPath: consent.html
+        readOnly: true
+
+  security:
+    consent:
+      enabled: true
+      buttonLabel: "Accept"
+    banner:
+      enabled: true
+      topText: "DEMO"
+      topColor: "#007A33"
+      bottomText: "DEMO"
+      bottomColor: "#007A33"

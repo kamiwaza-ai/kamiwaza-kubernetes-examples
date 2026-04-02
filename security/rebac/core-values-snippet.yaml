@@ -1,0 +1,24 @@
+# Merge the `core:` block below into Kamiwaza Deploy `cluster/values/overrides.yaml`
+# (or another values file layered after `kamiwaza-base.yaml` / `kamiwaza-dev.yaml`).
+#
+# ReBAC (relationship-based access control) requires:
+#   - auth.enabled: true (full stack with Keycloak — not lite mode)
+#   - See also: cluster/values/kamiwaza-rebac.yaml in Deploy (Helmfile when
+#     KAMIWAZA_REBAC_ENABLED=true or ./scripts/install-dev.sh --rebac)
+#
+# Lab defaults below use allowCommunityFallback: true for easier local testing.
+# Tighten for production (e.g. allowCommunityFallback: false).
+
+core:
+  # Drives core-config ConfigMap AUTH_REBAC_* (scheduler + services reading envFrom).
+  rebac:
+    enabled: true
+    backend: postgres
+    allowCommunityFallback: true
+
+  # Scheduler and Ray worker pods: explicit AUTH_REBAC_* env (overrides ConfigMap).
+  scheduler:
+    rebac:
+      enabled: true
+      defaultTenantId: "__default__"
+      allowCommunityFallback: true

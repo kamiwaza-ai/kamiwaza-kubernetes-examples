@@ -1,0 +1,30 @@
+# Same pattern as charts/auth keycloak-headers: Apache/php see HTTPS so DirectorySlash
+# redirects use https:// and session cookies stay on the correct origin.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: ldap-ui-headers
+  namespace: kamiwaza
+  labels:
+    app.kubernetes.io/name: ldap-ui
+    app.kubernetes.io/part-of: kamiwaza-kubernetes-examples
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+      X-Forwarded-Port: "443"
+---
+# PHP redirects to /account_manager?logged_in (no trailing slash). Apache then 301s to
+# add a slash and can drop the query string; normalize before the request hits the pod.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: ldap-ui-account-manager-slash
+  namespace: kamiwaza
+  labels:
+    app.kubernetes.io/name: ldap-ui
+    app.kubernetes.io/part-of: kamiwaza-kubernetes-examples
+spec:
+  replacePathRegex:
+    regex: "^/account_manager$"
+    replacement: "/account_manager/"

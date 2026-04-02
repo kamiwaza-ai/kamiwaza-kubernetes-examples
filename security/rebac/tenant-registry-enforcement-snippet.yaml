@@ -1,0 +1,12 @@
+# Optional: merge into Kamiwaza Deploy `cluster/values/overrides.yaml` to enforce the tenant
+# registry at runtime (reject unknown `tenant_id` claims). Requires the registry file inside
+# the core image at `configs/rebac/tenant_registry.yaml`, or mount a custom file and set
+# AUTH_TENANT_REGISTRY_PATH to that path.
+#
+# See `security/rebac/README.md` § Custom ReBAC tenants.
+
+core:
+  scheduler:
+    extraEnv:
+      - name: AUTH_TENANT_REGISTRY_ENFORCED
+        value: "true"

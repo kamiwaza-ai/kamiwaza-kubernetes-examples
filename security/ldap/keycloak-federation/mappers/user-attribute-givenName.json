@@ -1,0 +1,10 @@
+{
+  "name": "first name",
+  "providerId": "user-attribute-ldap-mapper",
+  "providerType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+  "config": {
+    "ldap.attribute": ["givenName"],
+    "user.model.attribute": ["firstName"],
+    "read.only": ["true"]
+  }
+}

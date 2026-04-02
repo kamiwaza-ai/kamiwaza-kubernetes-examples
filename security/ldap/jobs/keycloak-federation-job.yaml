@@ -1,0 +1,66 @@
+# Bundles keycloak-federation/ into a ConfigMap and runs apply-keycloak-ldap.sh. Workstation flow: OPERATOR_GUIDE §5b.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-ldap-federation-apply
+  namespace: kamiwaza
+spec:
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: apply
+          image: ubuntu:24.04
+          command:
+            - bash
+            - -lc
+            - |
+              set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update >/dev/null
+              apt-get install -y --no-install-recommends ca-certificates curl jq bash >/dev/null
+
+              mkdir -p /work/mappers
+              cp /bundle/apply-keycloak-ldap.sh /work/apply-keycloak-ldap.sh
+              cp /bundle/keycloak-declarative-common.sh /work/keycloak-declarative-common.sh
+              cp /bundle/manifest.json /work/manifest.json
+              cp /bundle/ldap-provider.json /work/ldap-provider.json
+              cp /bundle/group-ldap-mapper.json /work/mappers/group-ldap-mapper.json
+              cp /bundle/hardcoded-default-user-group.json /work/mappers/hardcoded-default-user-group.json
+              cp /bundle/user-attribute-mail.json /work/mappers/user-attribute-mail.json
+              cp /bundle/user-attribute-givenName.json /work/mappers/user-attribute-givenName.json
+              cp /bundle/user-attribute-sn.json /work/mappers/user-attribute-sn.json
+              chmod +x /work/apply-keycloak-ldap.sh
+
+              echo "Waiting for Keycloak readiness..."
+              until curl -fsS "http://keycloak.kamiwaza.svc.cluster.local:9000/health/ready" >/dev/null 2>&1; do
+                sleep 5
+              done
+
+              cd /work
+              ./apply-keycloak-ldap.sh
+          env:
+            - name: KEYCLOAK_URL
+              value: "http://keycloak.kamiwaza.svc.cluster.local:8080"
+            - name: KEYCLOAK_ADMIN
+              value: "admin"
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-admin
+                  key: password
+            - name: LDAP_BIND_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-ldap-bind
+                  key: password
+          volumeMounts:
+            - name: keycloak-declarative-bundle
+              mountPath: /bundle
+              readOnly: true
+      volumes:
+        - name: keycloak-declarative-bundle
+          configMap:
+            name: keycloak-declarative-bundle

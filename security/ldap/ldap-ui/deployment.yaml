@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ldap-ui
+  namespace: ldap
+  labels:
+    app: ldap-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ldap-ui
+  template:
+    metadata:
+      labels:
+        app: ldap-ui
+    spec:
+      containers:
+        - name: ldap-ui
+          image: wheelybird/luminary:v2.1.1
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - sh
+                  - -lc
+                  - |
+                    # Luminary v2.1.1 still hard-filters posixGroup in ldap_user_group_membership().
+                    # Expand to include groupOfNames/groupOfUniqueNames so RFC2307bis groups show in UI.
+                    perl -i -pe '
+                      if ($. == 632) {
+                        $_ = " \$ldap_search_query = \"(&(|(objectClass=posixGroup)"
+                          . "(objectClass=groupOfNames)(objectClass=groupOfUniqueNames))(\" "
+                          . ". \$LDAP[\"group_membership_attribute\"] . \"=\" . \$username . \"))\";\n";
+                      }
+                    ' /opt/luminary/includes/ldap_functions.inc.php || true
+          ports:
+            - containerPort: 80
+              name: http
+          env:
+            - name: LDAP_URI
+              value: "ldap://openldap.ldap.svc.cluster.local"
+            - name: LDAP_BASE_DN
+              value: "dc=kamiwaza,dc=local"
+            - name: LDAP_ADMIN_BIND_DN
+              value: "cn=admin,dc=kamiwaza,dc=local"
+            - name: LDAP_ADMIN_BIND_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: openldap-secret
+                  key: admin-password
+            - name: LDAP_USER_OU
+              value: "people"
+            - name: LDAP_ADMINS_GROUP
+              value: "admin"
+            # Align group writes with our directory schema + Keycloak mapper:
+            # groupOfNames + member (RFC2307bis), not posixGroup/gidNumber.
+            - name: FORCE_RFC2307BIS
+              value: "TRUE"
+            # Default new accounts into the platform's non-admin user group.
+            - name: DEFAULT_USER_GROUP
+              value: "user"
+            # Bootstrap groups are groupOfNames with "member" (user DN). Auto-detect may pick
+            # RFC2307bis + uniquemember and break admin checks → post-login redirect / menu breaks.
+            - name: LDAP_GROUP_MEMBERSHIP_ATTRIBUTE
+              value: "member"
+            - name: LDAP_GROUP_MEMBERSHIP_USES_UID
+              value: "FALSE"
+            - name: LDAP_REQUIRE_STARTTLS
+              value: "FALSE"
+            - name: NO_HTTPS
+              value: "true"
+            # Must match Host() in ldap-ui/ingressroute.yaml (TLS terminates at Traefik).
+            - name: SERVER_HOSTNAME
+              value: "ldap-ui.kamiwaza.test"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi

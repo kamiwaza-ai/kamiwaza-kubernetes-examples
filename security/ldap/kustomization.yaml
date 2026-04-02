@@ -1,0 +1,51 @@
+# LDAP lab stack for Kamiwaza operators (see README.md + docs/OPERATOR_GUIDE.md).
+#
+# Apply order (resources list):
+#   1. namespace ldap
+#   2. openldap — Secret, bootstrap ConfigMap, storage, workload, Service
+#   3. ldap-ui — optional web UI + Traefik routes into kamiwaza namespace
+#   4. jobs — LDAP import Job, Keycloak bind secret, federation Job
+#   5. configMapGenerator — bundles keycloak-federation/*.json + scripts for the federation Job
+#
+# Cross-namespace: IngressRoute lives in kamiwaza; OpenLDAP stays in ldap.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+labels:
+  - includeSelectors: true
+    pairs:
+      kamiwaza.ai/example: ldap-keycloak-federation
+
+resources:
+  - namespace.yaml
+  - openldap/secret.yaml
+  - openldap/configmap.yaml
+  - openldap/pvc.yaml
+  - openldap/pvc-config.yaml
+  - openldap/deployment.yaml
+  - openldap/service.yaml
+  - ldap-ui/deployment.yaml
+  - ldap-ui/service.yaml
+  - ldap-ui/kamiwaza-traefik-backend-service.yaml
+  - ldap-ui/traefik-middleware.yaml
+  - ldap-ui/ingressroute.yaml
+  - jobs/ldap-bootstrap-job.yaml
+  - jobs/keycloak-ldap-bind-secret.yaml
+  - jobs/keycloak-federation-job.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: keycloak-declarative-bundle
+    namespace: kamiwaza
+    files:
+      - keycloak-federation/apply-keycloak-ldap.sh
+      - keycloak-federation/keycloak-declarative-common.sh
+      - keycloak-federation/manifest.json
+      - keycloak-federation/ldap-provider.json
+      - keycloak-federation/mappers/group-ldap-mapper.json
+      - keycloak-federation/mappers/hardcoded-default-user-group.json
+      - keycloak-federation/mappers/user-attribute-mail.json
+      - keycloak-federation/mappers/user-attribute-givenName.json
+      - keycloak-federation/mappers/user-attribute-sn.json

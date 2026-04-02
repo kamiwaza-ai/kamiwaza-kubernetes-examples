@@ -1,0 +1,78 @@
+dn: ou=people,dc=kamiwaza,dc=local
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=kamiwaza,dc=local
+objectClass: organizationalUnit
+ou: groups
+
+dn: uid=alice,ou=people,dc=kamiwaza,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: alice
+cn: Alice Administrator
+sn: Administrator
+givenName: Alice
+displayName: Alice Administrator
+mail: alice@users.example.invalid
+uidNumber: 1001
+gidNumber: 1001
+homeDirectory: /home/alice
+title: Platform Administrator
+departmentNumber: Engineering
+employeeType: active
+userPassword: kamiwaza
+
+dn: uid=bob,ou=people,dc=kamiwaza,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: bob
+cn: Bob User
+sn: User
+givenName: Bob
+displayName: Bob User
+mail: bob@users.example.invalid
+uidNumber: 1002
+gidNumber: 1002
+homeDirectory: /home/bob
+title: Engineer
+departmentNumber: Engineering
+employeeType: active
+manager: uid=alice,ou=people,dc=kamiwaza,dc=local
+userPassword: kamiwaza
+
+dn: uid=carol,ou=people,dc=kamiwaza,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: carol
+cn: Carol Engineer
+sn: Engineer
+givenName: Carol
+displayName: Carol Engineer
+mail: carol@users.example.invalid
+uidNumber: 1011
+gidNumber: 1011
+homeDirectory: /home/carol
+title: Platform Engineer
+departmentNumber: Engineering
+employeeType: active
+manager: uid=alice,ou=people,dc=kamiwaza,dc=local
+userPassword: kamiwaza
+
+dn: cn=admin,ou=groups,dc=kamiwaza,dc=local
+objectClass: groupOfNames
+objectClass: extensibleObject
+cn: admin
+member: uid=alice,ou=people,dc=kamiwaza,dc=local
+memberUid: alice
+
+dn: cn=user,ou=groups,dc=kamiwaza,dc=local
+objectClass: groupOfNames
+objectClass: extensibleObject
+cn: user
+member: uid=alice,ou=people,dc=kamiwaza,dc=local
+member: uid=bob,ou=people,dc=kamiwaza,dc=local
+member: uid=carol,ou=people,dc=kamiwaza,dc=local
+memberUid: alice
+memberUid: bob
+memberUid: carol

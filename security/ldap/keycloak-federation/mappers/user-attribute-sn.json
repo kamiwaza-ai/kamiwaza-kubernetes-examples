@@ -1,0 +1,10 @@
+{
+  "name": "ldap-attribute-sn",
+  "providerId": "user-attribute-ldap-mapper",
+  "providerType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+  "config": {
+    "ldap.attribute": ["sn"],
+    "user.model.attribute": ["lastName"],
+    "read.only": ["true"]
+  }
+}

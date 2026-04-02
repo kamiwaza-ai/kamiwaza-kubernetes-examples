@@ -1,0 +1,5 @@
+# Merge into deploy/cluster/values/overrides.yaml when your environment has auth disabled
+# (e.g. lite) but you need Keycloak for LDAP federation.
+
+auth:
+  enabled: true

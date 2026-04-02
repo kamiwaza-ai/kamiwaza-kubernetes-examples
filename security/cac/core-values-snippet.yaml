@@ -1,0 +1,107 @@
+# Merge this block into Deploy `cluster/values/overrides.yaml` (or another higher-priority values file).
+#
+# Required secrets in namespace `kamiwaza` before sync:
+#   - auth-gateway-edge (key: secret)
+#   - traefik-client-ca (contains client CA cert(s), e.g. ca.crt)
+#
+# IMPORTANT: `X-Edge-Auth` in `cac-edge-auth` middleware MUST exactly match
+# Secret `auth-gateway-edge` key `secret` (cleartext).
+
+core:
+  scheduler:
+    extraEnv:
+      - name: AUTH_GATEWAY_CAC_ENABLED
+        value: "true"
+      - name: AUTH_GATEWAY_MTLS_REQUIRED
+        value: "true"
+      - name: AUTH_GATEWAY_CAC_ALLOWED_ISSUERS
+        value: '["REPLACE_WITH_RFC2253_ISSUER_DN"]'
+      - name: AUTH_GATEWAY_CAC_CLIENT_CERT_HEADER
+        value: "X-Forwarded-Tls-Client-Cert"
+      - name: AUTH_GATEWAY_CAC_CLIENT_CERT_VERIFIED_HEADER
+        value: "X-Forwarded-Tls-Client-Cert-Verified"
+      - name: AUTH_GATEWAY_CAC_EDGE_HEADER
+        value: "X-Edge-Auth"
+      - name: AUTH_GATEWAY_EDGE_SHARED_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: auth-gateway-edge
+            key: secret
+
+network:
+  traefik:
+    tlsOptions:
+      mtls:
+        minVersion: VersionTLS12
+        clientAuth:
+          secretNames:
+            - traefik-client-ca
+          clientAuthType: RequireAndVerifyClientCert
+
+    extraObjects:
+      - apiVersion: traefik.io/v1alpha1
+        kind: Middleware
+        metadata:
+          name: cac-strip-auth-headers
+          namespace: kamiwaza
+        spec:
+          headers:
+            customRequestHeaders:
+              X-Forwarded-Tls-Client-Cert: ""
+              X-Forwarded-Tls-Client-Cert-Verified: ""
+              X-Edge-Auth: ""
+              X-User-Id: ""
+              X-User-Email: ""
+              X-User-Name: ""
+              X-User-Roles: ""
+              X-User-Signature: ""
+              X-User-Signature-Ts: ""
+
+      - apiVersion: traefik.io/v1alpha1
+        kind: Middleware
+        metadata:
+          name: cac-pass-client-cert
+          namespace: kamiwaza
+        spec:
+          passTLSClientCert:
+            pem: true
+
+      - apiVersion: traefik.io/v1alpha1
+        kind: Middleware
+        metadata:
+          name: cac-edge-auth
+          namespace: kamiwaza
+        spec:
+          headers:
+            customRequestHeaders:
+              X-Forwarded-Tls-Client-Cert-Verified: "SUCCESS"
+              X-Edge-Auth: "REPLACE_WITH_EDGE_SHARED_SECRET"
+
+      - apiVersion: traefik.io/v1alpha1
+        kind: IngressRoute
+        metadata:
+          name: core-auth-cac-login
+          namespace: kamiwaza
+        spec:
+          entryPoints:
+            - websecure
+          routes:
+            - match: Host(`kamiwaza.test`) && (Path(`/api/auth/cac/login`) || Path(`/api/auth/cac/login/`)) && Method(`POST`)
+              kind: Rule
+              priority: 1205
+              middlewares:
+                - name: core-headers
+                  namespace: kamiwaza
+                - name: cac-strip-auth-headers
+                  namespace: kamiwaza
+                - name: cac-pass-client-cert
+                  namespace: kamiwaza
+                - name: cac-edge-auth
+                  namespace: kamiwaza
+              services:
+                - name: core-raycluster-head-svc
+                  port: 7777
+          tls:
+            options:
+              name: mtls
+              namespace: kamiwaza

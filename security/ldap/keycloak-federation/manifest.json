@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "description": "Declarative LDAP user federation for Keycloak (kamiwaza realm) against in-cluster OpenLDAP. See ../docs/OPERATOR_GUIDE.md. apply-keycloak-ldap.sh creates/updates the LDAP provider, mappers in mappers[], and group->realm role mappings in group_role_mappings.",
+  "realm": "kamiwaza",
+  "ldap_provider": {
+    "name": "Enterprise LDAP",
+    "provider_id": "ldap",
+    "provider_type": "org.keycloak.storage.UserStorageProvider",
+    "config_file": "ldap-provider.json"
+  },
+  "mappers": [
+    {
+      "name": "ldap-groups",
+      "file": "mappers/group-ldap-mapper.json"
+    },
+    {
+      "name": "ldap-default-user-group",
+      "file": "mappers/hardcoded-default-user-group.json"
+    },
+    {
+      "name": "ldap-attribute-mail",
+      "file": "mappers/user-attribute-mail.json"
+    },
+    {
+      "name": "first name",
+      "file": "mappers/user-attribute-givenName.json"
+    },
+    {
+      "name": "ldap-attribute-sn",
+      "file": "mappers/user-attribute-sn.json"
+    }
+  ],
+  "group_role_mappings": [
+    {
+      "group_name": "user",
+      "realm_role_name": "user"
+    },
+    {
+      "group_name": "admin",
+      "realm_role_name": "admin"
+    }
+  ],
+  "apply": {
+    "sync_after_apply": true,
+    "sync_action": "triggerFullSync"
+  },
+  "revert": {
+    "remove_imported_users_before_delete": true
+  }
+}

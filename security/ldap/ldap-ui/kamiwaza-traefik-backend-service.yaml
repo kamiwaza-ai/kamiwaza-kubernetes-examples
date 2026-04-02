@@ -1,0 +1,18 @@
+# ExternalName bridge: Traefik (kamiwaza ns, namespaced RBAC) → real ldap-ui ClusterIP in ldap ns.
+# Requires Traefik helm allowExternalNameServices: true (set in charts/network).
+apiVersion: v1
+kind: Service
+metadata:
+  name: ldap-ui-proxy
+  namespace: kamiwaza
+  labels:
+    app.kubernetes.io/name: ldap-ui-proxy
+    app.kubernetes.io/part-of: kamiwaza-kubernetes-examples
+spec:
+  type: ExternalName
+  externalName: ldap-ui.ldap.svc.cluster.local
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 80

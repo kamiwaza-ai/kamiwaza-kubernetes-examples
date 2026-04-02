@@ -1,0 +1,8 @@
+{
+  "name": "ldap-default-user-group",
+  "providerId": "hardcoded-ldap-group-mapper",
+  "providerType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+  "config": {
+    "group": ["/user"]
+  }
+}

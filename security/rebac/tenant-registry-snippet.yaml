@@ -1,0 +1,16 @@
+# Example `configs/rebac/tenant_registry.yaml` in the **Kamiwaza** repo after adding a lab tenant.
+# Replace / merge with your real registry; keep `__default__` unless you know you do not need it.
+#
+# When `AUTH_TENANT_REGISTRY_ENFORCED=true`, requests with a JWT tenant_id not listed here
+# are rejected (see `kamiwaza.services.authz.tenant_registry`).
+#
+# This file is NOT applied with `kubectl apply` — it ships inside the application image under
+# `/app/configs/rebac/` or is overridden via `AUTH_TENANT_REGISTRY_PATH` + volume mount.
+
+tenants:
+  - id: "__default__"
+    name: "Default Tenant"
+    description: "Bootstrap tenant for single-tenant / dev installs"
+  - id: "acme-lab"
+    name: "ACME Lab"
+    description: "Second tenant — example from kamiwaza-kubernetes-examples"

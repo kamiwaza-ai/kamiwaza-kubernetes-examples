@@ -1,0 +1,80 @@
+# Pre-commit for **this directory only** (Kubernetes examples).
+#
+# Vendored in Deploy monorepo (git root = deploy):
+#   pre-commit install --config kamiwaza-kubernetes-examples/.pre-commit-config.yaml
+#   make pre-commit-install    # from deploy root
+#
+# Standalone clone (git root = this repo):
+#   pre-commit install
+#
+# Run hooks:
+#   pre-commit run --config kamiwaza-kubernetes-examples/.pre-commit-config.yaml --all-files
+#   make lint-pre-commit       # from deploy root
+#
+# Paths match either:
+#   kamiwaza-kubernetes-examples/security/...   (monorepo)
+#   security/...                               (standalone examples repo)
+ci:
+  autoupdate_schedule: quarterly
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+        files: ^(kamiwaza-kubernetes-examples/)?(README\.md|\.gitignore|\.yamllint|\.prettier.*|\.pre-commit-config\.yaml|security/)
+      - id: trailing-whitespace
+        exclude_types: [markdown]
+        files: ^(kamiwaza-kubernetes-examples/)?(README\.md|\.gitignore|\.yamllint|\.prettier.*|\.pre-commit-config\.yaml|security/)
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        files: ^(kamiwaza-kubernetes-examples/)?(README\.md|\.gitignore|\.yamllint|\.prettier.*|\.pre-commit-config\.yaml|security/)
+      - id: check-merge-conflict
+        files: ^(kamiwaza-kubernetes-examples/)?(README\.md|security/)
+      - id: detect-private-key
+        files: ^(kamiwaza-kubernetes-examples/)?security/
+      - id: check-added-large-files
+        args: [--maxkb=800]
+        files: ^(kamiwaza-kubernetes-examples/)?security/
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+        files: ^(kamiwaza-kubernetes-examples/)?security/.*\.ya?ml$
+
+  - repo: local
+    hooks:
+      - id: yamllint-examples
+        name: yamllint
+        language: python
+        additional_dependencies: [yamllint==1.38.0]
+        entry: bash
+        args:
+          - -c
+          - |
+              REPO="$(git rev-parse --show-toplevel)"
+              CFG="$REPO/kamiwaza-kubernetes-examples/.yamllint"
+              [[ -f "$CFG" ]] || CFG="$REPO/.yamllint"
+              exec yamllint -c "$CFG" "$@"
+          - bash
+        types: [yaml]
+        files: ^(kamiwaza-kubernetes-examples/)?security/.*\.ya?ml$
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        types_or: [yaml, markdown]
+        files: ^(kamiwaza-kubernetes-examples/)?(README\.md|security/)
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        args: [-e, SC1091, -S, error]
+        files: ^(kamiwaza-kubernetes-examples/)?security/.*\.sh$
+
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.9.0-1
+    hooks:
+      - id: shfmt
+        args: [-w, -s, -i, "2"]
+        files: ^(kamiwaza-kubernetes-examples/)?security/.*\.sh$

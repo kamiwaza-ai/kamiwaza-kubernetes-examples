@@ -1,0 +1,8 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ldap
+  labels:
+    app.kubernetes.io/name: openldap-lab
+    app.kubernetes.io/part-of: kamiwaza-kubernetes-examples
