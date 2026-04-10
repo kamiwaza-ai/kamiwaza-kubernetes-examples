@@ -1,0 +1,121 @@
+# Helm values for kube-prometheus-stack (Prometheus + Grafana + Alertmanager).
+#
+# Install:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+#     -n monitoring --create-namespace -f kube-prometheus-stack-values.yaml
+
+crds:
+  enabled: true
+
+defaultRules:
+  create: true
+  rules:
+    alertmanager: true
+    etcd: false
+    kubernetesSystem: true
+    kubeProxy: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+
+prometheus:
+  prometheusSpec:
+    retention: 14d
+    retentionSize: "18GB"
+    # Scrape all ServiceMonitors/PodMonitors cluster-wide (no label selector).
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+
+grafana:
+  enabled: true
+  defaultDashboardsEnabled: true
+  defaultDashboardsTimezone: browser
+
+  grafana.ini:
+    analytics:
+      reporting_enabled: false
+      check_for_updates: false
+
+  # Sidecar: watches for ConfigMaps labelled grafana_dashboard="1" and
+  # loads them as dashboard JSON files. The grafana_folder annotation
+  # controls folder placement in the Grafana UI.
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: true
+
+  # Loki datasource for log panels in Kamiwaza dashboards.
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      url: http://loki.monitoring.svc.cluster.local:3100
+      access: proxy
+      isDefault: false
+      jsonData:
+        maxLines: 5000
+
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: default
+          orgId: 1
+          folder: Kubernetes
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+        - name: kamiwaza
+          orgId: 1
+          folder: Kamiwaza
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/kamiwaza
+
+  # Community dashboards from grafana.com.
+  dashboards:
+    default:
+      node-exporter-full:
+        gnetId: 1860
+        revision: 37
+        datasource: Prometheus
+      k8s-cluster-overview:
+        gnetId: 7249
+        revision: 1
+        datasource: Prometheus
+      pvc-usage:
+        gnetId: 13646
+        revision: 2
+        datasource: Prometheus
+
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true
+kube-state-metrics:
+  metricLabelsAllowlist:
+    - configmaps=[kamiwaza.io/template-name,kamiwaza.io/template-version]
+
+kubelet:
+  enabled: true
+
+# Not exposed on most lightweight distributions (k3s, k0s). Enable if your
+# cluster exposes these control-plane endpoints.
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false

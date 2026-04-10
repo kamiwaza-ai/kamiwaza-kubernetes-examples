@@ -1,0 +1,672 @@
+{
+  "uid": "kam-08",
+  "title": "Unified Log Explorer",
+  "description": "Pre-built LogQL queries for all Kamiwaza services. Use the variables to filter by service, level, and namespace. Click a pre-built query panel title to explore in Grafana Explore.",
+  "tags": [
+    "kamiwaza",
+    "logs",
+    "loki"
+  ],
+  "schemaVersion": 38,
+  "version": 1,
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "weekStart": "",
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "graphTooltip": 1,
+  "links": [
+    {
+      "title": "\u2190 Platform Overview",
+      "url": "/d/kam-01",
+      "type": "link",
+      "targetBlank": false
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "loki_datasource",
+        "type": "datasource",
+        "query": "loki",
+        "current": {},
+        "hide": 0,
+        "label": "Loki",
+        "multi": false,
+        "refresh": 1
+      },
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0,
+        "label": "Prometheus",
+        "multi": false,
+        "refresh": 1
+      },
+      {
+        "name": "service",
+        "type": "custom",
+        "label": "Service",
+        "hide": 0,
+        "current": {
+          "text": "all-services",
+          "value": ".+"
+        },
+        "options": [
+          {
+            "text": "all-services",
+            "value": ".+"
+          },
+          {
+            "text": "core-scheduler",
+            "value": "core"
+          },
+          {
+            "text": "ray",
+            "value": "ray"
+          },
+          {
+            "text": "core-etcd",
+            "value": "core-etcd"
+          },
+          {
+            "text": "core-postgres",
+            "value": "core-postgres"
+          },
+          {
+            "text": "keycloak",
+            "value": "keycloak"
+          },
+          {
+            "text": "extension-operator",
+            "value": "manager"
+          },
+          {
+            "text": "kaizen-backend",
+            "value": "kaizenv3-backend"
+          },
+          {
+            "text": "kaizen-frontend",
+            "value": "kaizenv3-frontend"
+          },
+          {
+            "text": "kaizen-sandbox-controller",
+            "value": "kaizenv3-sandbox-controller"
+          },
+          {
+            "text": "argocd",
+            "value": "argocd-application-controller"
+          },
+          {
+            "text": "grafana",
+            "value": "grafana"
+          },
+          {
+            "text": "prometheus",
+            "value": "prometheus"
+          },
+          {
+            "text": "loki",
+            "value": "loki"
+          },
+          {
+            "text": "alloy",
+            "value": "alloy"
+          }
+        ],
+        "multi": false,
+        "includeAll": false
+      },
+      {
+        "name": "namespace",
+        "type": "custom",
+        "label": "Namespace",
+        "hide": 0,
+        "current": {
+          "text": "kamiwaza",
+          "value": "kamiwaza"
+        },
+        "options": [
+          {
+            "text": "kamiwaza",
+            "value": "kamiwaza"
+          },
+          {
+            "text": "kamiwaza-extensions",
+            "value": "kamiwaza-extensions"
+          },
+          {
+            "text": "kamiwaza-sandboxes",
+            "value": "kamiwaza-sandboxes"
+          },
+          {
+            "text": "kamiwaza-system",
+            "value": "kamiwaza-system"
+          },
+          {
+            "text": "monitoring",
+            "value": "monitoring"
+          },
+          {
+            "text": "argocd",
+            "value": "argocd"
+          }
+        ],
+        "multi": false,
+        "includeAll": false
+      },
+      {
+        "name": "level",
+        "type": "custom",
+        "label": "Min Level",
+        "hide": 0,
+        "current": {
+          "text": "error",
+          "value": "(?i)(error|critical|fatal|panic)"
+        },
+        "options": [
+          {
+            "text": "all",
+            "value": ""
+          },
+          {
+            "text": "error",
+            "value": "(?i)(error|critical|fatal|panic)"
+          },
+          {
+            "text": "warn+error",
+            "value": "(?i)(warn|error|critical|fatal|panic)"
+          },
+          {
+            "text": "info+",
+            "value": "(?i)(info|warn|error|critical|fatal)"
+          }
+        ],
+        "multi": false,
+        "includeAll": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Log Volume Overview",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Log Rate by Namespace (lines/sec)",
+      "description": "Volume of log lines over time \u2014 spikes indicate activity bursts or log storms. Automatically includes all Kamiwaza namespaces and argocd.",
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 12,
+        "h": 6
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki_datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "expr": "sum by (namespace) (rate({namespace=~\"kamiwaza|kamiwaza-extensions|kamiwaza-sandboxes|kamiwaza-system|argocd|monitoring\"}[5m]))",
+          "legendFormat": "{{namespace}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "mean"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "stacking": {
+              "mode": "normal"
+            },
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Error Log Rate by Service",
+      "description": "How many error lines each service is producing per second",
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 12,
+        "h": 6
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki_datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "expr": "sum(rate({namespace=\"kamiwaza\"} |~ \"(?i)(error|fatal|critical)\" [5m])) by (container)",
+          "legendFormat": "{{container}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "expr": "sum(rate({namespace=~\"kamiwaza-extensions|kamiwaza-sandboxes\"} |~ \"(?i)(error|fatal|critical)\" [5m])) by (namespace)",
+          "legendFormat": "{{namespace}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "row",
+      "title": "Filtered Log Stream",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 5,
+      "type": "logs",
+      "title": "Log Stream (namespace=${namespace}, service filter=${service}, level=${level})",
+      "description": "Main log stream \u2014 adjust variables above to filter. Empty 'service' shows all containers.",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 12
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki_datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "expr": "{namespace=\"${namespace}\", container=~\"${service}.*\"} |~ \"${level}\"",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "maxDataPoints": 200
+    },
+    {
+      "id": 6,
+      "type": "row",
+      "title": "Pre-Built Diagnostic Queries",
+      "collapsed": true,
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [
+        {
+          "id": 7,
+          "type": "logs",
+          "title": "All Errors \u2014 All Kamiwaza Namespaces",
+          "gridPos": {
+            "x": 0,
+            "y": 21,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "${loki_datasource}"
+              },
+              "expr": "{namespace=~\"kamiwaza.*\"} |~ \"(?i)(error|fatal|critical|panic|exception|traceback)\"",
+              "legendFormat": ""
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none"
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "maxDataPoints": 100
+        },
+        {
+          "id": 8,
+          "type": "logs",
+          "title": "Auth Failures (401 / 403 / unauthorized)",
+          "gridPos": {
+            "x": 12,
+            "y": 21,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "${loki_datasource}"
+              },
+              "expr": "{namespace=~\"kamiwaza.*\"} |~ \"(?i)( 401 | 403 |status[=: \\\"]*40[13]|unauthorized|forbidden|invalid.token|authentication.failed)\"",
+              "legendFormat": ""
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none"
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "maxDataPoints": 100
+        },
+        {
+          "id": 9,
+          "type": "logs",
+          "title": "etcd Leader Changes & Elections",
+          "gridPos": {
+            "x": 0,
+            "y": 29,
+            "w": 12,
+            "h": 6
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "${loki_datasource}"
+              },
+              "expr": "{namespace=\"kamiwaza\", container=\"etcd\"} |~ \"(?i)(became.leader|leader|election|campaign|raft)\"",
+              "legendFormat": ""
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none"
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "maxDataPoints": 100
+        },
+        {
+          "id": 10,
+          "type": "logs",
+          "title": "Ray Worker Crashes & Fatal Errors",
+          "gridPos": {
+            "x": 12,
+            "y": 29,
+            "w": 12,
+            "h": 6
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "${loki_datasource}"
+              },
+              "expr": "{namespace=\"kamiwaza\", container=~\"ray.*\"} |~ \"(?i)(fatal|crash|traceback|oom|out of memory|worker died|worker failed)\"",
+              "legendFormat": ""
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none"
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "maxDataPoints": 100
+        },
+        {
+          "id": 11,
+          "type": "logs",
+          "title": "OOMKill Events (Kubernetes Events)",
+          "gridPos": {
+            "x": 0,
+            "y": 35,
+            "w": 12,
+            "h": 6
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "${loki_datasource}"
+              },
+              "expr": "{job=\"integrations/kubernetes/eventhandler\"} |= \"OOMKill\"",
+              "legendFormat": ""
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none"
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "maxDataPoints": 100
+        },
+        {
+          "id": 12,
+          "type": "logs",
+          "title": "ArgoCD Sync Failures",
+          "gridPos": {
+            "x": 12,
+            "y": 35,
+            "w": 12,
+            "h": 6
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "${loki_datasource}"
+              },
+              "expr": "{namespace=\"argocd\"} |~ \"(?i)(sync.failed|error|ComparisonError|hook.failed)\"",
+              "legendFormat": ""
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none"
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "maxDataPoints": 100
+        }
+      ]
+    }
+  ]
+}

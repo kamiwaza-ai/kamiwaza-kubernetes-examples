@@ -45,16 +45,24 @@ Use your organization’s fork or this copy when vendored inside the Deploy mono
 
 Category indexes:
 
-- **Security matrix:** [security/README.md](security/README.md)
-- **Deployment matrix:** [deployment/README.md](deployment/README.md)
+- **Deployment:** [deployment/README.md](deployment/README.md)
+- **Monitoring:** [monitoring/README.md](monitoring/README.md)
+- **Networking:** [networking/README.md](networking/README.md)
+- **Operations:** [operations/README.md](operations/README.md)
+- **Security:** [security/README.md](security/README.md)
+- **Troubleshooting:** [troubleshooting/README.md](troubleshooting/README.md)
 
-| Scenario                                            | Path                                                           | Tags                                |
-| --------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------- |
-| Environment profile matrix (lite/full/dev/dev-full) | [deployment/env-profile-matrix](deployment/env-profile-matrix) | #deployment #topology #helmfile     |
-| Consent modal + classification banners              | [security/consent-banner](security/consent-banner)             | #security #compliance #helm-values  |
-| CAC / PIV login (mTLS forwarding)                   | [security/cac](security/cac)                                   | #security #cac #mtls #helm-values   |
-| ReBAC (relationship-based access control)           | [security/rebac](security/rebac)                               | #security #rebac #auth #helm-values |
-| LDAP + Keycloak federation                          | [security/ldap](security/ldap)                                 | #security #ldap #keycloak           |
+| Scenario                                            | Path                                                                             | Tags                                         |
+| --------------------------------------------------- | -------------------------------------------------------------------------------- | -------------------------------------------- |
+| Environment profile matrix (lite/full/dev/dev-full) | [deployment/env-profile-matrix](deployment/env-profile-matrix)                   | #deployment #topology #helmfile              |
+| Grafana + Prometheus monitoring                     | [monitoring/grafana-prometheus](monitoring/grafana-prometheus)                    | #monitoring #prometheus #grafana #loki        |
+| Service access patterns                             | [networking/external-access](networking/external-access)                         | #networking #port-forward #ingress            |
+| Backup and restore                                  | [operations/backup-restore](operations/backup-restore)                           | #operations #backup #postgres #etcd           |
+| Consent modal + classification banners              | [security/consent-banner](security/consent-banner)                               | #security #compliance #helm-values           |
+| CAC / PIV login (mTLS forwarding)                   | [security/cac](security/cac)                                                     | #security #cac #mtls #helm-values            |
+| ReBAC (relationship-based access control)           | [security/rebac](security/rebac)                                                 | #security #rebac #auth #helm-values          |
+| LDAP + Keycloak federation                          | [security/ldap](security/ldap)                                                   | #security #ldap #keycloak                    |
+| Diagnostic commands                                 | [troubleshooting/diagnostic-commands](troubleshooting/diagnostic-commands)       | #troubleshooting #diagnostics #health-check   |
 
 ---
 
