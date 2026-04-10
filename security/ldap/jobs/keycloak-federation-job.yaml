@@ -10,6 +10,14 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      # Reduce ndots so external DNS (apt repos) resolves before cluster search
+      # domains are tried.  Cluster-local FQDNs use a trailing dot and are
+      # unaffected.  Without this, clusters whose node search domain has a
+      # wildcard record (e.g. *.example.com) may hijack apt/pip hostnames.
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
         - name: apply
           image: ubuntu:24.04
@@ -35,7 +43,7 @@ spec:
               chmod +x /work/apply-keycloak-ldap.sh
 
               echo "Waiting for Keycloak readiness..."
-              until curl -fsS "http://keycloak.kamiwaza.svc.cluster.local:9000/health/ready" >/dev/null 2>&1; do
+              until curl -fsS "http://keycloak.kamiwaza.svc.cluster.local.:8080/health/ready" >/dev/null 2>&1; do
                 sleep 5
               done
 
@@ -43,7 +51,7 @@ spec:
               ./apply-keycloak-ldap.sh
           env:
             - name: KEYCLOAK_URL
-              value: "http://keycloak.kamiwaza.svc.cluster.local:8080"
+              value: "http://keycloak.kamiwaza.svc.cluster.local.:8080"
             - name: KEYCLOAK_ADMIN
               value: "admin"
             - name: KEYCLOAK_ADMIN_PASSWORD

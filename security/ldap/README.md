@@ -27,7 +27,7 @@ cd keycloak-federation
 | **Federation bundle** | `keycloak-federation/`                                                   | Declarative Keycloak LDAP provider + mappers + apply/validate/revert scripts |
 | **Sample data**       | `ldap-samples/`                                                          | Optional LDIF data for labs (`bootstrap.ldif`, `user-template.ldif`)         |
 | **Runbook**           | `docs/OPERATOR_GUIDE.md`                                                 | Canonical operator narrative and troubleshooting                             |
-| **Values snippet**    | `values-snippet.yaml`                                                    | Enables `auth.enabled: true` when needed for federation                      |
+| **Values snippet**    | `values-snippet.yaml`                                                    | Re-enables auth (Keycloak + core integration) when needed for federation     |
 
 ## Prerequisites
 

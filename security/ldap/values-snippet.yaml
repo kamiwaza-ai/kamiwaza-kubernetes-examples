@@ -1,5 +1,12 @@
 # Merge into deploy/cluster/values/overrides.yaml when your environment has auth disabled
 # (e.g. lite) but you need Keycloak for LDAP federation.
+#
+# Lite mode disables both `auth.enabled` (Keycloak subchart) and `core.auth.enabled`
+# (core scheduler's Keycloak integration). Both must be re-enabled for federation.
+
+core:
+  auth:
+    enabled: true
 
 auth:
   enabled: true

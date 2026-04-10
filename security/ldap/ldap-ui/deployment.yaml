@@ -39,7 +39,7 @@ spec:
               name: http
           env:
             - name: LDAP_URI
-              value: "ldap://openldap.ldap.svc.cluster.local"
+              value: "ldap://openldap.ldap.svc.cluster.local."
             - name: LDAP_BASE_DN
               value: "dc=kamiwaza,dc=local"
             - name: LDAP_ADMIN_BIND_DN

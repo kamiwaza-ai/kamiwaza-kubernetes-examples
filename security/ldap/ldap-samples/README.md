@@ -4,7 +4,7 @@
 
 | File                     | Use                                                                                                                |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| **`bootstrap.ldif`**     | Richer entries (e.g. `title`, `manager`) on top of the minimal data loaded by the **`ldap-bootstrap-import`** Job. |
+| **`bootstrap.ldif`**     | Alternative entries with richer attributes (e.g. `title`, `manager`). If the **`ldap-bootstrap-import`** Job already ran, `ldapadd -c` skips existing DNs; use before the Job or on a fresh directory. |
 | **`user-template.ldif`** | Pattern for new users; fill placeholders, then `ldapmodify`.                                                       |
 
 Do not treat demo passwords or DNs as production-ready.

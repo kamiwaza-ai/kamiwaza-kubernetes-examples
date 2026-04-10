@@ -10,6 +10,10 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
         - name: bootstrap
           image: osixia/openldap:1.5.0
@@ -19,14 +23,14 @@ spec:
             - |
               set -eu
               echo "Waiting for OpenLDAP service..."
-              until ldapsearch -x -H ldap://openldap.ldap.svc.cluster.local:389 \
+              until ldapsearch -x -H ldap://openldap.ldap.svc.cluster.local.:389 \
                 -D "cn=admin,dc=kamiwaza,dc=local" -w "$LDAP_ADMIN_PASSWORD" \
                 -b "dc=kamiwaza,dc=local" -s base "(objectClass=*)" dn >/dev/null 2>&1; do
                 sleep 3
               done
               echo "Importing bootstrap LDIF (idempotent)..."
               set +e
-              OUT="$(ldapadd -x -c -H ldap://openldap.ldap.svc.cluster.local:389 \
+              OUT="$(ldapadd -x -c -H ldap://openldap.ldap.svc.cluster.local.:389 \
                 -D "cn=admin,dc=kamiwaza,dc=local" -w "$LDAP_ADMIN_PASSWORD" \
                 -f /bootstrap/bootstrap.ldif 2>&1)"
               RC=$?

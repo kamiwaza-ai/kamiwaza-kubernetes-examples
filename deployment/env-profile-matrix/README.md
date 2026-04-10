@@ -36,7 +36,7 @@ helm list -n kamiwaza
 kubectl -n kamiwaza get deploy | grep -E 'keycloak|datahub|core-scheduler|frontend'
 
 # Hot-reload hint (dev/dev-full): scheduler should carry dev mounts/env from hotreload values
-kubectl -n kamiwaza get deploy core-scheduler -o yaml | grep -E 'extraVolumeMounts|KAMIWAZA_DEBUG|watch|hotreload'
+kubectl -n kamiwaza get deploy core-scheduler -o yaml | grep -E 'KAMIWAZA_HOT_RELOAD|extraVolumeMounts|hostPath'
 ```
 
 ## Notes
