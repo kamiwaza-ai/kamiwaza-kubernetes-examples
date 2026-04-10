@@ -1,0 +1,29 @@
+# Additive NetworkPolicy allowing the monitoring namespace to reach Keycloak:
+#   port 9000 — management/metrics endpoint (Prometheus ServiceMonitor)
+#   port 8080 — Admin REST API (Grafana Infinity datasource for active-user panels)
+# NetworkPolicies are additive — this does not override existing Keycloak policies.
+# Only needed when Keycloak has a default-deny or restrictive NetworkPolicy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keycloak-allow-prometheus-scrape
+  namespace: kamiwaza
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/part-of: kamiwaza
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 9000
+          protocol: TCP
+        - port: 8080
+          protocol: TCP

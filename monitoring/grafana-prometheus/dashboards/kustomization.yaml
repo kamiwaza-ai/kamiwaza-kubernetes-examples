@@ -1,0 +1,43 @@
+# Wraps each dashboard JSON as a ConfigMap with the grafana_dashboard label.
+# Grafana's sidecar (enabled in kube-prometheus-stack-values.yaml) auto-loads
+# any ConfigMap with label grafana_dashboard="1" as a dashboard file.
+#
+# Apply:
+#   kubectl apply -k monitoring/grafana-prometheus/dashboards/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: Kamiwaza
+
+configMapGenerator:
+  - name: kam-01-platform-overview
+    files:
+      - kam-01-platform-overview.json
+  - name: kam-02-inference-ray
+    files:
+      - kam-02-inference-ray.json
+  - name: kam-03-core-api-scheduler
+    files:
+      - kam-03-core-api-scheduler.json
+  - name: kam-04-data-infrastructure
+    files:
+      - kam-04-data-infrastructure.json
+  - name: kam-05-extensions-kaizen
+    files:
+      - kam-05-extensions-kaizen.json
+  - name: kam-06-auth-identity
+    files:
+      - kam-06-auth-identity.json
+  - name: kam-07-kubernetes-events
+    files:
+      - kam-07-kubernetes-events.json
+  - name: kam-08-log-explorer
+    files:
+      - kam-08-log-explorer.json

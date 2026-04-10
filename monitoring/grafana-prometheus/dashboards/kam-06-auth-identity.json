@@ -1,0 +1,1174 @@
+{
+  "uid": "kam-06",
+  "title": "Auth & Identity",
+  "tags": [
+    "kamiwaza",
+    "auth",
+    "keycloak"
+  ],
+  "schemaVersion": 38,
+  "version": 1,
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "weekStart": "",
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "graphTooltip": 1,
+  "links": [
+    {
+      "title": "\u2190 Platform Overview",
+      "url": "/d/kam-01",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Log Explorer",
+      "url": "/d/kam-08",
+      "type": "link",
+      "targetBlank": false
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0,
+        "label": "Prometheus",
+        "multi": false,
+        "refresh": 1
+      },
+      {
+        "name": "loki_datasource",
+        "type": "datasource",
+        "query": "loki",
+        "current": {},
+        "hide": 0,
+        "label": "Loki",
+        "multi": false,
+        "refresh": 1
+      },
+      {
+        "name": "infinity_datasource",
+        "type": "datasource",
+        "query": "yesoreyeram-infinity-datasource",
+        "current": {},
+        "hide": 0,
+        "label": "Keycloak Admin",
+        "multi": false,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Auth Service Status",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Keycloak",
+      "description": "Prometheus scrape target. Shows DISABLED/DOWN when auth.enabled=false or Keycloak is unreachable.",
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 4,
+        "h": 3
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(up{job=\"keycloak\"}) or vector(0)",
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DISABLED / DOWN"
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Active Sessions",
+      "description": "Current active Keycloak sessions. Keycloak 26 exposes session counts via Infinispan cache stats (vendor_statistics_approximate_entries_unique{cache=\"sessions\"}).",
+      "gridPos": {
+        "x": 4,
+        "y": 1,
+        "w": 4,
+        "h": 3
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(vendor_statistics_approximate_entries_unique{job=\"keycloak\", cache=\"sessions\"}) or vector(0)",
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Logins",
+      "description": "Successful token grants (POST /token with HTTP 200) in the selected time window. Keycloak 26 logs successful LOGIN events at DEBUG level only, so Prometheus is more reliable than logs.",
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 4,
+        "h": 3
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "increase(http_server_requests_seconds_count{job=\"keycloak\", method=\"POST\", outcome=\"SUCCESS\", status=\"200\", uri=\"/realms/{realm}/protocol/{protocol}/token\"}[$__range])",
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Auth Errors",
+      "description": "All *_ERROR events (LOGIN_ERROR, LOGOUT_ERROR, etc.) in the selected time window.",
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 4,
+        "h": 3
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki_datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "expr": "sum(count_over_time({namespace=\"kamiwaza\", container=\"keycloak\"} |= \"org.keycloak.events\" |= \"_ERROR\" [$__range]))",
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 20
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "0",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Soonest Cert Expiry",
+      "description": "Days until the nearest cert-manager certificate expires. Red = action required.",
+      "gridPos": {
+        "x": 16,
+        "y": 1,
+        "w": 4,
+        "h": 3
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "min((certmanager_certificate_expiration_timestamp_seconds - time()) / 86400)",
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "d",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 14
+              },
+              {
+                "color": "green",
+                "value": 30
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Platform Auth Failures (1h)",
+      "description": "HTTP auth failures (401/403/unauthorized) across all kamiwaza namespaces in the last hour. Excludes debug response-body logs that contain auth-related strings but are not themselves failures.",
+      "gridPos": {
+        "x": 20,
+        "y": 1,
+        "w": 4,
+        "h": 3
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki_datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "expr": "sum(count_over_time({namespace=~\"kamiwaza.*\"} != \"response body\" |~ \"(?i)( 401 | 403 |status[=: \\\"]*40[13]|unauthorized|forbidden|authentication.failed|invalid.token)\" [1h]))",
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 10
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "0",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Auth Activity",
+      "description": "Login and logout rates from Prometheus (http_server_requests_seconds_count on the token/logout endpoints). Auth errors from Loki (WARN-level events which Keycloak always emits). Keycloak 26 emits successful LOGIN/LOGOUT events at DEBUG level only, making them unavailable in Loki without reconfiguring event logging.",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(http_server_requests_seconds_count{job=\"keycloak\", method=\"POST\", outcome=\"SUCCESS\", status=\"200\", uri=\"/realms/{realm}/protocol/{protocol}/token\"}[5m])",
+          "legendFormat": "Logins"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(http_server_requests_seconds_count{job=\"keycloak\", method=\"POST\", outcome=\"CLIENT_ERROR\", uri=\"/realms/{realm}/protocol/{protocol}/token\"}[5m])",
+          "legendFormat": "Auth Errors"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(http_server_requests_seconds_count{job=\"keycloak\", method=\"POST\", outcome=\"SUCCESS\", status=\"204\", uri=\"/realms/{realm}/protocol/{protocol}/logout\"}[5m])",
+          "legendFormat": "Logouts"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "gradientMode": "opacity",
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "ops"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Auth Errors"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Logins"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Logouts"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "type": "row",
+      "title": "Audit Trail",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Login & Logout Rate",
+      "description": "Token grants (logins) and logouts per second from Keycloak's HTTP server metrics. Keycloak 26 emits successful LOGIN/LOGOUT events at DEBUG level only \u2014 they are not available as log lines without setting KC_LOG_LEVEL_ORG_KEYCLOAK_EVENTS=info.",
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 12,
+        "h": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(http_server_requests_seconds_count{job=\"keycloak\", method=\"POST\", outcome=\"SUCCESS\", status=\"200\", uri=\"/realms/{realm}/protocol/{protocol}/token\"}[5m])",
+          "legendFormat": "Logins (token grants)"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(http_server_requests_seconds_count{job=\"keycloak\", method=\"POST\", outcome=\"SUCCESS\", status=\"204\", uri=\"/realms/{realm}/protocol/{protocol}/logout\"}[5m])",
+          "legendFormat": "Logouts"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(http_server_requests_seconds_count{job=\"keycloak\", method=\"POST\", outcome=\"CLIENT_ERROR\", uri=\"/realms/{realm}/protocol/{protocol}/token\"}[5m])",
+          "legendFormat": "Failed logins (4xx)"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "gradientMode": "opacity",
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failed logins (4xx)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Logins (token grants)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "type": "logs",
+      "title": "Auth Errors",
+      "description": "All *_ERROR events (LOGIN_ERROR, LOGOUT_ERROR, REGISTER_ERROR, etc.). Expand a line to see error type, client, and source IP.",
+      "gridPos": {
+        "x": 12,
+        "y": 13,
+        "w": 12,
+        "h": 12
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki_datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "expr": "{namespace=\"kamiwaza\", container=\"keycloak\"} |= \"org.keycloak.events\" |= \"_ERROR\"",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "maxDataPoints": 200
+    },
+    {
+      "id": 12,
+      "type": "logs",
+      "title": "Platform HTTP Auth Failures (401 / 403 / unauthorized)",
+      "description": "Auth-related HTTP failures across all kamiwaza namespaces. Excludes debug response-body logs (which contain auth strings but are not failures themselves).",
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki_datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "expr": "{namespace=~\"kamiwaza.*\"} != \"response body\" |~ \"(?i)( 401 | 403 |status[=: \\\"]*40[13]|unauthorized|forbidden|invalid.token|authentication.failed)\"",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "maxDataPoints": 200
+    },
+    {
+      "id": 15,
+      "type": "row",
+      "title": "Active Users",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 33,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 16,
+      "type": "table",
+      "title": "Active Browser Sessions",
+      "description": "Users with a live Keycloak browser session (token not yet expired). Queries the Keycloak Admin REST API via the Infinity datasource. Empty = no active browser sessions right now.",
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "${infinity_datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "${infinity_datasource}"
+          },
+          "type": "json",
+          "source": "url",
+          "url": "/admin/realms/kamiwaza/clients/3410320b-aa34-4c1a-9f31-526fb1b89dc7/user-sessions?max=100",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "parser": "backend",
+          "format": "table",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "username",
+              "text": "Username",
+              "type": "string"
+            },
+            {
+              "selector": "ipAddress",
+              "text": "IP Address",
+              "type": "string"
+            },
+            {
+              "selector": "lastAccess",
+              "text": "Last Access",
+              "type": "timestamp_epoch_ms"
+            },
+            {
+              "selector": "start",
+              "text": "Session Start",
+              "type": "timestamp_epoch_ms"
+            }
+          ]
+        }
+      ],
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Last Access",
+            "desc": true
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "displayMode": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Last Access"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocal"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Session Start"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocal"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 17,
+      "type": "table",
+      "title": "Sessions with Valid Tokens (Offline / Persistent)",
+      "description": "Users who have authenticated and hold a valid offline refresh token (remember-me / persistent sessions). These users can re-authenticate silently without a login prompt. Sorted by most-recent activity.",
+      "gridPos": {
+        "x": 12,
+        "y": 34,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "${infinity_datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "${infinity_datasource}"
+          },
+          "type": "json",
+          "source": "url",
+          "url": "/admin/realms/kamiwaza/clients/3410320b-aa34-4c1a-9f31-526fb1b89dc7/offline-sessions?max=100",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "parser": "backend",
+          "format": "table",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "username",
+              "text": "Username",
+              "type": "string"
+            },
+            {
+              "selector": "ipAddress",
+              "text": "IP Address",
+              "type": "string"
+            },
+            {
+              "selector": "lastAccess",
+              "text": "Last Access",
+              "type": "timestamp_epoch_ms"
+            },
+            {
+              "selector": "start",
+              "text": "Session Start",
+              "type": "timestamp_epoch_ms"
+            }
+          ]
+        }
+      ],
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Last Access",
+            "desc": true
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "displayMode": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Last Access"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocal"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Session Start"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocal"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "type": "row",
+      "title": "Certificate Health",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 44,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 14,
+      "type": "table",
+      "title": "Certificate Expiry",
+      "description": "Days until expiry for all cert-manager managed certificates, sorted soonest first.",
+      "gridPos": {
+        "x": 0,
+        "y": 45,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(certmanager_certificate_expiration_timestamp_seconds - time()) / 86400",
+          "instant": true,
+          "legendFormat": "{{namespace}} / {{name}}",
+          "format": "table"
+        }
+      ],
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "Value",
+            "desc": false
+          }
+        ],
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "displayMode": "auto",
+            "filterable": true
+          },
+          "unit": "d",
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Days Until Expiry"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 14
+                    },
+                    {
+                      "color": "green",
+                      "value": 30
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

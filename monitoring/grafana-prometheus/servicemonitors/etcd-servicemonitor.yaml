@@ -1,0 +1,23 @@
+# ServiceMonitor for etcd metrics.
+# etcd is started with --listen-metrics-urls=http://0.0.0.0:8080,
+# so the etcd-metrics port on the core-etcd service is always available.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: core-etcd
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: core-etcd
+    app.kubernetes.io/part-of: kamiwaza
+spec:
+  namespaceSelector:
+    matchNames:
+      - kamiwaza
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: core-etcd
+  endpoints:
+    - port: etcd-metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

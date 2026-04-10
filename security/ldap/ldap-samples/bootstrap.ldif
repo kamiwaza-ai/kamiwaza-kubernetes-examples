@@ -50,8 +50,8 @@ sn: Engineer
 givenName: Carol
 displayName: Carol Engineer
 mail: carol@users.example.invalid
-uidNumber: 1011
-gidNumber: 1011
+uidNumber: 1003
+gidNumber: 1003
 homeDirectory: /home/carol
 title: Platform Engineer
 departmentNumber: Engineering

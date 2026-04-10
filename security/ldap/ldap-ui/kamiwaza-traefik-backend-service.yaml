@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/part-of: kamiwaza-kubernetes-examples
 spec:
   type: ExternalName
-  externalName: ldap-ui.ldap.svc.cluster.local
+  externalName: ldap-ui.ldap.svc.cluster.local.
   ports:
     - name: http
       port: 80

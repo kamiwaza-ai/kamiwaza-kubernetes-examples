@@ -1,0 +1,24 @@
+# ServiceMonitor for Ray cluster Prometheus metrics.
+# The core-raycluster-headless service exposes port 8080 (metrics-export-port)
+# on all Ray head and worker pods. Being headless, Prometheus discovers and
+# scrapes each pod endpoint individually — useful for per-node Ray metrics.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: core-raycluster
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: core-raycluster
+    app.kubernetes.io/part-of: kamiwaza
+spec:
+  namespaceSelector:
+    matchNames:
+      - kamiwaza
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: core-raycluster
+  endpoints:
+    - port: metrics-export-port
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

@@ -1,0 +1,1285 @@
+{
+  "uid": "kam-01",
+  "title": "Platform Health Overview",
+  "tags": [
+    "kamiwaza"
+  ],
+  "schemaVersion": 38,
+  "version": 1,
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "weekStart": "",
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "graphTooltip": 1,
+  "links": [
+    {
+      "title": "Inference & Ray",
+      "url": "/d/kam-02",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Core API",
+      "url": "/d/kam-03",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Data Infrastructure",
+      "url": "/d/kam-04",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Extensions",
+      "url": "/d/kam-05",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Auth",
+      "url": "/d/kam-06",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "K8s Events",
+      "url": "/d/kam-07",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Log Explorer",
+      "url": "/d/kam-08",
+      "type": "link",
+      "targetBlank": false
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0,
+        "label": "Prometheus",
+        "multi": false,
+        "refresh": 1
+      },
+      {
+        "name": "loki_datasource",
+        "type": "datasource",
+        "query": "loki",
+        "current": {},
+        "hide": 0,
+        "label": "Loki",
+        "multi": false,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Component Health",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Core Scheduler",
+      "description": "1 = serving; 0 = scrape target down or pod not running",
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 4,
+        "h": 3
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "kube_deployment_status_replicas_ready{namespace=\"kamiwaza\", deployment=\"core-scheduler\"} or vector(0)",
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Ray Cluster",
+      "description": "Alive Ray nodes",
+      "gridPos": {
+        "x": 4,
+        "y": 1,
+        "w": 4,
+        "h": 3
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(ray_component_num_alive_nodes{Component=\"GCS\"}) or vector(0)",
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "green",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "etcd",
+      "description": "1 = has leader (healthy); 0 = no leader (cluster unavailable)",
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 4,
+        "h": 3
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "etcd_server_has_leader{job=\"core-etcd\"} or vector(0)",
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "NO LEADER",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "HAS LEADER",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "PostgreSQL Connections",
+      "description": "Active connections to core DB",
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 4,
+        "h": 3
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "pg_stat_activity_count{job=\"postgres-exporter\", datname=\"kamiwaza\"}",
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 80
+              },
+              {
+                "color": "red",
+                "value": 100
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Keycloak",
+      "description": "Auth provider health (only when auth.enabled=true)",
+      "gridPos": {
+        "x": 16,
+        "y": 1,
+        "w": 4,
+        "h": 3
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(up{job=\"keycloak\"}) or vector(0)",
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DISABLED / DOWN"
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Extension Operator",
+      "description": "Ready replicas",
+      "gridPos": {
+        "x": 20,
+        "y": 1,
+        "w": 4,
+        "h": 3
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "kube_deployment_status_replicas_ready{namespace=\"kamiwaza-system\", deployment=\"extension-operator\"} or vector(0)",
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "row",
+      "title": "Golden Signals",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Inference Request Rate (RPS)",
+      "description": "Requests/sec served by Ray Serve deployments",
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(rate(ray_serve_deployment_request_counter_requests_total[5m])) by (deployment_name)",
+          "legendFormat": "{{deployment_name}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "API Error Rate (5xx %)",
+      "description": "Percentage of Ray Serve requests returning errors",
+      "gridPos": {
+        "x": 6,
+        "y": 5,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "100 * sum(rate(ray_serve_deployment_error_counter_requests_total[5m])) / (sum(rate(ray_serve_deployment_request_counter_requests_total[5m])) > 0)",
+          "legendFormat": "Error %"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "fixedColor": "red",
+            "mode": "fixed"
+          },
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Pod Restarts (last 1h)",
+      "description": "Container restarts in kamiwaza & kamiwaza-extensions namespaces",
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "topk(10, increase(kube_pod_container_status_restarts_total{namespace=~\"kamiwaza|kamiwaza-extensions\"}[1h]))",
+          "legendFormat": "{{namespace}}/{{pod}}/{{container}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "auto",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Pods Not Running",
+      "description": "Non-Running pods in kamiwaza namespace right now",
+      "gridPos": {
+        "x": 18,
+        "y": 5,
+        "w": 6,
+        "h": 3
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count(kube_pod_status_phase{namespace=~\"kamiwaza|kamiwaza-extensions\", phase=~\"Pending|Failed|Unknown\"} == 1) or vector(0)",
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "CrashLoopBackOff",
+      "description": "Containers currently in CrashLoopBackOff",
+      "gridPos": {
+        "x": 18,
+        "y": 8,
+        "w": 6,
+        "h": 3
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count(kube_pod_container_status_waiting_reason{namespace=~\"kamiwaza|kamiwaza-extensions\", reason=\"CrashLoopBackOff\"}) or vector(0)",
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "0 (OK)",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "type": "row",
+      "title": "Resource Utilisation",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "CPU Usage by Namespace",
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"kamiwaza|kamiwaza-extensions|kamiwaza-sandboxes\", container!=\"\"}[5m])) by (namespace)",
+          "legendFormat": "{{namespace}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "stacking": {
+              "mode": "normal"
+            },
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "cores"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Memory Usage by Namespace",
+      "gridPos": {
+        "x": 12,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(container_memory_working_set_bytes{namespace=~\"kamiwaza|kamiwaza-extensions|kamiwaza-sandboxes\", container!=\"\"}) by (namespace)",
+          "legendFormat": "{{namespace}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "stacking": {
+              "mode": "normal"
+            },
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 17,
+      "type": "row",
+      "title": "Storage (PVC Utilisation)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 18,
+      "type": "table",
+      "title": "PVC Usage",
+      "description": "Persistent volumes by utilisation percentage",
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 24,
+        "h": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes * 100",
+          "instant": true,
+          "legendFormat": "",
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "kubelet_volume_stats_used_bytes",
+          "instant": true,
+          "legendFormat": "",
+          "format": "table"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "kubelet_volume_stats_capacity_bytes",
+          "instant": true,
+          "legendFormat": "",
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "__name__": true,
+              "__name__ 1": true,
+              "__name__ 2": true,
+              "__name__ 3": true,
+              "endpoint": true,
+              "instance": true,
+              "job": true,
+              "metrics_path": true,
+              "node": true,
+              "service": true
+            },
+            "indexByName": {},
+            "renameByName": {}
+          }
+        }
+      ],
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "Used %",
+            "desc": true
+          }
+        ],
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "displayMode": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Used %"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 70
+                    },
+                    {
+                      "color": "red",
+                      "value": 85
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Used"
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Capacity"
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 19,
+      "type": "row",
+      "title": "Kubernetes Warning Events",
+      "collapsed": true,
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [
+        {
+          "id": 20,
+          "type": "logs",
+          "title": "Recent Warning Events (kamiwaza namespaces)",
+          "description": "Kubernetes events from Alloy eventhandler \u2014 filtered to Warning severity in Kamiwaza namespaces",
+          "gridPos": {
+            "x": 0,
+            "y": 30,
+            "w": 24,
+            "h": 10
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "${loki_datasource}"
+              },
+              "expr": "{job=\"integrations/kubernetes/eventhandler\"} |= \"Warning\" |~ \"kamiwaza|BackOff|OOMKill|Failed|Evict|Unhealthy|ImagePull\"",
+              "legendFormat": ""
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none"
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "maxDataPoints": 100
+        }
+      ]
+    }
+  ]
+}

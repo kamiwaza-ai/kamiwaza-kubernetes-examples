@@ -1,0 +1,24 @@
+# ServiceMonitor for Keycloak management metrics.
+# Keycloak 26+ (Quarkus native) exposes Prometheus metrics at /metrics
+# on the management port (9000). Only active when auth.enabled=true;
+# Prometheus silently finds no targets when Keycloak is not deployed.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: keycloak
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/part-of: kamiwaza
+spec:
+  namespaceSelector:
+    matchNames:
+      - kamiwaza
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak
+  endpoints:
+    - port: management
+      path: /metrics
+      interval: 60s
+      scrapeTimeout: 15s

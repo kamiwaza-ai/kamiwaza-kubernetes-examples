@@ -51,7 +51,7 @@ Browser → Kamiwaza UI / API
 
 1. **`ldap-bootstrap-import` Job** loads LDIF from the **`openldap-bootstrap`** ConfigMap (minimal users + groups). Enough for federation and UI login tests.
 
-2. **`ldap-samples/bootstrap.ldif`** adds richer attributes (`title`, `manager`, …). Use when teaching attribute sync or HR-style entries.
+2. **`ldap-samples/bootstrap.ldif`** is an alternative set with richer attributes (`title`, `manager`, …). Use when teaching attribute sync or HR-style entries. **Note:** if the Job already loaded the minimal data, `ldapadd -c` skips existing DNs (same `uid=*` entries already exist). To use this file instead, apply it on a fresh OpenLDAP instance before the Job runs, or delete and recreate the OpenLDAP PVCs first.
 
 Apply optional bootstrap from **`security/ldap`** (admin password from secret; demo default `kamiwaza`):
 
@@ -157,6 +157,7 @@ Then Keycloak: **Synchronize changed users**.
 | `0 users` synced                    | LDAP empty or wrong **Users DN** / object classes — `ldapsearch` on `ou=people`.                                |
 | TLS errors from laptop scripts      | `KEYCLOAK_INSECURE_TLS=1` (dev only) or trust cluster CA.                                                       |
 | UI login fails                      | LDAP UI expects a user in **`admin`** group (demo: **`alice`**), not directory `cn=admin`.                      |
+| DNS: FQDNs resolve to wrong IP      | Clusters with wildcard DNS search domains (e.g. `*.example.com`) can hijack `*.svc.cluster.local` under the default `ndots:5`. Job manifests include `dnsConfig.options: [{name: ndots, value: "1"}]` and FQDNs use a trailing dot to force absolute resolution. |
 
 ---
 

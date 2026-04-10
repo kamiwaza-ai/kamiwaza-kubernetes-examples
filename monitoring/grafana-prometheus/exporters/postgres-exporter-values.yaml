@@ -1,0 +1,38 @@
+# Helm values for prometheus-postgres-exporter.
+#
+# Install:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm upgrade --install postgres-exporter prometheus-community/prometheus-postgres-exporter \
+#     --version 6.10.0 -n kamiwaza -f exporters/postgres-exporter-values.yaml
+#
+# Prerequisite: Secret `core-postgres` in namespace `kamiwaza` with key `password`
+# (created by the Kamiwaza Deploy Helm chart).
+
+fullnameOverride: postgres-exporter
+
+config:
+  datasource:
+    host: core-postgres
+    port: "5432"
+    user: core
+    database: kamiwaza
+    sslmode: disable
+    passwordSecret:
+      name: core-postgres
+      key: password
+
+serviceMonitor:
+  enabled: true
+  namespace: monitoring
+  interval: 30s
+  scrapeTimeout: 10s
+  labels:
+    app.kubernetes.io/part-of: kamiwaza
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
