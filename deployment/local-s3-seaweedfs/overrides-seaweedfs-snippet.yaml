@@ -1,0 +1,20 @@
+# Drop in as deploy/cluster/values/overrides-seaweedfs.yaml.
+# Loaded by the seaweedfs release (only when KAMIWAZA_LOCAL_S3_ENABLED=true
+# at helmfile time). The chart fails closed if either field is blank.
+#
+# The same credentials are mirrored into the kamiwaza/core-s3 secret by the
+# seaweedfs release, so the consumer side (core) does not need a separate
+# manual secret-create step.
+
+auth:
+  accessKeyId: "REPLACE-WITH-A-LONG-RANDOM-STRING"
+  secretAccessKey: "REPLACE-WITH-A-LONGER-RANDOM-STRING"
+
+# Optional tunables (defaults shown).
+# bucket:
+#   name: kz-workroom
+# storage:
+#   size: 100Gi
+# image:
+#   repository: ghcr.io/kamiwaza-internal/containers/images/seaweedfs
+#   tag: "v4.15"

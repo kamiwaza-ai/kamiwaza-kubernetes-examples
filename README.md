@@ -55,6 +55,7 @@ Category indexes:
 | Scenario                                            | Path                                                                             | Tags                                         |
 | --------------------------------------------------- | -------------------------------------------------------------------------------- | -------------------------------------------- |
 | Environment profile matrix (lite/full/dev/dev-full) | [deployment/env-profile-matrix](deployment/env-profile-matrix)                   | #deployment #topology #helmfile              |
+| Local S3 with bundled SeaweedFS                     | [deployment/local-s3-seaweedfs](deployment/local-s3-seaweedfs)                   | #deployment #storage #s3 #seaweedfs           |
 | Grafana + Prometheus monitoring                     | [monitoring/grafana-prometheus](monitoring/grafana-prometheus)                    | #monitoring #prometheus #grafana #loki        |
 | Service access patterns                             | [networking/external-access](networking/external-access)                         | #networking #port-forward #ingress            |
 | Backup and restore                                  | [operations/backup-restore](operations/backup-restore)                           | #operations #backup #postgres #etcd           |
