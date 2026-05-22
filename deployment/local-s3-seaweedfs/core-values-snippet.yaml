@@ -1,20 +1,24 @@
-# Merge into deploy/cluster/values/overrides.yaml (Helmfile merges overrides last).
-# Replace any existing `core.context.objectStorage` block with this one.
+# Merge into deploy/cluster/values/overrides.yaml. Replace any existing
+# `core.context.objectStorage` block with this one.
 #
-# The endpointUrl points at the in-cluster SeaweedFS S3 Service created by
-# the seaweedfs Helm release (namespace `seaweedfs`, see the local-s3-
-# seaweedfs scenario README). The credentialsSecretRef points at the
-# `core-s3` secret in namespace `kamiwaza` — the SeaweedFS release mirrors
-# its admin credentials into that secret, so no manual `kubectl create
-# secret core-s3` step is needed in this mode.
+# endpointUrl points at the in-cluster SeaweedFS Service created by
+# seaweedfs.yaml (namespace `kamiwaza-system`, Service `seaweed-s3`).
+# Region must be a valid AWS-style region string; SeaweedFS doesn't enforce
+# it, but botocore validates the format on the client side. `us-east-1` is
+# the most compatible default.
+#
+# credentialsSecretRef points at the `core-s3` secret in namespace `kamiwaza`
+# (see core-s3-secret.yaml). The chart wires these into
+# CONTEXT_SERVICE_S3_{ACCESS_KEY_ID,SECRET_ACCESS_KEY} on core-scheduler and
+# the core-raycluster head pod.
 
 core:
   context:
     objectStorage:
+      endpointUrl: "http://seaweed-s3.kamiwaza-system.svc.cluster.local:8333"
       defaultBucket: "kz-workroom"
       defaultRegion: "us-east-1"
       defaultPrefix: "context/raw"
-      endpointUrl: "http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333"
       credentialsSecretRef:
         name: "core-s3"
         accessKeyIdKey: "access_key_id"

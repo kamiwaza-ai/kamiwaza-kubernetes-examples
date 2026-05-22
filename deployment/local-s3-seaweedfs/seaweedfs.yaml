@@ -1,0 +1,133 @@
+---
+# SeaweedFS S3 backend for Kamiwaza's Skills Library / context object storage.
+# Single all-in-one Deployment (master + volume + filer + S3 gateway). Single
+# PVC on the cluster's default StorageClass (RWO). Single replica with
+# Recreate strategy — no replication, brief downtime on chart upgrades.
+#
+# The Secret carries the admin S3 credentials and a SeaweedFS `s3.config`
+# identities document referencing them. Replace ${ACCESS_KEY} and
+# ${SECRET_KEY} before applying (see README.md, step 1).
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kamiwaza-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: seaweed-s3-config
+  namespace: kamiwaza-system
+type: Opaque
+stringData:
+  config.json: |
+    {
+      "identities": [
+        {
+          "name": "admin",
+          "credentials": [
+            {
+              "accessKey": "${ACCESS_KEY}",
+              "secretKey": "${SECRET_KEY}"
+            }
+          ],
+          "actions": ["Admin", "Read", "Write", "List", "Tagging", "ReadAcp", "WriteAcp"]
+        }
+      ]
+    }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: seaweed-data
+  namespace: kamiwaza-system
+spec:
+  accessModes: ["ReadWriteOnce"]
+  # Default Kind StorageClass is `standard` (rancher.io/local-path); change if
+  # your cluster uses something else. WaitForFirstConsumer binding is fine.
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seaweed-s3
+  namespace: kamiwaza-system
+  labels:
+    app: seaweed-s3
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: seaweed-s3
+  template:
+    metadata:
+      labels:
+        app: seaweed-s3
+    spec:
+      containers:
+        - name: weed
+          # Image already in the Kind node's containerd via the Kamiwaza
+          # extensions bundle (loaded as a side-effect of the milvus
+          # extension image pack). `IfNotPresent` avoids a registry pull.
+          image: ghcr.io/kamiwaza-internal/containers/images/seaweedfs:v4.15
+          imagePullPolicy: IfNotPresent
+          args:
+            - server
+            - -dir=/data
+            - -s3
+            - -s3.config=/etc/seaweedfs/config.json
+            - -filer
+            - -master.volumePreallocate=false
+            - -master.volumeSizeLimitMB=1024
+          ports:
+            - containerPort: 8333
+              name: s3
+            - containerPort: 9333
+              name: master
+            - containerPort: 8888
+              name: filer
+            - containerPort: 8080
+              name: volume
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /etc/seaweedfs
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 8333
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 24
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: 8333
+            initialDelaySeconds: 60
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: seaweed-data
+        - name: config
+          secret:
+            secretName: seaweed-s3-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweed-s3
+  namespace: kamiwaza-system
+spec:
+  selector:
+    app: seaweed-s3
+  ports:
+    - name: s3
+      port: 8333
+      targetPort: 8333

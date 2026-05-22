@@ -1,16 +1,16 @@
-# Local S3 with bundled SeaweedFS
+# Local S3 with SeaweedFS
 
-**Scenario:** wire Kamiwaza's Skills Library / context object storage to an in-cluster SeaweedFS instance instead of AWS S3 (or another managed S3 endpoint). Reuses the **`ghcr.io/kamiwaza-internal/containers/images/seaweedfs:v4.15`** image already shipped inside the Kamiwaza extensions bundle for the Milvus extension; deploys a **separate** SeaweedFS instance so the Skills Library and Milvus do not share storage.
+**Scenario:** wire Kamiwaza's Skills Library / context object storage to an in-cluster SeaweedFS instance instead of AWS S3 (or another managed S3 endpoint). Reuses the **`ghcr.io/kamiwaza-internal/containers/images/seaweedfs:v4.15`** image already shipped inside the Kamiwaza extensions bundle for the Milvus extension, but stands up a **dedicated** SeaweedFS instance so Skills Library and Milvus do not share storage.
 
 **Tags:** #deployment #storage #s3 #seaweedfs #helm-values
 
 ## What you get
 
-- Helmfile release **`seaweedfs/seaweedfs`** running `weed server -s3` in all-in-one mode (master + volume + filer + S3 gateway) in namespace **`seaweedfs`**.
-- A pre-created bucket (default **`kz-workroom`**) materialized by a post-install Job.
-- Secret **`core-s3`** written into namespace **`kamiwaza`** with the credentials the umbrella chart reads via `core.context.objectStorage.credentialsSecretRef`.
-- Values fragment **`core-values-snippet.yaml`** to merge into the Deploy repo's **`cluster/values/overrides.yaml`** (points `endpointUrl` at the in-cluster SeaweedFS Service).
-- Values fragment **`overrides-seaweedfs-snippet.yaml`** to drop in as **`cluster/values/overrides-seaweedfs.yaml`** (carries the SeaweedFS S3 credentials).
+- Deployment **`seaweed-s3`** running `weed server -s3` in all-in-one mode (master + volume + filer + S3 gateway) in namespace **`kamiwaza-system`**.
+- Service **`seaweed-s3.kamiwaza-system.svc.cluster.local:8333`** speaking the S3 API.
+- A pre-created bucket (default **`kz-workroom`**) materialized by a one-shot exec.
+- Secret **`core-s3`** in namespace **`kamiwaza`** with the credentials the umbrella chart reads via `core.context.objectStorage.credentialsSecretRef`.
+- Values fragment **`core-values-snippet.yaml`** to merge into the Deploy repo's `cluster/values/overrides.yaml`. Sets `endpointUrl` so core's S3 client targets the in-cluster Service.
 
 ## When to use this
 
@@ -20,123 +20,159 @@ Pick this scenario when:
 - You do not have a managed S3-compatible endpoint to point at.
 - You can tolerate single-node, single-replica object storage (this is **not** a multi-AZ resilient backend — it's a pragmatic local lane).
 
-Use a managed S3 endpoint (or **`security/`**-tier object storage) for multi-node or production deployments.
+Use a managed S3 endpoint (or the **`security/`**-tier object storage scenario) for multi-node or production deployments.
+
+## Why this isn't `helmfile`-driven yet
+
+The release-0.13.0 bundle on disk references a `KAMIWAZA_LOCAL_S3_ENABLED=true` flag in `cluster/values/overrides-seaweedfs.yaml`, but there is **no actual `seaweedfs/seaweedfs` Helm release in the chart graph** — `/opt/kamiwaza/charts/` has no `seaweedfs` subchart and `helmfile.yaml` has no entry that toggles on that flag. The doc is forward-looking and the wiring hasn't shipped. Until it does, deploy SeaweedFS as raw manifests alongside the Kamiwaza chart and point the chart's `endpointUrl` at it. Once the helmfile release lands, this scenario will collapse to "set `KAMIWAZA_LOCAL_S3_ENABLED=true` and put creds in `overrides-seaweedfs.yaml`."
 
 ## Prerequisites
 
-- A Kamiwaza install via **[Kamiwaza Deploy](https://github.com/kamiwaza/deploy)**, version **`release-0.13.0`** or newer (chart honors `core.context.objectStorage.endpointUrl` — see `charts/core/values.yaml`).
-- The bundled SeaweedFS chart at **`/opt/kamiwaza/charts/seaweedfs/`** and the helmfile entry that loads it (gated by `KAMIWAZA_LOCAL_S3_ENABLED=true`).
-- Kind on Podman (the release path; image side-load uses `podman exec <node> ctr -n k8s.io images import`).
-- The Kamiwaza extensions bundle tarball available — typically already extracted under **`/opt/kamiwaza/extensions-bundle/`** per the offline quickstart.
+- A Kamiwaza install via **[Kamiwaza Deploy](https://github.com/kamiwaza/deploy)** at **`release-0.13.0`** or newer (chart honors `core.context.objectStorage.endpointUrl` — see `charts/core/values.yaml`).
+- The Kamiwaza extensions bundle has been loaded (the seaweed image lands in containerd as a side-effect; verify with `sudo podman exec <kind-node> crictl images | grep seaweed`).
+- Cluster default StorageClass supports `ReadWriteOnce` PVC binding. On Kind, that's `standard` (rancher.io/local-path) — adjust `storageClassName` in `seaweedfs.yaml` if yours differs.
 
 ## Steps
 
-### 1. Extract the extensions bundle (if not already done)
-
-The bundle ships the SeaweedFS image. Per the quickstart, this happens once and is shared with the Extension Bundle Install step at the end of that runbook.
+### 1. Generate credentials and apply manifests
 
 ```bash
-sudo mkdir -p /opt/kamiwaza/extensions-bundle
-sudo tar -xzf ~/artifacts/<timestamp>/kamiwaza-extensions-bundle-*.tar.gz \
-  -C /opt/kamiwaza/extensions-bundle
+ACCESS_KEY=$(LC_ALL=C tr -dc 'A-Z0-9' </dev/urandom | head -c 20)
+SECRET_KEY=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')
 
-EXTENSIONS_BUNDLE_ROOT=$(sudo find /opt/kamiwaza/extensions-bundle \
-  -maxdepth 1 -type d -name 'kamiwaza-extensions-bundle-*' | head -n1)
+# Save somewhere safe — you'll need both values again for the consumer-side
+# secret in step 3.
+printf '%s\n' "$ACCESS_KEY" | sudo tee /etc/kamiwaza-extras/seaweed-access >/dev/null
+printf '%s\n' "$SECRET_KEY" | sudo tee /etc/kamiwaza-extras/seaweed-secret >/dev/null
+sudo chmod 600 /etc/kamiwaza-extras/seaweed-*
+
+ACCESS_KEY="$ACCESS_KEY" SECRET_KEY="$SECRET_KEY" \
+  envsubst < seaweedfs.yaml | kubectl apply -f -
+
+kubectl -n kamiwaza-system rollout status deploy/seaweed-s3 --timeout=120s
 ```
 
-### 2. Side-load the SeaweedFS image into the Kind node
+### 2. Create the bucket inside SeaweedFS
+
+`weed shell` is bundled in the image; pipe a command in non-interactively.
 
 ```bash
-sudo /opt/kamiwaza/scripts/load-local-s3-image.sh \
-  --bundle-root "${EXTENSIONS_BUNDLE_ROOT}"
+kubectl -n kamiwaza-system exec deploy/seaweed-s3 -- sh -c \
+  'echo "s3.bucket.create -name kz-workroom" | weed shell -filer=localhost:8888 -master=localhost:9333'
+
+# Confirm
+kubectl -n kamiwaza-system exec deploy/seaweed-s3 -- sh -c \
+  'echo "s3.bucket.list" | weed shell -filer=localhost:8888 -master=localhost:9333'
 ```
 
-The script is idempotent — re-running after the image is already in containerd is a no-op.
-
-### 3. Drop in the SeaweedFS credentials overrides
-
-The chart fails closed if either field is blank.
+### 3. Create the consumer-side `core-s3` secret
 
 ```bash
-sudo install -m 0644 overrides-seaweedfs-snippet.yaml \
-  /opt/kamiwaza/cluster/values/overrides-seaweedfs.yaml
-sudo "${EDITOR:-vi}" /opt/kamiwaza/cluster/values/overrides-seaweedfs.yaml
+ACCESS_KEY=$(sudo cat /etc/kamiwaza-extras/seaweed-access)
+SECRET_KEY=$(sudo cat /etc/kamiwaza-extras/seaweed-secret)
+
+ACCESS_KEY="$ACCESS_KEY" SECRET_KEY="$SECRET_KEY" \
+  envsubst < core-s3-secret.yaml | kubectl apply -f -
 ```
 
-Replace the placeholder strings with long random values. The same credentials get mirrored into the `kamiwaza/core-s3` secret automatically.
+### 4. Wire it into `cluster/values/overrides.yaml`
 
-### 4. Merge the consumer-side overrides
+Copy the `core:` block from **`core-values-snippet.yaml`** into your deploy repo's `cluster/values/overrides.yaml` (or replace the existing `core.context.objectStorage` block).
 
-Copy the **`core:`** block from **`core-values-snippet.yaml`** into **`cluster/values/overrides.yaml`** (or replace any existing `core.context.objectStorage` block). The key change vs. the AWS-S3 default is the new `endpointUrl` line pointing at the in-cluster Service.
+### 5. Apply the new override
 
-### 5. Enable the helmfile release and install
+You have two paths. Both end with a fresh `core-scheduler` pod and a fresh `core-raycluster-head` pod consuming `CONTEXT_SERVICE_S3_ENDPOINT_URL`.
+
+**Path A — full reinstall (clean, long-running):** re-run `install-prod.sh` with the updated `overrides.yaml`. Takes ~10 min and rolls every component. Recommended if you can afford the downtime, since it keeps Helm state and on-disk overrides consistent.
 
 ```bash
-export KAMIWAZA_LOCAL_S3_ENABLED=true
-
-# Then run the normal install per the quickstart:
 sudo -E /opt/kamiwaza/scripts/install-prod.sh \
   --offline \
   --domain "${DOMAIN}" \
   --admin-password "${ADMIN_PASSWORD}" \
-  ...
+  # ...the rest of your usual flags
 ```
 
-When the flag is on, the helmfile adds the **`seaweedfs/seaweedfs`** release to the dependency graph and makes the **`kamiwaza/kamiwaza`** release `needs:` it — so the bucket and `core-s3` secret exist before core starts.
-
-### 6. (Already-running cluster) Sync just the SeaweedFS release
-
-If Kamiwaza is already installed and you're enabling the local-S3 lane after the fact:
+**Path B — patch in place (fast, no re-roll of other components):** patch the consumed ConfigMap and roll the two S3-reading pods. Use this when the cluster is already running and a full reinstall is overkill. **Caveat:** `helm upgrade kamiwaza ...` standalone fails on 0.13.0 because the `network` subchart depends on an upstream Traefik chart (`traefik.github.io/charts` v37.4.0) that the install-prod.sh bundle fetches at build time but isn't reproducible from a vanilla `helm dependency build`. Re-running `install-prod.sh` (Path A) is the only Helm-clean way to apply this. The ConfigMap patch persists between Helm releases as long as you also keep `overrides.yaml` in sync.
 
 ```bash
-cd /opt/kamiwaza/cluster
-sudo -E KAMIWAZA_LOCAL_S3_ENABLED=true \
-  /opt/kamiwaza/prereqs/bin/helmfile -e release \
-  --selector name=seaweedfs sync
+kubectl -n kamiwaza patch configmap core-config --type=merge -p '{
+  "data":{
+    "CONTEXT_SERVICE_S3_ENDPOINT_URL":"http://seaweed-s3.kamiwaza-system.svc.cluster.local:8333",
+    "CONTEXT_SERVICE_S3_DEFAULT_REGION":"us-east-1",
+    "CONTEXT_SERVICE_S3_DEFAULT_BUCKET":"kz-workroom"
+  }
+}'
 
-# Restart core-scheduler so it picks up the freshly created core-s3 secret.
+# core-scheduler reads its env on pod start.
 kubectl -n kamiwaza rollout restart deployment/core-scheduler
+kubectl -n kamiwaza rollout status   deployment/core-scheduler --timeout=120s
+
+# The Ray Serve replicas (which serve /api/skills/import) inherit env from
+# the head pod at worker-spawn time. Restart the head pod so the new env
+# propagates to fresh workers.
+kubectl -n kamiwaza delete pod -l ray.io/node-type=head
+kubectl -n kamiwaza wait --for=condition=ready --timeout=120s pod -l ray.io/node-type=head
+```
+
+### 6. Bounce the consumers that depend on object storage
+
+```bash
+kubectl -n kamiwaza-extensions rollout restart deploy \
+  -l extensions.kamiwaza.io/name=skills-library
+
+# Optional — restart any other extension that talks to workroom storage.
 ```
 
 ## Verification
 
 ```bash
-kubectl -n seaweedfs get pods
-kubectl -n seaweedfs logs deploy/seaweedfs | tail -20
-kubectl -n seaweedfs get jobs seaweedfs-bucket-init
-kubectl -n kamiwaza get secret core-s3 -o jsonpath='{.metadata.name}{"\n"}'
+# SeaweedFS up
+kubectl -n kamiwaza-system get pods,svc,pvc
 
-# Confirm core is pointed at the in-cluster endpoint:
-kubectl -n kamiwaza exec deploy/core-scheduler -- \
-  printenv | grep CONTEXT_SERVICE_S3
+# core-scheduler sees the new env (look for ENDPOINT_URL)
+kubectl -n kamiwaza exec deploy/core-scheduler -c core -- \
+  sh -c 'printenv | grep CONTEXT_SERVICE_S3_'
+
+# End-to-end PutObject from inside the scheduler pod
+kubectl -n kamiwaza exec deploy/core-scheduler -c core -- python3 -c '
+import boto3, os
+s3 = boto3.client("s3",
+    endpoint_url=os.environ["CONTEXT_SERVICE_S3_ENDPOINT_URL"],
+    aws_access_key_id=os.environ["CONTEXT_SERVICE_S3_ACCESS_KEY_ID"],
+    aws_secret_access_key=os.environ["CONTEXT_SERVICE_S3_SECRET_ACCESS_KEY"],
+    region_name=os.environ["CONTEXT_SERVICE_S3_DEFAULT_REGION"])
+b = os.environ["CONTEXT_SERVICE_S3_DEFAULT_BUCKET"]
+print("put:",  s3.put_object(Bucket=b, Key="context/raw/healthcheck.txt", Body=b"ok")["ResponseMetadata"]["HTTPStatusCode"])
+print("get:",  s3.get_object(Bucket=b, Key="context/raw/healthcheck.txt")["Body"].read())
+print("list:", [o["Key"] for o in s3.list_objects_v2(Bucket=b).get("Contents", [])])
+'
 ```
 
-End-to-end check (creates and lists a test object):
+Expected output:
 
-```bash
-ACCESS_KEY=$(kubectl -n kamiwaza get secret core-s3 -o jsonpath='{.data.access_key_id}' | base64 -d)
-SECRET_KEY=$(kubectl -n kamiwaza get secret core-s3 -o jsonpath='{.data.secret_access_key}' | base64 -d)
-
-kubectl -n seaweedfs run --rm -i --tty s3-test --image=amazon/aws-cli --restart=Never -- \
-  --endpoint-url http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333 \
-  --region us-east-1 \
-  s3 ls s3://kz-workroom \
-  | tee /dev/stderr
+```
+put: 200
+get: b'ok'
+list: ['context/raw/healthcheck.txt']
 ```
 
-Set `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` via `--env` flags as appropriate for your `kubectl run` flavor.
+From the UI: open Skills Library, log in. The "Workroom storage is unavailable" gate should clear. If it persists, hard-refresh (Cmd/Ctrl+Shift+R) — `LauncherAuthGuard.tsx` caches the previous probe result in component state until the session reloads.
 
 ## Files
 
-| File                                  | Purpose                                                                                  |
-| ------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `README.md`                           | This document.                                                                           |
-| `core-values-snippet.yaml`            | Umbrella **`core.context.objectStorage`** overrides for `cluster/values/overrides.yaml`. |
-| `overrides-seaweedfs-snippet.yaml`    | SeaweedFS credentials for `cluster/values/overrides-seaweedfs.yaml`.                     |
+| File                       | Purpose                                                                                  |
+| -------------------------- | ---------------------------------------------------------------------------------------- |
+| `README.md`                | This document.                                                                           |
+| `seaweedfs.yaml`           | SeaweedFS Deployment + Service + PVC + admin-credentials Secret (envsubst placeholders). |
+| `core-s3-secret.yaml`      | Consumer-side credential mirror in namespace `kamiwaza` (envsubst placeholders).         |
+| `core-values-snippet.yaml` | `core.context.objectStorage` block for `cluster/values/overrides.yaml`.                  |
 
 ## Tradeoffs
 
 - **Single replica, single node.** SeaweedFS runs as one Deployment with `Recreate` strategy and a single PVC. There is no replication and the data plane goes briefly offline on chart upgrades.
-- **Image source.** Uses the bundled `seaweedfs:v4.15` image from `ghcr.io/kamiwaza-internal/containers/images/`. If you want a different SeaweedFS build, override `image.repository` / `image.tag` in `overrides-seaweedfs.yaml`.
-- **Separate from Milvus.** The Milvus extension brings its own SeaweedFS via the Garden compose runtime; this scenario does not share that instance. The Skills Library blast radius stays independent from the vector-DB blast radius.
+- **20 GiB default.** Bump the PVC `resources.requests.storage` in `seaweedfs.yaml` if you're going to push a lot of context. On Kind/local-path the PV materializes on the node's data disk; pick a size that fits.
+- **Manual deploy, not Helm-managed.** Until the umbrella chart adds a `seaweedfs` subchart, this side-deploy lives outside Helm's view of the world. Re-running `install-prod.sh` won't touch it; that's a feature, not a bug. The consumer side (`core-s3` secret, `overrides.yaml`) is Helm-managed and *will* round-trip cleanly.
+- **`kubectl patch` vs reinstall.** Path B in step 5 is a fast forward path but creates drift between Helm's recorded state and what's actually running. Either keep `overrides.yaml` in sync so the next `install-prod.sh` reconciles cleanly, or treat Path B as a one-shot.
+- **Separate from Milvus.** The Milvus extension brings its own SeaweedFS via the Garden compose runtime; this scenario does not share that instance. Skills Library blast radius stays independent from the vector-DB blast radius.
 - **Not Azure Blob.** Native Azure Blob is not supported by the chart as of 0.13.0; this scenario is the supported "BYO S3-compatible endpoint" path on Azure single-VM installs.
