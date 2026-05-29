@@ -49,6 +49,20 @@ This folder covers two separate cases:
    security/tls-trust/extensions/apply-kaizen-extension-trust.py kaizen-a1b2c3d4
    ```
 
+   Optional proxy path for customer/private egress:
+
+   ```bash
+   security/tls-trust/extensions/apply-kaizen-extension-trust.py \
+     --https-proxy http://squid.internal:3128 \
+     --http-proxy http://squid.internal:3128 \
+     --no-proxy localhost,127.0.0.1,.svc,.cluster.local \
+     kaizen-a1b2c3d4
+   ```
+
+   This injects proxy env into the **declared backend service** only. It is
+   still not assumed to reach spawned sandboxes; that remains a verification
+   gate below.
+
 4. Open or resume a Kaizen conversation so the sandbox-controller actually spawns
    an agent pod in `kamiwaza-sandboxes`.
 5. Run the verifier:
@@ -71,12 +85,17 @@ For the live Kaizen `KamiwazaExtension` CR, the patcher:
 - sets `spec.networking.networkPolicy.allowExternalAccess: true`
 - mounts `kamiwaza-trust-bundle` at `/etc/ssl/certs/ca-certificates.crt`
 - injects `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`, and `AWS_CA_BUNDLE`
+- optionally injects `HTTPS_PROXY`, `HTTP_PROXY`, and `NO_PROXY` into the
+  Kaizen backend when you pass them on the command line (or export them in the
+  shell running the patcher)
 - flips the Kaizen-side verify flags back on:
   - `AGENT_DISABLE_SSL_VERIFY=false`
   - `KAMIWAZA_VERIFY_SSL=true`
 
 It patches the **declared** `backend` and `sandbox-controller` services only.
-It does **not** claim to patch the spawned sandbox pod directly.
+Proxy envs go to the backend because that process constructs `forward_env` for
+spawned sandboxes. This packet still does **not** claim to patch the spawned
+sandbox pod directly.
 
 ## Pass / fail criteria
 
@@ -88,12 +107,14 @@ It does **not** claim to patch the spawned sandbox pod directly.
 - the backend pod shows `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`, and
   `AWS_CA_BUNDLE` pointing at that path
 - the backend pod no longer runs with the Kaizen SSL-bypass flags
+- if proxy envs were requested, the backend pod shows them too
 
 **Pass for sandbox path**
 
 - `kamiwaza-trust-bundle` exists in `kamiwaza-sandboxes`
 - a spawned sandbox pod exists for the extension
 - that sandbox pod also shows the bundle mount and CA env
+- if proxy envs were requested, that sandbox pod shows them too
 
 **Fail / stop**
 

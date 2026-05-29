@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from typing import Any, Dict, List
@@ -117,7 +118,7 @@ def _patch_service(service: Dict[str, Any], extra_env: Dict[str, str]) -> None:
     _upsert_volume_mount(service)
 
 
-def _patch_spec(obj: Dict[str, Any]) -> Dict[str, Any]:
+def _patch_spec(obj: Dict[str, Any], backend_extra_env: Dict[str, str]) -> Dict[str, Any]:
     spec = obj.setdefault("spec", {})
 
     kamiwaza = spec.setdefault("kamiwaza", {})
@@ -138,7 +139,7 @@ def _patch_spec(obj: Dict[str, Any]) -> Dict[str, Any]:
     for service in services:
         name = service.get("name")
         if name == "backend":
-            _patch_service(service, BACKEND_VERIFY_ENV)
+            _patch_service(service, {**BACKEND_VERIFY_ENV, **backend_extra_env})
             found_backend = True
         elif name == "sandbox-controller":
             _patch_service(service, {})
@@ -181,10 +182,34 @@ def main() -> int:
         action="store_true",
         help="Print the patched manifest instead of applying it",
     )
+    parser.add_argument(
+        "--https-proxy",
+        default=os.environ.get("HTTPS_PROXY", ""),
+        help="Optional HTTPS proxy URL to inject into the Kaizen backend",
+    )
+    parser.add_argument(
+        "--http-proxy",
+        default=os.environ.get("HTTP_PROXY", ""),
+        help="Optional HTTP proxy URL to inject into the Kaizen backend",
+    )
+    parser.add_argument(
+        "--no-proxy",
+        default=os.environ.get("NO_PROXY", ""),
+        help="Optional NO_PROXY value to inject into the Kaizen backend",
+    )
     args = parser.parse_args()
 
     obj = _load_extension(args.name, args.namespace)
-    cleaned = _patch_spec(obj)
+    backend_extra_env = {
+        key: value
+        for key, value in {
+            "HTTPS_PROXY": args.https_proxy,
+            "HTTP_PROXY": args.http_proxy,
+            "NO_PROXY": args.no_proxy,
+        }.items()
+        if value
+    }
+    cleaned = _patch_spec(obj, backend_extra_env)
     rendered = json.dumps(cleaned, indent=2) + "\n"
 
     if args.print_only:
@@ -193,6 +218,8 @@ def main() -> int:
 
     _run("kubectl", "apply", "-f", "-", input_text=rendered)
     print(f"patched Kaizen extension {args.namespace}/{args.name}")
+    if backend_extra_env:
+        print(f"injected backend proxy env: {', '.join(sorted(backend_extra_env))}")
     print("next: open or resume a Kaizen conversation, then run verify-kaizen.sh")
     return 0
 

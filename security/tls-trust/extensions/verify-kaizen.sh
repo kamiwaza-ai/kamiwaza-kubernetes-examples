@@ -4,6 +4,7 @@
 # Usage:
 #   security/tls-trust/extensions/verify-kaizen.sh <extension-name>
 #   security/tls-trust/extensions/verify-kaizen.sh <extension-name> https://endpoint
+#   EXPECT_HTTPS_PROXY=http://squid.internal:3128 security/tls-trust/extensions/verify-kaizen.sh <extension-name> https://endpoint
 #
 # Fail closed:
 #   - no backend trust wiring -> fail
@@ -23,6 +24,9 @@ EXT_NS="${EXT_NS:-kamiwaza-extensions}"
 SANDBOX_NS="${SANDBOX_NS:-kamiwaza-sandboxes}"
 BUNDLE_CM="kamiwaza-trust-bundle"
 BUNDLE_PATH="/etc/ssl/certs/ca-certificates.crt"
+EXPECT_HTTPS_PROXY="${EXPECT_HTTPS_PROXY:-${HTTPS_PROXY:-}}"
+EXPECT_HTTP_PROXY="${EXPECT_HTTP_PROXY:-${HTTP_PROXY:-}}"
+EXPECT_NO_PROXY="${EXPECT_NO_PROXY:-${NO_PROXY:-}}"
 
 pass() { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 fail() { printf '  \033[31m✗\033[0m %s\n' "$1"; exit 1; }
@@ -36,6 +40,16 @@ check_env_equals() {
   echo "$text" | grep -q "^${key}=${expected}$" \
     && pass "${label} ${key}=${expected}" \
     || fail "${label} missing ${key}=${expected}"
+}
+
+check_env_if_expected() {
+  local label="$1"
+  local text="$2"
+  local key="$3"
+  local expected="$4"
+  if [ -n "$expected" ]; then
+    check_env_equals "$label" "$text" "$key" "$expected"
+  fi
 }
 
 check_cert_count() {
@@ -85,6 +99,9 @@ check_env_equals "backend" "$BACKEND_ENV" "AWS_CA_BUNDLE" "$BUNDLE_PATH"
 check_env_equals "backend" "$BACKEND_ENV" "AGENT_DISABLE_SSL_VERIFY" "false"
 check_env_equals "backend" "$BACKEND_ENV" "KAMIWAZA_VERIFY_SSL" "true"
 check_env_equals "backend" "$BACKEND_ENV" "KAMIWAZA_TLS_REJECT_UNAUTHORIZED" "1"
+check_env_if_expected "backend" "$BACKEND_ENV" "HTTPS_PROXY" "$EXPECT_HTTPS_PROXY"
+check_env_if_expected "backend" "$BACKEND_ENV" "HTTP_PROXY" "$EXPECT_HTTP_PROXY"
+check_env_if_expected "backend" "$BACKEND_ENV" "NO_PROXY" "$EXPECT_NO_PROXY"
 
 if [ -n "$PROBE_URL" ]; then
   info "3. Live backend TLS probe to $PROBE_URL"
@@ -101,6 +118,9 @@ check_cert_count "sandbox" "$SANDBOX_POD" "$SANDBOX_NS"
 check_env_equals "sandbox" "$SANDBOX_ENV" "SSL_CERT_FILE" "$BUNDLE_PATH"
 check_env_equals "sandbox" "$SANDBOX_ENV" "REQUESTS_CA_BUNDLE" "$BUNDLE_PATH"
 check_env_equals "sandbox" "$SANDBOX_ENV" "AWS_CA_BUNDLE" "$BUNDLE_PATH"
+check_env_if_expected "sandbox" "$SANDBOX_ENV" "HTTPS_PROXY" "$EXPECT_HTTPS_PROXY"
+check_env_if_expected "sandbox" "$SANDBOX_ENV" "HTTP_PROXY" "$EXPECT_HTTP_PROXY"
+check_env_if_expected "sandbox" "$SANDBOX_ENV" "NO_PROXY" "$EXPECT_NO_PROXY"
 
 if [ -n "$PROBE_URL" ]; then
   info "5. Live sandbox TLS probe to $PROBE_URL"
