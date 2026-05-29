@@ -98,7 +98,8 @@ Kaizen adds one more boundary:
 
 ## Scale note: raise the Kind pod ceiling to 1000 on 0.13.0
 
-For a live offline RHEL install already running `release/0.13.0`, patch:
+For a live offline RHEL install already running `release/0.13.0`, a plain
+installer rerun is not enough. Patch:
 
 `/opt/kamiwaza/cluster/kind/generated-kamiwaza-prod.yaml`
 
@@ -120,8 +121,15 @@ nodes:
     maxPods: 1000
 ```
 
-Then recreate the Kind cluster and rerun the offline installer so the patched
-config is used on cluster creation.
+Then:
+
+```bash
+/opt/kamiwaza/bin/uninstall-prod.sh
+/opt/kamiwaza/bin/install-prod.sh --offline
+```
+
+That forces the Kind cluster to be recreated so the patched config is used on
+cluster creation.
 
 Verify with:
 
