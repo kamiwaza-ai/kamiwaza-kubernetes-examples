@@ -15,17 +15,51 @@ Two approaches:
 
 ## ⚠️ Required on 0.13.0 only
 
-> The manifests in this folder are **required on 0.13.0**, where there is no native
-> values knob to serve a BYO ingress cert — so you create the Secret and repoint the
-> Traefik default `TLSStore` yourself. On **later releases** the network chart serves
-> a BYO ingress cert through a native values knob, so these manifests are **not needed**
-> there (and you should **not** hand-apply a `default` TLSStore on a release that
-> manages it — helm/Argo sync will fight it).
->
-> Why a manifest (not a plain `kubectl` one-off): on a helm/Argo-managed cluster a
-> bare `kubectl` repoint of the `default` TLSStore is **reverted on the next sync**.
-> On 0.13.0 the platform does not manage a `default` TLSStore (the chart does not
-> create one), so applying these manifests is stable there.
+The manifests in this folder are **required on 0.13.0**, where there is no native
+values knob to serve a BYO ingress cert. On **later releases** the network chart
+serves a BYO ingress cert through a native values knob and these manifests are not
+needed (and should NOT be applied — Helm/Argo sync will fight them).
+
+### Helm ownership on 0.13.0
+
+The earlier version of this doc said the network chart "does not create a `default`
+TLSStore" on 0.13.0. That is **incorrect**. On 0.13.0 the network subchart already
+manages two Helm-owned resources in the `kamiwaza` namespace:
+
+| Resource | Template | Default secretName |
+| --- | --- | --- |
+| `TLSStore/default` | `charts/network/templates/traefik/default-tlsstore.yaml` | `traefik-wildcard-public-tls` |
+| `Certificate/traefik-wildcard-public` | `charts/network/templates/traefik/wildcard-certificate.yaml` | `traefik-wildcard-public-tls`, issued by `app-ca` |
+
+That means a plain `kubectl apply` of the `TLSStore/default` repoint below will:
+
+1. Succeed once, with a `last-applied-configuration` warning (Helm did not create
+   the resource with the kubectl annotation). **Verified on 0.13.0.**
+2. **Survive an ordinary `helmfile sync`** — it is **not** auto-reverted. Helm 3's
+   three-way merge only reasserts a field when the chart's *rendered value for it
+   changes between releases*; when the chart output for `TLSStore/default` is
+   unchanged, the original→modified diff is empty and your live drift is preserved.
+   (Verified: after a full re-sync, `helm get manifest kamiwaza` still shows
+   `secretName: traefik-wildcard-public-tls` while the live store keeps
+   `org-ingress-tls`, and Traefik keeps serving the BYO cert.)
+
+   The repoint **is** clobbered, however, by any of: a chart change to that field's
+   rendered value, `helm upgrade --force` / `--replace`, or an **Argo CD self-heal**
+   (Argo does a full reconcile, not Helm's diff-based patch). Plan for those.
+
+Realistic options on 0.13.0:
+
+- **(Static / helmfile-only clusters)** Apply the manifest once. It is stable across
+  ordinary re-syncs; only re-apply if you bump the chart's TLSStore output or run a
+  forced upgrade.
+- **(Recommended for Argo/CI-driven clusters)** Use the renamed manifests in
+  Approach 2 (`Certificate/traefik-wildcard-byo` with its own secret name). This
+  leaves the chart-managed Certificate alone; only the `TLSStore/default`
+  repoint stays Helm-conflicted, and because Argo self-heal *will* revert it, reassert
+  it via a post-sync hook (a one-line patch).
+- **(Cleanest, requires a chart change)** Open a values knob in the network
+  subchart (e.g. `network.traefik.defaultTlsStore.secretName`) and disable
+  `Certificate/traefik-wildcard-public` when set. Tracked as platform follow-up.
 
 ---
 

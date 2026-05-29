@@ -8,6 +8,12 @@
 #       --cert=/path/to/org-ca.crt --key=/path/to/org-ca.key
 #
 # The internal app-ca / infra-ca / root-ca hierarchy is left untouched.
+#
+# NOTE on naming: on 0.13.0 the network subchart already manages a Certificate
+# named `traefik-wildcard-public` (issued by `app-ca`, secret `traefik-wildcard-public-tls`).
+# This example uses DISTINCT names (`traefik-wildcard-byo`, secret `org-ingress-tls`)
+# so a kubectl apply does NOT collide with the Helm-owned Certificate. Only the
+# `TLSStore/default` repoint (in tlsstore-default-byo.yaml) stays Helm-conflicted.
 ---
 apiVersion: cert-manager.io/v1
 kind: Issuer
@@ -24,14 +30,16 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: traefik-wildcard-public
+  # Distinct from the chart-managed `traefik-wildcard-public` Certificate so kubectl
+  # apply does not patch (and silently inherit fields from) the Helm-owned resource.
+  name: traefik-wildcard-byo
   namespace: kamiwaza
   labels:
     app.kubernetes.io/name: traefik
     app.kubernetes.io/part-of: network
 spec:
-  # Reuse the same secret name the default TLSStore reads (or set tlsstore-default-byo
-  # secretName to match this). Keep it distinct from the platform app-ca secret.
+  # Distinct from the chart-managed secret `traefik-wildcard-public-tls`. The
+  # TLSStore in tlsstore-default-byo.yaml points at this name.
   secretName: org-ingress-tls
   commonName: "*.REPLACE_WITH_YOUR_DOMAIN"
   dnsNames:

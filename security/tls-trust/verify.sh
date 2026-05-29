@@ -44,6 +44,17 @@ SCHED_ENV="$(kubectl -n "$NS" exec deploy/core-scheduler -c core -- \
   sh -c "ls $BUNDLE_PATH >/dev/null 2>&1 && env" 2>/dev/null || true)"
 [ -n "$SCHED_ENV" ] && pass "scheduler has $BUNDLE_PATH mounted" \
   || fail "scheduler missing $BUNDLE_PATH mount (deploy/core-scheduler not ready?)"
+# In-pod cert count guards against a silent-empty-mount failure: the chart mounts
+# the bundle ConfigMap with optional: true, so if trust-manager is absent (the
+# 0.13.0 default — see parent README "Prereq A") the file is missing or empty
+# inside the container even though the volume "mounts cleanly".
+SCHED_CERT_COUNT="$(kubectl -n "$NS" exec deploy/core-scheduler -c core -- \
+  sh -c "grep -c 'BEGIN CERTIFICATE' $BUNDLE_PATH 2>/dev/null" 2>/dev/null || echo 0)"
+if [ "${SCHED_CERT_COUNT:-0}" -gt 50 ]; then
+  pass "scheduler bundle has $SCHED_CERT_COUNT certs in-pod (Mozilla set present)"
+else
+  fail "scheduler bundle has only ${SCHED_CERT_COUNT:-0} certs in-pod — trust-manager not running, or pod predates the bundle (rollout restart)"
+fi
 for v in AWS_CA_BUNDLE SSL_CERT_FILE REQUESTS_CA_BUNDLE; do
   echo "$SCHED_ENV" | grep -q "^${v}=${BUNDLE_PATH}$" \
     && pass "scheduler $v=$BUNDLE_PATH" \
