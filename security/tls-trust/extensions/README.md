@@ -96,6 +96,86 @@ Kaizen adds one more boundary:
    security/tls-trust/extensions/verify-kaizen.sh <extension-name> https://bedrock.example.com
    ```
 
+## Scale note: raise the Kind pod ceiling to 1000 on 0.13.0
+
+If you are driving large Kaizen sandbox fan-out on `0.13.0`, you can hit the
+Kind node's pod ceiling before the TLS trust packet itself becomes the limiting
+factor. For Ansible-managed `deploy` installs on `release/0.13.0`, patch the
+Kind kubelet config to allow up to `1000` pods.
+
+### During deploy (best path)
+
+Patch the source template in the `deploy` repo before you run the install:
+
+`deploy/ansible/roles/kind_cluster/templates/kind-cluster.yaml.j2`
+
+Add `maxPods: 1000` inside the `KubeletConfiguration` block so it looks like:
+
+```yaml
+kubeadmConfigPatches:
+  - |
+    kind: KubeletConfiguration
+    apiVersion: kubelet.config.k8s.io/v1beta1
+    maxPods: 1000
+    podPidsLimit: 32768
+```
+
+Then run the normal installer, for example:
+
+```bash
+cd deploy
+./scripts/install-prod.sh
+```
+
+or:
+
+```bash
+cd deploy/ansible
+ansible-playbook playbooks/install/prod.yml \
+  -i inventory/production/hosts.yml
+```
+
+Do not patch the generated `cluster/kind/generated-*.yaml` file directly; the
+Jinja template above is the source of truth.
+
+### After deploy
+
+Changing the Ansible template alone does not update an already-created Kind
+node. On `release/0.13.0`, the `kind_cluster` role applies that kubelet config
+when the cluster is created, so an existing cluster needs a recreate window:
+
+1. Make the same template patch above so future rebuilds keep `maxPods: 1000`.
+2. Recreate the Kind cluster, then rerun the installer.
+
+   Example wrapper flow:
+
+   ```bash
+   cd deploy
+   ./scripts/uninstall-prod.sh
+   ./scripts/install-prod.sh
+   ```
+
+   Or delete the Kind cluster and rerun the Ansible install playbook.
+
+3. Verify the new pod ceiling:
+
+```bash
+kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" pods="}{.status.capacity.pods}{"\n"}{end}'
+```
+
+Expect each node to report `pods=1000`.
+
+### Newer deploy branches
+
+Newer `deploy` branches already carry this as a first-class Ansible knob:
+
+- `ansible/vars/dev.yml` -> `kind_kubelet_max_pods: 1000`
+- `ansible/vars/prod.yml` -> `kind_kubelet_max_pods: 1000`
+- `ansible/roles/kind_cluster/templates/kind-cluster.yaml.j2` -> `maxPods: {{ kind_kubelet_max_pods | default(1000) }}`
+
+So if you are not pinned to `release/0.13.0`, prefer keeping that variable at
+`1000` instead of carrying a local template-only patch forever.
+
 ## What the Kaizen patcher changes
 
 For the live Kaizen `KamiwazaExtension` CR, the patcher:
