@@ -32,7 +32,6 @@ CA_ENV = {
 BACKEND_VERIFY_ENV = {
     "AGENT_DISABLE_SSL_VERIFY": "false",
     "KAMIWAZA_VERIFY_SSL": "true",
-    "MCP_VERIFY_SSL": "true",
 }
 
 

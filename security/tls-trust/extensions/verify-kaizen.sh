@@ -84,7 +84,6 @@ check_env_equals "backend" "$BACKEND_ENV" "REQUESTS_CA_BUNDLE" "$BUNDLE_PATH"
 check_env_equals "backend" "$BACKEND_ENV" "AWS_CA_BUNDLE" "$BUNDLE_PATH"
 check_env_equals "backend" "$BACKEND_ENV" "AGENT_DISABLE_SSL_VERIFY" "false"
 check_env_equals "backend" "$BACKEND_ENV" "KAMIWAZA_VERIFY_SSL" "true"
-check_env_equals "backend" "$BACKEND_ENV" "MCP_VERIFY_SSL" "true"
 check_env_equals "backend" "$BACKEND_ENV" "KAMIWAZA_TLS_REJECT_UNAUTHORIZED" "1"
 
 if [ -n "$PROBE_URL" ]; then

@@ -74,7 +74,6 @@ For the live Kaizen `KamiwazaExtension` CR, the patcher:
 - flips the Kaizen-side verify flags back on:
   - `AGENT_DISABLE_SSL_VERIFY=false`
   - `KAMIWAZA_VERIFY_SSL=true`
-  - `MCP_VERIFY_SSL=true`
 
 It patches the **declared** `backend` and `sandbox-controller` services only.
 It does **not** claim to patch the spawned sandbox pod directly.
