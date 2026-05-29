@@ -40,6 +40,13 @@ endpoint whose certificate is signed by a corporate CA.
 | Declared extension pods | ⚠️ follow-on | use [`extensions/`](extensions/) to mount the bundle + set CA env on live extension CRs |
 | Kaizen spawned sandboxes | ❌ validate explicitly | config-only path is not proven until the sandbox pod itself shows bundle mount + CA env |
 
+> **Hostname caveat for Kaizen / custom endpoints:** this packet adds **CA
+> trust**, not hostname rewrites. If a sandbox or extension is configured to
+> call an HTTPS **IP literal** while the upstream presents a DNS wildcard cert,
+> verification will still fail after the CA is trusted (first `unknown CA`,
+> then `IP address mismatch`). See [`extensions/`](extensions/) for the Kaizen
+> follow-on and endpoint-shape warning.
+
 ### Client-library consumption (with this recipe's env set, bundle at `/etc/ssl/certs/ca-certificates.crt`)
 
 | Library | Honors | Covered by this recipe |

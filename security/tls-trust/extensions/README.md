@@ -101,3 +101,35 @@ It does **not** claim to patch the spawned sandbox pod directly.
 - sandbox pod exists but lacks the mount or env: the current `0.13.0`
   config-only packet stops here; the remaining gap is sandbox-controller /
   operator propagation, not customer Helm values
+
+## Important hostname constraint
+
+This packet solves **CA trust**. It does **not** override normal TLS hostname
+validation.
+
+That matters for Kaizen because committed agent configs in the repo commonly use
+HTTPS **IP-literal** endpoints like:
+
+- `https://192.168.100.118:61117/v1`
+- `https://192.168.100.115:61109/v1`
+
+Meanwhile, sibling Kamiwaza deployment endpoints present a wildcard DNS cert
+like `*.default.deployment.kamiwaza.ai`.
+
+If your sandbox calls an IP-literal HTTPS URL while the server presents a DNS
+wildcard cert, you will still fail verification even after the CA bundle is
+mounted correctly:
+
+- first failure mode: `self-signed certificate` / unknown CA
+- second failure mode after trusting that CA: `IP address mismatch`
+
+So for verification-on success you need **both**:
+
+1. the CA bundle mounted and wired into the caller environment
+2. the target hostname in the URL to match the certificate SANs
+
+If the federal/customer endpoint is a private DNS hostname signed by the
+customer CA, this packet can still work. If the endpoint is configured as an
+IP-literal HTTPS URL, fix the endpoint naming first or use a different routing
+pattern; do not assume a wildcard DNS cert or generic private CA patch will
+make the IP literal verify.
