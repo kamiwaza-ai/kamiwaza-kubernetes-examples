@@ -11,7 +11,7 @@ whether the current config-only packet reaches the spawned sandbox pods too.
 This folder covers two separate cases:
 
 1. **Declared extension pods** in `kamiwaza-extensions`
-   - proven config-only path
+   - supported config-only path
    - mount `kamiwaza-trust-bundle`
    - set `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` / `AWS_CA_BUNDLE`
    - keep verification ON
