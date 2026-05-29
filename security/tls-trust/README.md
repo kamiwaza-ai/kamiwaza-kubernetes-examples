@@ -37,7 +37,8 @@ endpoint whose certificate is signed by a corporate CA.
 | --- | --- | --- |
 | `core-scheduler` | ✅ | bundle mounted at `/etc/ssl/certs/ca-certificates.crt` |
 | Ray head + workers | ✅ | same mount; this is where Bedrock/LiteLLM runs |
-| Frontend / extensions / Kaizen | ❌ deferred | platform follow-up (`NODE_EXTRA_CA_CERTS`, extension trust) |
+| Declared extension pods | ⚠️ follow-on | use [`extensions/`](extensions/) to mount the bundle + set CA env on live extension CRs |
+| Kaizen spawned sandboxes | ❌ validate explicitly | config-only path is not proven until the sandbox pod itself shows bundle mount + CA env |
 
 ### Client-library consumption (with this recipe's env set, bundle at `/etc/ssl/certs/ca-certificates.crt`)
 
@@ -159,6 +160,7 @@ re-installing it would conflict with the Helm-owned CRD.
 | [`verify.sh`](verify.sh) | End-to-end verification (ConfigMap contents, namespace sync, pod env/mount, optional live TLS probe). |
 | [`bedrock-custom-region/`](bedrock-custom-region/) | **Companion** — custom Bedrock **region** enablement. Declarative botocore hotfix so boto3 *accepts* a non-default region; pair with this recipe so no `SSL_VERIFY=False` is needed. |
 | [`ingress/`](ingress/) | BYO ingress cert — manifest path required on 0.13.0 (not needed on later releases). |
+| [`extensions/`](extensions/) | Extension / Kaizen follow-on: add `kamiwaza-sandboxes` to trust-bundle targets, patch a live Kaizen extension CR, and verify whether spawned sandboxes inherit trust. |
 
 ---
 
@@ -278,6 +280,23 @@ kubectl -n kamiwaza exec <ray-pod> -- python -c \
 **Pass:** the httpx/Bedrock call completes the TLS handshake with verification ON
 (no `AUTH_GATEWAY_TLS_INSECURE`, no `verify=False`), and `get_ssl_verify()` returns the
 `SSL_CERT_FILE` path — i.e. LiteLLM is verifying against your additive bundle.
+
+## Extensions / Kaizen follow-on
+
+Once the core / Ray packet above is green, use [`extensions/`](extensions/) for the
+remaining 0.13.0 Kaizen slice.
+
+That follow-on does three things:
+
+1. extends the trust-bundle sync target list to `kamiwaza-sandboxes`
+2. patches a live Kaizen `KamiwazaExtension` CR so the declared backend pod mounts
+   the bundle, keeps verification ON, and is allowed external egress
+3. verifies whether the spawned sandbox pod also receives the bundle + CA env
+
+**Important:** a green backend pod is not enough for Kaizen. If the sandbox pod does
+not show `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` / `AWS_CA_BUNDLE` plus the mounted
+bundle file, the current config-only packet stops there and the remaining gap is
+sandbox-controller / operator behavior, not customer values.
 
 ---
 
