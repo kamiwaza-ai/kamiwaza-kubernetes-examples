@@ -1,0 +1,68 @@
+# Custom CA trust recipe — merge into Deploy `cluster/values/overrides.yaml`
+# (or another higher-priority values file).
+#
+# Prereqs before sync:
+#   - Secret `kamiwaza-org-ca` exists in ns `kamiwaza` (root + intermediate PEM).
+#   - trust-manager is installed (ships with the `ca` chart).
+#
+# Effect (additive): Mozilla public CAs + platform root-ca + your CA(s) are merged
+# into ConfigMap `kamiwaza-trust-bundle` (key `ca-certificates.crt`) and synced to
+# ns kamiwaza / kamiwaza-system / kamiwaza-extensions, then mounted on scheduler +
+# Ray at /etc/ssl/certs/ca-certificates.crt.
+
+# --- ca subchart: register the CA Secret as a Bundle source -------------------
+ca:
+  trustBundle:
+    # `customerCASecret` is the chart's own values key; point it at any Secret name.
+    # Secret MUST be in the kamiwaza namespace and exist before this sync.
+    # includeAllKeys: a single Secret can carry root + intermediate(s).
+    customerCASecret: kamiwaza-org-ca
+
+# --- core subchart: mount the bundle + set client-library trust env ----------
+core:
+  # Working key. NOTE: top-level `trustManager:` in kamiwaza-base.yaml is a no-op
+  # (the core subchart never reads it). Set it here under `core`.
+  trustManager:
+    enabled: true
+
+  scheduler:
+    # Consumed by BOTH the scheduler Deployment and the Ray head/worker pods
+    # (both read `scheduler.extraEnv`). This is where Bedrock/LiteLLM runs.
+    extraEnv:
+      # SSL_CERT_FILE is the key lever for the Bedrock/LiteLLM path. In litellm 1.83
+      # Bedrock is httpx-based (not boto3): get_ssl_verify() returns $SSL_CERT_FILE when
+      # verification is on, and httpx 0.28 create_ssl_context() uses $SSL_CERT_FILE as the
+      # CA file when set (else certifi). Also covers stdlib ssl and the OpenSSL CLI.
+      # Point it at the ADDITIVE bundle so public TLS still works (SSL_CERT_FILE replaces
+      # certifi, it does not augment it).
+      - name: SSL_CERT_FILE
+        value: "/etc/ssl/certs/ca-certificates.crt"
+      # AWS_CA_BUNDLE only matters for DIRECT boto3 use (S3, STS) — litellm's Bedrock
+      # call does not use boto3. Harmless to set; covers those direct paths.
+      - name: AWS_CA_BUNDLE
+        value: "/etc/ssl/certs/ca-certificates.crt"
+      # REQUESTS_CA_BUNDLE is already set to this path by the chart (requests path).
+
+    # --- FALLBACK ONLY (rarely needed): certifi overlay --------------------------
+    # NOT needed for httpx >= 0.28 / litellm 1.83 — they honor SSL_CERT_FILE above.
+    # Use this only for a client that pins certifi.where() AND ignores SSL_CERT_FILE.
+    # Overlays the trust-bundle ConfigMap onto the venv's certifi cacert.pem.
+    #
+    # 1) Find the exact path in the pod:
+    #      kubectl -n kamiwaza exec deploy/core-scheduler -c core -- \
+    #        python -c "import certifi; print(certifi.where())"
+    # 2) Set mountPath + subPath below to that path, then uncomment both blocks.
+    #
+    # extraVolumes:
+    #   - name: certifi-overlay
+    #     configMap:
+    #       name: kamiwaza-trust-bundle
+    #       items:
+    #         - key: ca-certificates.crt
+    #           path: cacert.pem
+    #       optional: true
+    # extraVolumeMounts:
+    #   - name: certifi-overlay
+    #     mountPath: /app/.venv/lib/python3.11/site-packages/certifi/cacert.pem  # <-- REPLACE with `certifi.where()`
+    #     subPath: cacert.pem
+    #     readOnly: true

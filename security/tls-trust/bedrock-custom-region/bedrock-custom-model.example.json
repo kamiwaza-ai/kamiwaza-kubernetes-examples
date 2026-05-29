@@ -1,0 +1,28 @@
+{
+  "_comment": "Reference payload to register a custom AWS Bedrock endpoint via the API, bypassing the frontend's non-amazonaws.com URL rejection (the backend has no region/URL validator on 0.13.0). POST to /api/models/. Replace every REPLACE_* token. Do NOT commit real credentials.",
+  "name": "bedrock-custom-endpoint",
+  "description": "Custom Bedrock endpoint",
+  "hub": "external",
+  "purpose": "external",
+  "modelfamily": "external",
+  "repo_modelId": "REPLACE_MODEL_ID",
+  "source_repository": "AWS Bedrock",
+  "private": true,
+  "default_config": {
+    "name": "bedrock-custom-endpoint External Endpoint",
+    "default": true,
+    "description": "Custom Bedrock endpoint config",
+    "config": {},
+    "system_config": {
+      "engine_name": "aws_bedrock",
+      "external_endpoint": {
+        "service": "aws_bedrock",
+        "model_id": "REPLACE_MODEL_ID",
+        "region": "REPLACE_WITH_REGION",
+        "endpoint_url": "https://REPLACE_REAL_CUSTOM_ENDPOINT",
+        "credential_secret": "{\"aws_access_key_id\":\"REPLACE_ACCESS_KEY\",\"aws_secret_access_key\":\"REPLACE_SECRET_KEY\"}",
+        "extra_body": {}
+      }
+    }
+  }
+}

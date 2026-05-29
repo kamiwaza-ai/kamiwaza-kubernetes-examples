@@ -1,0 +1,51 @@
+# CA-issuer approach (0.13.0 manifest path): cert-manager issues the ingress leaf
+# from YOUR CA in-cluster and rotates it.
+#
+# Prereq: Secret `org-ca-keypair` (kubernetes.io/tls layout) in ns kamiwaza,
+#   tls.crt = your CA cert, tls.key = your CA private key:
+#
+#     kubectl -n kamiwaza create secret tls org-ca-keypair \
+#       --cert=/path/to/org-ca.crt --key=/path/to/org-ca.key
+#
+# The internal app-ca / infra-ca / root-ca hierarchy is left untouched.
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: org-ca
+  namespace: kamiwaza
+  labels:
+    app.kubernetes.io/name: org-ca
+    app.kubernetes.io/part-of: network
+spec:
+  ca:
+    secretName: org-ca-keypair
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: traefik-wildcard-public
+  namespace: kamiwaza
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/part-of: network
+spec:
+  # Reuse the same secret name the default TLSStore reads (or set tlsstore-default-byo
+  # secretName to match this). Keep it distinct from the platform app-ca secret.
+  secretName: org-ingress-tls
+  commonName: "*.REPLACE_WITH_YOUR_DOMAIN"
+  dnsNames:
+    - "REPLACE_WITH_YOUR_DOMAIN"
+    - "*.REPLACE_WITH_YOUR_DOMAIN"
+  privateKey:
+    algorithm: RSA
+    size: 2048
+    rotationPolicy: Always
+  duration: 8760h   # 1 year
+  renewBefore: 720h # 30 days
+  usages:
+    - server auth
+  # Point at your CA Issuer instead of the platform `app-ca`.
+  issuerRef:
+    name: org-ca
+    kind: Issuer

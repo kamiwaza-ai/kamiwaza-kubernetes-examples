@@ -60,6 +60,7 @@ Category indexes:
 | Backup and restore                                  | [operations/backup-restore](operations/backup-restore)                           | #operations #backup #postgres #etcd           |
 | Consent modal + classification banners              | [security/consent-banner](security/consent-banner)                               | #security #compliance #helm-values           |
 | CAC / PIV login (mTLS forwarding)                   | [security/cac](security/cac)                                                     | #security #cac #mtls #helm-values            |
+| Custom TLS trust + BYO ingress cert                 | [security/tls-trust](security/tls-trust)                                         | #security #tls #pki #ca-trust #bedrock       |
 | ReBAC (relationship-based access control)           | [security/rebac](security/rebac)                                                 | #security #rebac #auth #helm-values          |
 | LDAP + Keycloak federation                          | [security/ldap](security/ldap)                                                   | #security #ldap #keycloak                    |
 | Diagnostic commands                                 | [troubleshooting/diagnostic-commands](troubleshooting/diagnostic-commands)       | #troubleshooting #diagnostics #health-check   |

@@ -1,0 +1,47 @@
+# Custom Bedrock region hotfix — DECLARATIVE form (survives helm/ArgoCD sync).
+#
+# Merge into Deploy `cluster/values/overrides.yaml`. This replaces the hand-run
+# `kubectl set env` / `kubectl patch deployment` / `kubectl edit raycluster` steps —
+# those get REVERTED on the next helm/Argo sync (an Argo-managed cluster reverts
+# imperative edits). Because Ray head + workers also read `scheduler.extraEnv` /
+# `scheduler.extraVolumes` / `scheduler.extraVolumeMounts`, this one block covers the
+# scheduler AND every Ray pod (where LiteLLM/boto3 actually runs).
+#
+# Prereq: ConfigMap `botocore-region-hotfix` exists in ns kamiwaza
+#   kubectl apply -k security/tls-trust/bedrock-custom-region
+#
+# Pairs with ../trust-bundle-values-snippet.yaml (CA trust, verify ON). Keep both —
+# the region patch makes boto3 ACCEPT the custom region; the CA trust makes the TLS
+# handshake to the privately-signed endpoint succeed WITHOUT SSL_VERIFY=False.
+
+core:
+  scheduler:
+    extraEnv:
+      # Auto-import the sitecustomize hook from the mounted ConfigMap.
+      - name: PYTHONPATH
+        value: "/app/hotfix:/app"
+      # Exact region code(s), comma-separated. No Python edits needed.
+      - name: KAMIWAZA_EXTRA_BEDROCK_REGIONS
+        value: "your-region-1"
+
+    extraVolumes:
+      - name: botocore-region-hotfix
+        configMap:
+          name: botocore-region-hotfix
+
+    extraVolumeMounts:
+      - name: botocore-region-hotfix
+        mountPath: /app/hotfix
+        readOnly: true
+
+# If you are ALSO applying the parent CA-trust recipe (you should be), merge its
+# AWS_CA_BUNDLE / SSL_CERT_FILE entries into the SAME core.scheduler.extraEnv list
+# (a values key can appear only once). Combined list:
+#
+#   core:
+#     scheduler:
+#       extraEnv:
+#         - {name: PYTHONPATH,                    value: "/app/hotfix:/app"}
+#         - {name: KAMIWAZA_EXTRA_BEDROCK_REGIONS, value: "your-region-1"}
+#         - {name: AWS_CA_BUNDLE,                 value: "/etc/ssl/certs/ca-certificates.crt"}
+#         - {name: SSL_CERT_FILE,                 value: "/etc/ssl/certs/ca-certificates.crt"}
