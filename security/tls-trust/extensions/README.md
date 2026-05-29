@@ -105,7 +105,13 @@ Kind kubelet config to allow up to `1000` pods.
 
 ### During deploy (best path)
 
-Patch the source template in the `deploy` repo before you run the install:
+For an **offline production package install**, patch the packaged Ansible
+template before you run the installer:
+
+`/opt/kamiwaza/ansible/roles/kind_cluster/templates/kind-cluster.yaml.j2`
+
+If you are working from a full source checkout instead, the equivalent repo path
+is:
 
 `deploy/ansible/roles/kind_cluster/templates/kind-cluster.yaml.j2`
 
@@ -120,14 +126,20 @@ kubeadmConfigPatches:
     podPidsLimit: 32768
 ```
 
-Then run the normal installer, for example:
+Then run the packaged installer, for example:
 
 ```bash
-cd deploy
-./scripts/install-prod.sh
+/opt/kamiwaza/bin/install-prod.sh --offline
 ```
 
 or:
+
+```bash
+/opt/kamiwaza/bin/install-prod.sh --offline \
+  -i /opt/kamiwaza/ansible/inventory/production/hosts.yml
+```
+
+If you do have a source checkout, the equivalent source-driven path is:
 
 ```bash
 cd deploy/ansible
@@ -137,6 +149,11 @@ ansible-playbook playbooks/install/prod.yml \
 
 Do not patch the generated `cluster/kind/generated-*.yaml` file directly; the
 Jinja template above is the source of truth.
+
+On `release/0.13.0`, this is a **template edit**, not just an extra-var
+override: that branch's Kind template does not yet expose `kind_kubelet_max_pods`
+as a first-class knob, so `-e kind_kubelet_max_pods=1000` alone is not enough
+there.
 
 ### After deploy
 
@@ -150,12 +167,12 @@ when the cluster is created, so an existing cluster needs a recreate window:
    Example wrapper flow:
 
    ```bash
-   cd deploy
-   ./scripts/uninstall-prod.sh
-   ./scripts/install-prod.sh
+   /opt/kamiwaza/bin/uninstall-prod.sh
+   /opt/kamiwaza/bin/install-prod.sh --offline
    ```
 
-   Or delete the Kind cluster and rerun the Ansible install playbook.
+   Or delete the Kind cluster and rerun the packaged installer / Ansible
+   install playbook.
 
 3. Verify the new pod ceiling:
 
@@ -174,7 +191,15 @@ Newer `deploy` branches already carry this as a first-class Ansible knob:
 - `ansible/roles/kind_cluster/templates/kind-cluster.yaml.j2` -> `maxPods: {{ kind_kubelet_max_pods | default(1000) }}`
 
 So if you are not pinned to `release/0.13.0`, prefer keeping that variable at
-`1000` instead of carrying a local template-only patch forever.
+`1000` instead of carrying a local template-only patch forever. Packaged
+installers on those newer branches also accept Ansible passthrough args, so you
+can use:
+
+```bash
+/opt/kamiwaza/bin/install-prod.sh --offline -e kind_kubelet_max_pods=1000
+```
+
+instead of editing the template again.
 
 ## What the Kaizen patcher changes
 
