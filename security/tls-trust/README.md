@@ -37,15 +37,15 @@ endpoint whose certificate is signed by a corporate CA.
 | --- | --- | --- |
 | `core-scheduler` | ✅ | bundle mounted at `/etc/ssl/certs/ca-certificates.crt` |
 | Ray head + workers | ✅ | same mount; this is where Bedrock/LiteLLM runs |
-| Declared extension pods | ⚠️ follow-on | use [`extensions/`](extensions/) to mount the bundle + set CA env on live extension CRs |
-| Kaizen spawned sandboxes | ❌ validate explicitly | config-only path is not proven until the sandbox pod itself shows bundle mount + CA env |
+| Declared extension pods | ⚠️ generic follow-on | use [`extensions/`](extensions/) for the reusable declared-pod trust pattern: mount the bundle, set CA env, keep verification ON |
+| Kaizen spawned sandboxes | ❌ Kaizen-specific follow-on | Kaizen adds a second boundary: config-only is not proven until the spawned sandbox pod itself shows bundle mount + CA env |
 
 > **Hostname caveat for Kaizen / custom endpoints:** this packet adds **CA
 > trust**, not hostname rewrites. If a sandbox or extension is configured to
 > call an HTTPS **IP literal** while the upstream presents a DNS wildcard cert,
 > verification will still fail after the CA is trusted (first `unknown CA`,
-> then `IP address mismatch`). See [`extensions/`](extensions/) for the Kaizen
-> follow-on and endpoint-shape warning.
+> then `IP address mismatch`). See [`extensions/`](extensions/) for the generic
+> extension trust pattern and the Kaizen-specific sandbox warning.
 
 ### Client-library consumption (with this recipe's env set, bundle at `/etc/ssl/certs/ca-certificates.crt`)
 
@@ -167,7 +167,7 @@ re-installing it would conflict with the Helm-owned CRD.
 | [`verify.sh`](verify.sh) | End-to-end verification (ConfigMap contents, namespace sync, pod env/mount, optional live TLS probe). |
 | [`bedrock-custom-region/`](bedrock-custom-region/) | **Companion** — custom Bedrock **region** enablement. Declarative botocore hotfix so boto3 *accepts* a non-default region; pair with this recipe so no `SSL_VERIFY=False` is needed. |
 | [`ingress/`](ingress/) | BYO ingress cert — manifest path required on 0.13.0 (not needed on later releases). |
-| [`extensions/`](extensions/) | Extension / Kaizen follow-on: add `kamiwaza-sandboxes` to trust-bundle targets, patch a live Kaizen extension CR, and verify whether spawned sandboxes inherit trust. |
+| [`extensions/`](extensions/) | Two-layer follow-on: generic extension trust pattern for declared pods, plus the Kaizen-specific sandbox verification path. |
 
 ---
 
