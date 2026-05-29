@@ -98,36 +98,38 @@ Kaizen adds one more boundary:
 
 ## Scale note: raise the Kind pod ceiling to 1000 on 0.13.0
 
-For an offline prod install, add this top-level key to
-`/opt/kamiwaza/cluster/values/overrides.yaml`:
+For a live offline RHEL install already running `release/0.13.0`, patch:
+
+`/opt/kamiwaza/cluster/kind/generated-kamiwaza-prod.yaml`
+
+This is the live backport path for systems not yet moved to `release/0.13.1`.
+
+Make the control-plane entry include:
 
 ```yaml
-kind_kubelet_max_pods: 1000
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        max-pods: "1000"
+  - |
+    kind: KubeletConfiguration
+    maxPods: 1000
 ```
 
-Then rerun the installer and pass that same file through to Ansible:
+Then recreate the Kind cluster and rerun the offline installer so the patched
+config is used on cluster creation.
+
+Verify with:
 
 ```bash
-/opt/kamiwaza/bin/install-prod.sh --offline \
-  -e @/opt/kamiwaza/cluster/values/overrides.yaml
+kubectl get node -o jsonpath='{.items[0].status.allocatable.pods}'
 ```
 
-If the cluster already exists, recreate it first because the Kind kubelet
-config is applied at cluster creation:
-
-```bash
-/opt/kamiwaza/bin/uninstall-prod.sh
-/opt/kamiwaza/bin/install-prod.sh --offline \
-  -e @/opt/kamiwaza/cluster/values/overrides.yaml
-```
-
-Verify:
-
-```bash
-kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" pods="}{.status.capacity.pods}{"\n"}{end}'
-```
-
-Expect `pods=1000`.
+Expect `1000`.
 
 ## What the Kaizen patcher changes
 
