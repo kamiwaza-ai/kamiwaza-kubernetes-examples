@@ -1,4 +1,4 @@
-# Kaizen sandbox trust (config-only sandbox-controller overlay)
+# Kaizen sandbox trust (spawned-sandbox CA bundle)
 
 **Scenario:** close the last gap left open by the parent [`../`](../) packet — make the
 Kaizen **spawned sandbox** pods (not just the declared backend) trust your corporate CA,
@@ -13,9 +13,45 @@ same path, into every sandbox the Kaizen sandbox-controller spawns.
 > [`../README.md`](../README.md) extension follow-on is applied for the declared Kaizen
 > backend. This folder only addresses the spawned-sandbox boundary.
 
+> **The recommended way to close this boundary is the generic, dynamic
+> [`../extension-trust-webhook/`](../extension-trust-webhook/)** — it covers sandboxes
+> **and** declared pods for **all** extensions, automatically and across redeploys. The
+> per-extension controller overlay documented in the rest of this README is now the niche
+> **fallback** (single stable Kaizen extension, no admission webhook wanted).
+
 ---
 
-## Why this is needed
+## Two ways to do this
+
+There are two config-only ways to land the trust bundle in spawned sandboxes. Both reuse the
+**same `kamiwaza-trust-bundle` ConfigMap** at the **same `/etc/ssl/certs/ca-certificates.crt`
+path** — they differ only in *how* the mount reaches the spawned pod.
+
+| Approach | What it does | Dynamic? | When to use |
+| --- | --- | --- | --- |
+| **(a) Dynamic, extension-agnostic webhook (recommended)** → [`../extension-trust-webhook/`](../extension-trust-webhook/) | A mutating admission webhook injects the bundle mount **and** CA env into **every** sandbox pod **and** every declared extension pod at admission time | **Yes** — every conversation, resume, redeployed extension, and brand-new/second extension, across **all** extensions, automatically | The general case — zero per-extension action, survives redeploys, covers declared pods too |
+| **(b) Per-extension Kaizen controller overlay** (`apply-sandbox-controller-trust.py`, the rest of this README) | Overlays **one** Kaizen extension's sandbox-controller pod-builder | **No** — tied to one extension's CR, **lost on redeploy**, must be re-run per extension | The niche fallback: you don't want an admission webhook **and** have a **single stable** Kaizen extension |
+
+**(a) Recommended: the dynamic, extension-agnostic webhook**
+([`../extension-trust-webhook/`](../extension-trust-webhook/)). Because it mutates **pod
+creation** rather than controller code, it auto-applies to every sandbox from every
+extension (and to declared extension pods), survives extension redeploys, and needs no
+per-extension action. This is the durable replacement for the overlay below.
+
+**(b) Alternative: the per-extension Kaizen controller overlay** (the rest of this
+README). Simpler — no admission webhook — but it is **not** dynamic: it patches one
+Kaizen extension's sandbox-controller, is tied to that extension's CR, and is **lost when
+that extension is redeployed or a new/second Kaizen extension is created** (you must
+re-run it per extension). Keep it as the fallback for "I don't want an admission webhook
+and have a single stable Kaizen extension."
+
+> The rest of this README documents the **per-extension overlay fallback (b)**. For the
+> recommended dynamic, extension-agnostic approach, see
+> [`../extension-trust-webhook/`](../extension-trust-webhook/).
+
+---
+
+## Why this is needed (for the overlay alternative)
 
 The Kaizen sandbox-controller builds every agent sandbox pod **programmatically** in
 `kaizen/sandbox_controller/backends/kubernetes.py` (methods `_build_pod` and
@@ -23,11 +59,14 @@ The Kaizen sandbox-controller builds every agent sandbox pod **programmatically*
 Helm values and **not** by the `KamiwazaExtension` CR. Neither customer config surface can
 add a volume to a pod the controller invents at spawn time.
 
-So on `0.13.0`, the only config-only way to land the trust bundle in every sandbox is to
+One config-only way to land the trust bundle in a sandbox without an admission webhook is to
 overlay a tiny patch onto **that one controller file** and let the controller mount the
 bundle into the pods it creates. That is exactly what
 [`apply-sandbox-controller-trust.py`](apply-sandbox-controller-trust.py) does — the file
-is the source of truth for behavior and flags; this README is the operator guide.
+is the source of truth for behavior and flags; this README is the operator guide. (The
+dynamic [`../extension-trust-webhook/`](../extension-trust-webhook/) achieves the same
+mount cluster-wide — for sandboxes and declared pods alike — without touching controller
+code; see [Two ways to do this](#two-ways-to-do-this).)
 
 ## How it works
 
@@ -162,10 +201,16 @@ and 5**:
 > spec. Open or **resume** a conversation *after* the rollout to get a fresh pod with the
 > mount.
 
+> **Not dynamic — lost on redeploy.** This overlay patches **one** extension's
+> sandbox-controller and is tied to that extension's CR. Redeploying the extension reverts it
+> to the stock controller, and a new/second Kaizen extension does not inherit it — you must
+> re-run the applier per extension. If you need it to apply automatically and survive
+> redeploys, use the dynamic [`../extension-trust-webhook/`](../extension-trust-webhook/) instead.
+
 > **One controller per Kaizen extension.** Each `KamiwazaExtension` has its own
 > sandbox-controller — re-run the applier per extension. A brand-new Kaizen from the catalog
 > gets the stock controller until you run the applier (or bake the overlay into the
-> deploy / catalog).
+> deploy / catalog). The dynamic [`../extension-trust-webhook/`](../extension-trust-webhook/) avoids this entirely.
 
 > **Version pin is auto-handled.** Because the applier extracts + patches the **live** file,
 > the overlay always matches the running controller. But if you use `--from-file`, that file
@@ -210,8 +255,9 @@ sandboxes are unaffected until they respawn.
 
 | File | Purpose |
 | --- | --- |
-| [`apply-sandbox-controller-trust.py`](apply-sandbox-controller-trust.py) | Extract → inject → validate → ConfigMap → CR-patch. Config-only; live extraction = no drift. Source of truth for behavior/flags. |
-| [`smoke-test-local.sh`](smoke-test-local.sh) | Cluster-free validation of the recipe: PART A asserts the injection (4 sites, idempotent, compiles) against a sample `kubernetes.py`; optional PART B mirrors the proven local E2E with the demo PKI + agent image. |
+| [`../extension-trust-webhook/`](../extension-trust-webhook/) | **Dynamic, extension-agnostic trust (recommended).** A mutating admission webhook that injects the bundle mount + CA env into **every** spawned sandbox **and** every declared extension pod automatically — survives redeploys, no per-extension action. The durable replacement for the overlay below. |
+| [`apply-sandbox-controller-trust.py`](apply-sandbox-controller-trust.py) | **Per-extension Kaizen overlay (fallback).** Extract → inject → validate → ConfigMap → CR-patch. Config-only; live extraction = no drift. Source of truth for behavior/flags. Not dynamic — re-run per extension. |
+| [`smoke-test-local.sh`](smoke-test-local.sh) | Cluster-free validation of the overlay: PART A asserts the injection (4 sites, idempotent, compiles) against a sample `kubernetes.py`; optional PART B mirrors the proven local E2E with the demo PKI + agent image. |
 | [`README.md`](README.md) | This guide. |
 
 > `apply-sandbox-controller-trust.py` and `smoke-test-local.sh` are executable; if your
@@ -225,5 +271,10 @@ ship this sandbox mount **natively**, gated by a value — mirroring the core
 `trustManager.enabled` pattern — so the `kamiwaza-trust-bundle` is propagated into the
 spawned-pod template without overlaying controller code. That is the only path that is both
 declarative and able to close the sandbox boundary, but it requires changes to the platform
-charts and the sandbox-controller image, which live outside this examples repo. Until that
-ships, **this overlay is the supported interim** for live `0.13.0` clusters.
+charts and the sandbox-controller image, which live outside this examples repo.
+
+In-repo, the **dynamic [`../extension-trust-webhook/`](../extension-trust-webhook/) is the
+durable interim** — it closes the sandbox boundary (and the declared-pod boundary) for every
+extension without per-extension patching and survives redeploys, so it does not drift the way
+this single-extension overlay does. This overlay remains the fallback for operators who do not
+want to run an admission webhook on a single stable Kaizen extension.

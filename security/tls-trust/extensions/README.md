@@ -2,6 +2,14 @@
 
 Use this folder **after** the parent [`../`](../) packet is green for core / Ray.
 
+> **Recommended dynamic mechanism: [`extension-trust-webhook/`](extension-trust-webhook/).**
+> A single mutating admission webhook makes **every** extension workload trust the
+> corporate CA — declared service pods of any extension (apps, tools, MCP servers) **and**
+> spawned sandbox pods — automatically, across redeploys, with **no per-extension
+> patching**. Deploy it once and both boundaries below are covered. The per-extension
+> helpers in this folder remain for Kaizen-specific remediation that the generic webhook
+> does not do (see [What the Kaizen patcher changes](#what-the-kaizen-patcher-changes)).
+
 The goal here is two-layered:
 
 1. define the **generic extension trust pattern** for declared extension pods
@@ -30,6 +38,15 @@ reusable config-only pattern is:
 This layer is broadly reusable across extensions even though the helper scripts
 in this folder are Kaizen-focused.
 
+> **The mount + CA env half of this pattern is now automated by
+> [`extension-trust-webhook/`](extension-trust-webhook/).** Deploy that webhook once and
+> every declared extension pod (label `extensions.kamiwaza.io/deployment-id`) gets the
+> `kamiwaza-trust-bundle` mount + the CA env vars injected at pod-create — for **all**
+> extensions, including ones deployed later, with no per-extension mount patching. The
+> webhook supersedes hand-patching the mount + env per extension; what it does **not** do
+> is the Kaizen-specific verify-on flag remediation and the internal-`KAMIWAZA_API_URL`
+> fix (see [What the Kaizen patcher changes](#what-the-kaizen-patcher-changes)).
+
 ### 2. Kaizen-specific sandbox follow-on
 
 Kaizen adds one more boundary:
@@ -37,10 +54,14 @@ Kaizen adds one more boundary:
 - declared `backend` / `sandbox-controller` services must pick up the trust
   bundle like any other extension
 - **spawned sandbox pods** in `kamiwaza-sandboxes` must also end up trusting the
-  corporate CA. The config-only way to satisfy this on `0.13.0` is the
-  controller overlay in [`kaizen-sandbox-trust/`](kaizen-sandbox-trust/); the
-  rest of this section explains why an overlay (not Helm values or a CR patch) is
-  required.
+  corporate CA. The recommended fix is the generic, dynamic
+  [`extension-trust-webhook/`](extension-trust-webhook/) — one mutating admission
+  webhook that injects the bundle mount + CA env into **every** sandbox pod (and every
+  declared extension pod) automatically, across redeploys, for all extensions. The
+  Kaizen-specific [`kaizen-sandbox-trust/`](kaizen-sandbox-trust/) **per-extension
+  controller overlay** remains as a niche fallback (single stable Kaizen extension, no
+  admission webhook wanted). The rest of this section explains why neither Helm values nor
+  a CR patch can add this mount, so one of those two is required.
 
 **What the sandbox actually needs (and why it's simpler than it looks).** The
 Kaizen agent image entrypoint already pins trust to a fixed path — it runs
@@ -53,12 +74,14 @@ in that one file **inside the sandbox pod**.
 That file is owned by the spawned pod, which the **sandbox-controller** creates —
 not the operator and not Helm values. Neither Helm values nor the CR `services`
 list can add a volume to a pod the controller invents at spawn time. The in-repo
-fix is to overlay the controller's pod-builder so every spawned sandbox mounts
-`kamiwaza-trust-bundle` — see
-[`kaizen-sandbox-trust/`](kaizen-sandbox-trust/) (validated live, Kaizen
-1.8.13). So if a live probe from the sandbox to a corporate-CA endpoint fails, it
-means the overlay hasn't been applied (or the bundle isn't present in
-`kamiwaza-sandboxes`) — not that the gap is unfixable.
+fix gets `kamiwaza-trust-bundle` into every spawned sandbox either by the generic
+**mutating admission webhook** that injects the mount at pod-create time (dynamic,
+recommended — [`extension-trust-webhook/`](extension-trust-webhook/)) or by
+**overlaying the controller's pod-builder** (per-extension fallback — see
+[`kaizen-sandbox-trust/`](kaizen-sandbox-trust/), validated live, Kaizen 1.8.13).
+So if a live probe from the sandbox to a corporate-CA endpoint fails, it means
+neither has been applied (or the bundle isn't present in `kamiwaza-sandboxes`) —
+not that the gap is unfixable.
 
 > **Structural checks alone do not prove sandbox trust.** The agent image already
 > ships a full CA bundle (Mozilla set + the Traefik cert it installs), so a
@@ -70,11 +93,12 @@ means the overlay hasn't been applied (or the bundle isn't present in
 
 | File | Purpose |
 | --- | --- |
+| [`extension-trust-webhook/`](extension-trust-webhook/) | **Dynamic, extension-agnostic CA trust (recommended).** A mutating admission webhook that injects the `kamiwaza-trust-bundle` mount + CA env into **every** declared extension pod (apps, tools, MCP servers) **and** every spawned sandbox pod, automatically and across redeploys — no per-extension patching, no controller overlay, no new image. Validated live. This is the in-repo answer to both the declared-pod and spawned-sandbox gaps. |
 | [`sandbox-target-namespaces-values-snippet.yaml`](sandbox-target-namespaces-values-snippet.yaml) | Note: run the build script with `--include-sandboxes` to also write the ConfigMap to `kamiwaza-sandboxes` (no values change needed without trust-manager). |
-| [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.py) | Kaizen-specific helper: patches a live Kaizen `KamiwazaExtension` CR so its declared services pick up the generic trust pattern. |
-| [`verify-kaizen.sh`](verify-kaizen.sh) | Kaizen-specific verifier: checks declared backend trust wiring **and** whether the spawned sandbox pod inherited it. |
+| [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.py) | Kaizen-specific helper for the remediation the generic webhook does **not** do: re-asserts Kaizen's secure verify-on flags and fixes the internal-`KAMIWAZA_API_URL` mismatch on the declared backend CR. The generic mount + CA env is now provided by [`extension-trust-webhook/`](extension-trust-webhook/), so this is no longer needed for plain CA trust. |
+| [`verify-kaizen.sh`](verify-kaizen.sh) | Kaizen-specific verifier: checks declared backend trust wiring **and** whether the spawned sandbox pod inherited it (including the live TLS probe). |
 | [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/) | Offline / local-catalog livepatch for future Kaizen launches: 30-day lifetime / retention plus selected `0.13.1` startup and memory fixes. |
-| [`kaizen-sandbox-trust/`](kaizen-sandbox-trust/) | **Spawned-sandbox trust (config-only controller overlay).** Overlays the sandbox-controller's pod-builder so every spawned Kaizen sandbox mounts `kamiwaza-trust-bundle` automatically — no new image, no `docker`, no trust-manager. Validated end-to-end against live 1.8.13. This is the in-repo answer to the spawned-sandbox gap noted below. |
+| [`kaizen-sandbox-trust/`](kaizen-sandbox-trust/) | **Kaizen-specific per-extension overlay alternative.** Overlays one Kaizen extension's sandbox-controller pod-builder to mount `kamiwaza-trust-bundle` into the sandboxes it spawns. The niche fallback for "single stable Kaizen extension, no admission webhook" — **not** dynamic, lost on redeploy. Superseded by [`extension-trust-webhook/`](extension-trust-webhook/) for the general case. Config-only, validated end-to-end against live 1.8.13. |
 
 ## Apply order
 
@@ -84,11 +108,27 @@ means the overlay hasn't been applied (or the bundle isn't present in
    so the `kamiwaza-trust-bundle` ConfigMap is also written to `kamiwaza-sandboxes`
    (see [`sandbox-target-namespaces-values-snippet.yaml`](sandbox-target-namespaces-values-snippet.yaml);
    no values change is needed without trust-manager).
-3. For **declared extension pods generally**, apply the generic pattern:
-   mount `kamiwaza-trust-bundle`, inject the CA envs, keep verification ON, and
-   allow external egress only when needed.
+3. **Deploy the dynamic, extension-agnostic webhook once** — this is the recommended
+   path and it covers **every extension's declared pods AND spawned sandboxes** in one
+   step (the `kamiwaza-trust-bundle` mount + CA env, injected at pod-create, across
+   redeploys, with no per-extension action). Full guide:
+   [`extension-trust-webhook/`](extension-trust-webhook/).
 
-   For **Kaizen specifically**, patch the live extension CR with the helper:
+   ```bash
+   security/tls-trust/extensions/extension-trust-webhook/deploy-extension-trust-webhook.sh
+   ```
+
+   With the webhook deployed, the generic declared-pod mount + CA env and the spawned
+   sandbox mount + CA env are both handled automatically — the per-extension steps below
+   are only needed for the **Kaizen-specific** remediation the webhook does not do, or as
+   the no-webhook fallback.
+
+4. **(Kaizen-specific, optional)** The webhook gives Kaizen's declared backend the mount +
+   CA env, but it does **not** re-assert Kaizen's secure verify-on flags or fix a
+   non-cert-matching internal `KAMIWAZA_API_URL`. If the platform was put in insecure
+   mode, or the backend's `KAMIWAZA_API_URL` is an HTTPS `.svc` hostname (see
+   [the internal API URL tripwire](#the-internal-api-url-is-the-most-common-real-world-tripwire-verify-this-first)),
+   patch the live extension CR with the Kaizen helper:
 
    ```bash
    security/tls-trust/extensions/apply-kaizen-extension-trust.py <extension-name>
@@ -114,20 +154,20 @@ means the overlay hasn't been applied (or the bundle isn't present in
    still not assumed to reach spawned sandboxes; that remains a verification
    gate below.
 
-4. For **Kaizen spawned sandboxes**, apply the config-only controller overlay:
+   **No-webhook fallback for sandboxes:** if you cannot run an admission webhook and have a
+   single stable Kaizen extension, overlay that one extension's sandbox-controller
+   pod-builder instead. Wait for the controller to roll (reconcile is async) before
+   spawning. Note this is **not** dynamic — it is lost on redeploy and must be re-run
+   per extension. Full guide: [`kaizen-sandbox-trust/`](kaizen-sandbox-trust/).
 
    ```bash
    security/tls-trust/extensions/kaizen-sandbox-trust/apply-sandbox-controller-trust.py <extension-name>
    ```
-
-   This overlays the sandbox-controller pod-builder so every newly spawned
-   sandbox mounts `kamiwaza-trust-bundle`. Full guide:
-   [`kaizen-sandbox-trust/`](kaizen-sandbox-trust/). Wait for the controller to
-   roll (reconcile is async) before spawning.
 5. For Kaizen, open or resume a conversation so the sandbox-controller actually
-   spawns an agent pod in `kamiwaza-sandboxes`. The overlay from the previous
-   step only affects pods spawned **after** the controller rollout, so this must
-   come after that rollout has landed.
+   spawns an agent pod in `kamiwaza-sandboxes`. Both the webhook and the overlay affect
+   **new pods only**: the webhook mutates pods at CREATE, and the overlay only affects
+   pods spawned after the controller rollout — so this must come after the webhook is
+   deployed (or after that rollout has landed).
 6. If this customer is on offline / local catalog `0.13.0` and future Kaizen
    launches also need the selected `0.13.1` template fixes, run
    [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/).
@@ -148,7 +188,16 @@ means the overlay hasn't been applied (or the bundle isn't present in
 For the live Kaizen `KamiwazaExtension` CR, the patcher patches the **declared**
 `backend` and `sandbox-controller` services only.
 
-**The two changes that actually establish corporate-CA trust on the backend:**
+> **The generic mount + CA env is now superseded by
+> [`extension-trust-webhook/`](extension-trust-webhook/).** With the webhook deployed,
+> every declared Kaizen pod already gets the `kamiwaza-trust-bundle` mount + CA env at
+> pod-create. So the **first** group below (the mount + env) is no longer the reason to
+> run this patcher — the webhook does it. What remains Kaizen-specific, and is **not** done
+> by the webhook, is **re-asserting the secure verify-on flags** and the
+> **internal-`KAMIWAZA_API_URL`** fix. Run this patcher only for those.
+
+**The two changes that establish corporate-CA trust on the backend (now provided
+generically by the webhook):**
 
 - mounts `kamiwaza-trust-bundle` at `/etc/ssl/certs/ca-certificates.crt`
 - injects `SSL_CERT_FILE` + `REQUESTS_CA_BUNDLE` pointing at that path — these are
@@ -195,9 +244,11 @@ For the live Kaizen `KamiwazaExtension` CR, the patcher patches the **declared**
 > verification-ON path it forwards only `MCP_VERIFY_SSL` and
 > `KAMIWAZA_TRUST_TRAEFIK_CERT` — **not** `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` /
 > `AWS_CA_BUNDLE`, and **not** the proxy vars. Patching the backend therefore does
-> not reach the sandbox. The CA bundle instead reaches the sandbox via the
-> controller overlay in [`kaizen-sandbox-trust/`](kaizen-sandbox-trust/), which
-> mounts `kamiwaza-trust-bundle` into the spawned pod — not via `forward_env`.
+> not reach the sandbox. The CA bundle instead reaches the sandbox directly on the
+> spawned pod — via the dynamic [`extension-trust-webhook/`](extension-trust-webhook/)
+> (recommended) or the controller overlay in
+> [`kaizen-sandbox-trust/`](kaizen-sandbox-trust/) (fallback), both of which mount
+> `kamiwaza-trust-bundle` into the spawned pod — **not** via `forward_env`.
 
 ## Why the declared-backend patch is a script, not a manifest
 
@@ -226,8 +277,12 @@ extension service pods (gated by a value), and propagate that mount into the
 that is declarative end-to-end, but it requires changes to the platform Helm
 charts and the operator/sandbox-controller images, which live outside this
 examples repo. TODAY, though, **both boundaries are closed config-only in this
-repo**: this script for the declared backend, and
-[`kaizen-sandbox-trust/`](kaizen-sandbox-trust/) for the spawned sandboxes.
+repo** — the dynamic [`extension-trust-webhook/`](extension-trust-webhook/) injects
+the mount + CA env into both declared extension pods **and** spawned sandboxes for
+every extension at once. This script remains only for the Kaizen-specific verify-on
+flag remediation + the internal-`KAMIWAZA_API_URL` fix (its name-keyed CR merge,
+explained above), and [`kaizen-sandbox-trust/`](kaizen-sandbox-trust/) remains the
+no-webhook fallback for the spawned sandboxes.
 
 ## Pass / fail criteria
 
@@ -261,11 +316,12 @@ repo**: this script for the declared backend, and
 - no sandbox pod exists yet: create or resume a Kaizen conversation, then rerun
 - sandbox pod exists but the live probe to a corporate-CA endpoint fails (the
   corporate CA is not in the sandbox's `/etc/ssl/certs/ca-certificates.crt`): the
-  sandbox is still on the agent image's default bundle. Apply the controller
-  overlay in [`kaizen-sandbox-trust/`](kaizen-sandbox-trust/), confirm
-  `kamiwaza-trust-bundle` exists in `kamiwaza-sandboxes`
-  (`build-trust-bundle-configmap.sh --include-sandboxes`), resume or open a new
-  conversation so a fresh sandbox spawns, then re-run the probe
+  sandbox is still on the agent image's default bundle. Deploy the dynamic
+  [`extension-trust-webhook/`](extension-trust-webhook/) (or, as the no-webhook
+  fallback, apply the controller overlay in
+  [`kaizen-sandbox-trust/`](kaizen-sandbox-trust/)), confirm `kamiwaza-trust-bundle`
+  exists in `kamiwaza-sandboxes` (`build-trust-bundle-configmap.sh --include-sandboxes`),
+  resume or open a new conversation so a fresh sandbox spawns, then re-run the probe
 
 ## Important hostname constraint
 
