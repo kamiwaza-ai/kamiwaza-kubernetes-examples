@@ -18,19 +18,14 @@ pass() { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 fail() { printf '  \033[31m✗\033[0m %s\n' "$1"; exit 1; }
 info() { printf '\033[1m%s\033[0m\n' "$1"; }
 
-info "1. trust-manager + Bundle present"
-kubectl get crd bundles.trust.cert-manager.io >/dev/null 2>&1 \
-  && pass "bundles.trust.cert-manager.io CRD present" \
-  || fail "trust-manager CRD missing — is the ca chart synced with trust-manager?"
-
-info "2. Bundle ConfigMap synced to all target namespaces"
+info "1. Trust-bundle ConfigMap present in all target namespaces"
 for ns in "${SYNC_NAMESPACES[@]}"; do
   kubectl -n "$ns" get configmap "$BUNDLE_CM" >/dev/null 2>&1 \
     && pass "$ns/$BUNDLE_CM present" \
-    || fail "$ns/$BUNDLE_CM missing — is core.trustManager.enabled=true and trust-manager running?"
+    || fail "$ns/$BUNDLE_CM missing — run security/tls-trust/build-trust-bundle-configmap.sh to create it"
 done
 
-info "3. Bundle contains multiple CAs (Mozilla + platform root + your CA)"
+info "2. Bundle contains multiple CAs (Mozilla + platform root + your CA)"
 CERT_COUNT="$(kubectl -n "$NS" get configmap "$BUNDLE_CM" \
   -o jsonpath='{.data.ca-certificates\.crt}' | grep -c 'BEGIN CERTIFICATE' || true)"
 if [ "${CERT_COUNT:-0}" -gt 1 ]; then
@@ -39,21 +34,21 @@ else
   fail "bundle holds ${CERT_COUNT:-0} certificate(s) — CA Secret not merged?"
 fi
 
-info "4. Scheduler: mount + trust env vars"
+info "3. Scheduler: mount + trust env vars"
 SCHED_ENV="$(kubectl -n "$NS" exec deploy/core-scheduler -c core -- \
   sh -c "ls $BUNDLE_PATH >/dev/null 2>&1 && env" 2>/dev/null || true)"
 [ -n "$SCHED_ENV" ] && pass "scheduler has $BUNDLE_PATH mounted" \
   || fail "scheduler missing $BUNDLE_PATH mount (deploy/core-scheduler not ready?)"
 # In-pod cert count guards against a silent-empty-mount failure: the chart mounts
-# the bundle ConfigMap with optional: true, so if trust-manager is absent (the
-# 0.13.0 default — see parent README "Prereq A") the file is missing or empty
-# inside the container even though the volume "mounts cleanly".
+# the bundle ConfigMap with optional: true, so if the kamiwaza-trust-bundle
+# ConfigMap was not built/applied (run build-trust-bundle-configmap.sh) the file
+# is missing or empty inside the container even though the volume "mounts cleanly".
 SCHED_CERT_COUNT="$(kubectl -n "$NS" exec deploy/core-scheduler -c core -- \
   sh -c "grep -c 'BEGIN CERTIFICATE' $BUNDLE_PATH 2>/dev/null" 2>/dev/null || echo 0)"
 if [ "${SCHED_CERT_COUNT:-0}" -gt 50 ]; then
   pass "scheduler bundle has $SCHED_CERT_COUNT certs in-pod (Mozilla set present)"
 else
-  fail "scheduler bundle has only ${SCHED_CERT_COUNT:-0} certs in-pod — trust-manager not running, or pod predates the bundle (rollout restart)"
+  fail "scheduler bundle has only ${SCHED_CERT_COUNT:-0} certs in-pod — ConfigMap not built (run build-trust-bundle-configmap.sh), or pod predates the bundle (rollout restart)"
 fi
 for v in AWS_CA_BUNDLE SSL_CERT_FILE REQUESTS_CA_BUNDLE; do
   echo "$SCHED_ENV" | grep -q "^${v}=${BUNDLE_PATH}$" \
@@ -61,7 +56,7 @@ for v in AWS_CA_BUNDLE SSL_CERT_FILE REQUESTS_CA_BUNDLE; do
     || fail "scheduler missing $v=$BUNDLE_PATH (merge the values snippet + re-sync)"
 done
 
-info "5. Ray head: mount + trust env vars"
+info "4. Ray head: mount + trust env vars"
 RAY_POD="$(kubectl -n "$NS" get pods -l ray.io/node-type=head -o name 2>/dev/null | head -1)"
 if [ -z "$RAY_POD" ]; then
   RAY_POD="$(kubectl -n "$NS" get pods -o name 2>/dev/null | grep -i raycluster | head -1 || true)"
@@ -76,7 +71,7 @@ else
   printf '  (no Ray pod found — skipping)\n'
 fi
 
-info "6. LiteLLM trust resolution (does litellm pick up the bundle?)"
+info "5. LiteLLM trust resolution (does litellm pick up the bundle?)"
 TARGET_POD="${RAY_POD:-deploy/core-scheduler}"
 RESOLVED="$(kubectl -n "$NS" exec "$TARGET_POD" -- python -c \
   "from litellm.llms.custom_httpx.http_handler import get_ssl_verify; print(get_ssl_verify())" 2>/dev/null || true)"
@@ -89,7 +84,7 @@ else
 fi
 
 if [ -n "$PROBE_URL" ]; then
-  info "7. Live TLS probe to $PROBE_URL via httpx (litellm's transport, verification ON)"
+  info "6. Live TLS probe to $PROBE_URL via httpx (litellm's transport, verification ON)"
   # httpx exercises the SAME SSL_CERT_FILE resolution litellm/Bedrock use — unlike urllib.
   if kubectl -n "$NS" exec "$TARGET_POD" -- python -c \
     "import httpx; print('status', httpx.get('$PROBE_URL', timeout=15).status_code)" 2>/dev/null; then

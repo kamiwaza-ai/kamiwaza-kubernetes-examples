@@ -84,7 +84,7 @@ kubectl -n "$EXT_NS" get configmap "$BUNDLE_CM" >/dev/null 2>&1 \
   || fail "$EXT_NS/$BUNDLE_CM missing"
 kubectl -n "$SANDBOX_NS" get configmap "$BUNDLE_CM" >/dev/null 2>&1 \
   && pass "$SANDBOX_NS/$BUNDLE_CM present" \
-  || fail "$SANDBOX_NS/$BUNDLE_CM missing (merge sandbox-target-namespaces-values-snippet.yaml + re-sync)"
+  || fail "$SANDBOX_NS/$BUNDLE_CM missing (run build-trust-bundle-configmap.sh --include-sandboxes)"
 
 info "2. Declared Kaizen backend pod has bundle mount + CA env"
 BACKEND_POD="$(kubectl -n "$EXT_NS" get pods -l "extensions.kamiwaza.io/deployment-id=${EXT_NAME},extensions.kamiwaza.io/service=backend" -o name 2>/dev/null | head -1)"

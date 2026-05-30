@@ -1,27 +1,41 @@
 # Custom CA trust recipe — merge into Deploy `cluster/values/overrides.yaml`
 # (or another higher-priority values file).
 #
-# Prereqs before sync:
-#   - Secret `kamiwaza-org-ca` exists in ns `kamiwaza` (root + intermediate PEM).
-#   - trust-manager is installed (ships with the `ca` chart).
+# This recipe is CONFIG-ONLY and needs NO trust-manager controller.
 #
-# Effect (additive): Mozilla public CAs + platform root-ca + your CA(s) are merged
-# into ConfigMap `kamiwaza-trust-bundle` (key `ca-certificates.crt`) and synced to
-# ns kamiwaza / kamiwaza-system / kamiwaza-extensions, then mounted on scheduler +
-# Ray at /etc/ssl/certs/ca-certificates.crt.
+# Prereqs before sync:
+#   - The `kamiwaza-trust-bundle` ConfigMap has been built + applied by
+#     `build-trust-bundle-configmap.sh` (it assembles the additive PEM and writes
+#     the ConfigMap to ns kamiwaza / kamiwaza-system / kamiwaza-extensions).
+#     That script is the config-only replacement for the trust-manager controller.
+#   - The customer CA source the script reads exists: a local PEM (`--ca-file`)
+#     or Secret `kamiwaza-org-ca` in ns `kamiwaza`.
+#
+# Effect (additive): public/Mozilla CAs + platform root-ca + your CA(s) are merged
+# into ConfigMap `kamiwaza-trust-bundle` (key `ca-certificates.crt`) by the script,
+# then mounted on scheduler + Ray at /etc/ssl/certs/ca-certificates.crt by the
+# Helm value below.
 
-# --- ca subchart: register the CA Secret as a Bundle source -------------------
+# --- ca subchart: do NOT use the trust-manager Bundle path --------------------
 ca:
   trustBundle:
-    # `customerCASecret` is the chart's own values key; point it at any Secret name.
-    # Secret MUST be in the kamiwaza namespace and exist before this sync.
-    # includeAllKeys: a single Secret can carry root + intermediate(s).
-    customerCASecret: kamiwaza-org-ca
+    # No trust-manager controller in this recipe, so the chart's Bundle CR has
+    # nothing to reconcile it. Disable it so a dead/inert Bundle CR is not
+    # rendered on every sync. (The ConfigMap is produced by the build script,
+    # not by this CR.) The build script — not `targetNamespaces` — controls
+    # which namespaces receive the ConfigMap.
+    enabled: false
+    # NOTE: intentionally NO `customerCASecret` here. That key only feeds the
+    # trust-manager Bundle CR (disabled above); the customer CA is fed to the
+    # build script via `--ca-file` or the `kamiwaza-org-ca` Secret instead.
 
 # --- core subchart: mount the bundle + set client-library trust env ----------
 core:
-  # Working key. NOTE: top-level `trustManager:` in kamiwaza-base.yaml is a no-op
-  # (the core subchart never reads it). Set it here under `core`.
+  # This gate mounts the `kamiwaza-trust-bundle` ConfigMap on scheduler + Ray.
+  # The name is a legacy misnomer: it only mounts a ConfigMap — it does NOT
+  # require the trust-manager controller. Keep it enabled.
+  # (Aside: the top-level `trustManager:` key in kamiwaza-base.yaml is a no-op —
+  # the core subchart never reads it. Set it here under `core`.)
   trustManager:
     enabled: true
 

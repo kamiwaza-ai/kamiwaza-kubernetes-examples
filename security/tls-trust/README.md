@@ -6,9 +6,10 @@ registries, private object stores) **with verification left ON**, and serve the
 **inbound** ingress cert from a non-Kamiwaza CA — without `SSL_VERIFY=false`,
 without `AUTH_GATEWAY_TLS_INSECURE`, and without rebuilding containers.
 
-It uses **only supported Helm values + Secrets** on the trust side (no chart edits),
-and a manifest path for the ingress side on 0.13.0. Driver: a private AWS Bedrock
-endpoint whose certificate is signed by a corporate CA.
+It uses **supported Helm values + a config-only ConfigMap-builder script** on the
+trust side (no chart edits, no controller), and a manifest path for the ingress side
+on 0.13.0. Driver: a private AWS Bedrock endpoint whose certificate is signed by a
+corporate CA.
 
 > **Two blockers often travel together for custom Bedrock endpoints.** The
 > privately-signed cert (this recipe) is usually paired with a **custom AWS region**
@@ -163,7 +164,7 @@ renders — which fails to unmarshal — or the node was not recreated).
 | Item | Status |
 | --- | --- |
 | Validated against | **Kamiwaza 0.13.0** |
-| Outbound CA trust (this folder) | **Requires one extra prereq on 0.13.0** — install the trust-manager controller out-of-band first (see [Prereq A](#prereq-a-trust-manager-on-0130), then use `ca.trustBundle.customerCASecret` + `core.trustManager.enabled` + `core.scheduler.extraEnv` as documented |
+| Outbound CA trust (this folder) | **Config-only on 0.13.0** — no trust-manager controller needed. Build the `kamiwaza-trust-bundle` ConfigMap with [`build-trust-bundle-configmap.sh`](build-trust-bundle-configmap.sh), then `core.trustManager.enabled` + `core.scheduler.extraEnv` mount it. |
 | BYO ingress cert | **Manifest path on 0.13.0** — there is no native values knob, but the network subchart already manages a `default` TLSStore + wildcard Certificate, so the BYO manifests collide with Helm-owned resources. Read the [Helm-ownership caveat](ingress/#helm-ownership-on-0130) in `ingress/` before applying. **Not needed on later releases**, which serve a BYO ingress cert through a native values knob. |
 
 > The trust bundle is **additive**: Mozilla public CAs **+** platform `root-ca` **+**
@@ -211,6 +212,9 @@ renders — which fails to unmarshal — or the node was not recreated).
 
 - Kamiwaza 0.13.x deployed; namespaces `kamiwaza`, `kamiwaza-system`,
   `kamiwaza-extensions` present.
+- `openssl` + `kubectl` (with cluster access) on the operator host — the only deps
+  of [`build-trust-bundle-configmap.sh`](build-trust-bundle-configmap.sh). No
+  trust-manager controller, no extra cluster components.
 - Access to Deploy values layering (`cluster/values/overrides.yaml`).
 - Your enterprise **root + intermediate** CA chain as PEM (one file, concatenated is fine).
 
@@ -219,86 +223,51 @@ renders — which fails to unmarshal — or the node was not recreated).
 This recipe works on a cluster that is **already running** and on a **fresh install**.
 Both paths must satisfy one ordering rule, then differ only in *when* you run the steps.
 
-> **Ordering rule (both paths):** trust-manager ([Prereq A](#prereq-a-trust-manager-on-0130))
-> and the `kamiwaza-org-ca` Secret must both exist in the `kamiwaza` namespace **before**
-> the `helmfile sync` that sets `core.trustManager.enabled: true`. The bundle volume is
-> `optional: true`, so a sync run *before* the prereqs are in place brings the
-> scheduler/Ray pods up with **no CA file mounted** — silently. `verify.sh` (step 2 /
-> in-pod cert count) is the guard.
+> **Ordering rule (both paths):** the `kamiwaza-trust-bundle` ConfigMap (built by
+> [`build-trust-bundle-configmap.sh`](build-trust-bundle-configmap.sh)) must exist in
+> the `kamiwaza` namespace **before** the `helmfile sync` that sets
+> `core.trustManager.enabled: true`. The bundle volume is `optional: true`, so a sync
+> run *before* the ConfigMap exists brings the scheduler/Ray pods up with **no CA file
+> mounted** — silently. `verify.sh` (in-pod cert count) is the guard. If the mount is
+> already enabled and you build/update the ConfigMap afterward, roll the pods (see
+> [Recovery](#recovery--rollback-bad-ca)).
 
 **Path 1 — cluster already running (the verified path).**
 
-1. Install trust-manager out-of-band ([Prereq A](#prereq-a-trust-manager-on-0130)).
-2. Create the `kamiwaza-org-ca` Secret ([Step 1](#1-create-the-kamiwaza-org-ca-secret-in-kamiwaza)).
-3. Merge the values snippet ([Step 2](#2-merge-the-values-snippet-into-clustervaluesoverridesyaml)).
-4. `helmfile … sync` ([Step 3](#3-sync-and-wait-for-rollout)). The sync changes the
+1. Provide your corporate CA PEM ([Step 1](#1-provide-your-corporate-ca)).
+2. Run the build script ([Step 2](#2-build--apply-the-trust-bundle-configmap)). It
+   harvests the public baseline from the running scheduler pod, adds the platform
+   `root-ca` + your CA, dedupes, and writes the `kamiwaza-trust-bundle` ConfigMap to
+   `kamiwaza` / `kamiwaza-system` / `kamiwaza-extensions`.
+3. Merge the values snippet ([Step 3](#3-merge-the-values-snippet-into-clustervaluesoverridesyaml)).
+4. `helmfile … sync` ([Step 4](#4-sync-and-wait-for-rollout)). The sync changes the
    scheduler/Ray **pod spec** (adds the mount + env), so the rollout it triggers brings
-   pods up with the bundle already populated — no manual restart needed in the normal
-   case. If a pod predates the synced ConfigMap, roll it (see [Recovery](#recovery--rollback-bad-ca)).
+   pods up with the ConfigMap already mounted — no manual restart needed in the normal
+   case. If a pod predates the ConfigMap, roll it (see [Recovery](#recovery--rollback-bad-ca)).
 
-**Path 2 — fresh 0.13.0 install.** Namespaces don't exist until the first sync's
-prepare hook creates them, but the Secret must live in `kamiwaza` before the
-bundle-enabling sync. Two clean orderings:
+**Path 2 — fresh 0.13.0 install.** The build script harvests the public baseline from
+a **running** platform pod by default, so on a brand-new cluster the platform must
+either be up first, or you must feed the baseline from a file. Two clean orderings:
 
 - **(a) Sync, then enable (simplest).** Run a normal install first
   (`make install` / `helmfile … sync`) to create the namespaces and platform, then
-  follow Path 1 exactly. This is just "existing cluster" applied to a cluster you
-  brought up a minute ago.
-- **(b) Pre-seed, enable on first boot.** Pre-create the `kamiwaza` namespace
-  (`kubectl create namespace kamiwaza`), create the `kamiwaza-org-ca` Secret, install
-  trust-manager, merge the values snippet, **then** run the first `make install` /
-  `helmfile … sync`. Pods come up trusting your CA on first boot — no second sync, no
-  rollout. Use this when you want the platform correct from the very first reconcile
-  (e.g. air-gapped or GitOps bootstrap).
-
-### Prereq A: trust-manager on 0.13.0
-
-The trust-bundle CRD (`bundles.trust.cert-manager.io`) ships with the `ca` chart on
-0.13.0 (`charts/ca/crds/`), but the **trust-manager controller does not** — on
-`release/0.13.0` the `ca` chart declares `dependencies: []` (verify:
-`grep -n dependencies charts/ca/Chart.yaml`), so no controller Deployment is rendered.
-The controller is wired in as a `ca`-chart dependency on `develop`/`main` (ENG-2838),
-but **that work is not on `release/0.13.0`** — so on a 0.13.0 cluster you must install
-the controller out-of-band, while the Bundle CR the chart renders has nothing to
-reconcile it until you do.
-
-Check:
-
-```bash
-kubectl get crd bundles.trust.cert-manager.io                # must be Present
-kubectl get deploy -A | grep -i trust-manager                # must be Running
-```
-
-If the CRD is present but the deployment is missing (the 0.13.0 default state),
-install trust-manager out-of-band into `cert-manager`:
-
-```bash
-helm repo add jetstack https://charts.jetstack.io --force-update
-helm repo update jetstack
-
-helm install trust-manager jetstack/trust-manager \
-  --namespace cert-manager \
-  --version v0.21.1 \
-  --set crds.enabled=false \
-  --set app.trust.namespace=kamiwaza \
-  --wait
-```
-
-`crds.enabled=false` because the Bundle CRD already ships at `charts/ca/crds/`;
-re-installing it would conflict with the Helm-owned CRD.
-
-> **Failure mode if you skip this on 0.13.0:** the chart still renders the Bundle
-> CR and the scheduler/Ray pod volume mounts, but the bundle volume uses
-> `optional: true`, so pods come up **with no CA file mounted at all** and corp TLS
-> fails silently. `verify.sh` will fail on "Bundle ConfigMap synced" in step 2.
-
----
+  follow Path 1 exactly: run the build script (it harvests the baseline from the now-
+  running scheduler), then enable the mount. This is just "existing cluster" applied to
+  a cluster you brought up a minute ago.
+- **(b) Offline baseline, enable on first boot.** Pre-create the `kamiwaza` namespace
+  (`kubectl create namespace kamiwaza`), run the build script with
+  `--baseline-file <offline mozilla/system CA PEM>` so it needs **no running pod**, then
+  merge the values snippet and run the first `make install` / `helmfile … sync`. Pods
+  come up trusting your CA on first boot — no second sync, no rollout. Use this when you
+  want the platform correct from the very first reconcile (e.g. air-gapped or GitOps
+  bootstrap).
 
 ## What you get
 
 | File | Purpose |
 | --- | --- |
-| [`trust-bundle-values-snippet.yaml`](trust-bundle-values-snippet.yaml) | Helm values overlay: enable trust bundle, point at the CA Secret, set `SSL_CERT_FILE` (covers httpx/LiteLLM/Bedrock) + `AWS_CA_BUNDLE` (direct boto3) on scheduler + Ray, plus an optional certifi-overlay fallback. |
+| [`build-trust-bundle-configmap.sh`](build-trust-bundle-configmap.sh) | **Config-only ConfigMap builder — the replacement for the trust-manager controller.** Assembles the additive PEM (public/Mozilla baseline + platform `root-ca` + your corporate CA(s), deduped by SHA-256) and `kubectl apply`s ConfigMap `kamiwaza-trust-bundle` (key `ca-certificates.crt`) into each target namespace. Needs only `openssl` + `kubectl`. |
+| [`trust-bundle-values-snippet.yaml`](trust-bundle-values-snippet.yaml) | Helm values overlay: mounts the (script-built) `kamiwaza-trust-bundle` ConfigMap on scheduler + Ray and sets `SSL_CERT_FILE` (covers httpx/LiteLLM/Bedrock) + `AWS_CA_BUNDLE` (direct boto3), plus an optional certifi-overlay fallback. Disables the chart's inert Bundle CR (`ca.trustBundle.enabled: false`) since there is no controller to reconcile it. |
 | [`org-ca-secret.template.yaml`](org-ca-secret.template.yaml) | Direct-apply `kamiwaza-org-ca` Secret template. |
 | [`kustomization.yaml`](kustomization.yaml) | Local-secret-driven generator for the same Secret (keeps PEM out of hand-edited YAML). |
 | [`org-ca.pem.example`](org-ca.pem.example) | Placeholder PEM. |
@@ -312,19 +281,22 @@ re-installing it would conflict with the Helm-owned CRD.
 
 ## Steps — outbound CA trust
 
-### 1. Create the `kamiwaza-org-ca` Secret in `kamiwaza`
+### 1. Provide your corporate CA
 
-A single Secret can carry root **and** intermediate(s) — the Bundle uses
-`includeAllKeys: true`.
+The build script needs your **root + intermediate** CA chain. Give it a PEM file
+(`--ca-file`, repeatable) **or** create the `kamiwaza-org-ca` Secret in `kamiwaza` and
+let the script read it (all keys) when no `--ca-file` is passed. A single Secret can
+carry root **and** intermediate(s).
 
 > **Just want to see it work?** A committed, **fake** demo PKI lives in
-> [`demo-pki/`](demo-pki/) so you can run the whole cycle with zero generation:
+> [`demo-pki/`](demo-pki/), so the whole cycle runs with **one command, no Secret**:
 > ```bash
-> kubectl apply -f security/tls-trust/demo-pki/secret-kamiwaza-org-ca.yaml
+> security/tls-trust/build-trust-bundle-configmap.sh \
+>   --ca-file security/tls-trust/demo-pki/ca-chain.pem
 > ```
-> That creates `kamiwaza-org-ca` from the demo root+intermediate. It is
-> throwaway material — **never** use it for anything real. For a real deployment
-> use one of the options below with your own CA.
+> `demo-pki/ca-chain.pem` is the fake root+intermediate. It is throwaway material —
+> **never** use it for anything real. For a real deployment pass your own
+> `--ca-file`, or create the `kamiwaza-org-ca` Secret with one of the options below.
 
 ```bash
 # Option A (recommended): kustomize from a local PEM file (gitignored)
@@ -342,16 +314,51 @@ kubectl create secret generic kamiwaza-org-ca \
 kubectl apply -f security/tls-trust/org-ca-secret.template.yaml
 ```
 
-> The Secret **must** live in the `kamiwaza` namespace and **must exist before**
-> the Helm sync that sets `ca.trustBundle.customerCASecret`.
+> If you use the Secret path, it **must** live in the `kamiwaza` namespace. The script
+> reads it only when you do **not** pass `--ca-file`.
 
-### 2. Merge the values snippet into `cluster/values/overrides.yaml`
+### 2. Build + apply the trust-bundle ConfigMap
+
+Run the script. It assembles the additive PEM (public baseline + platform `root-ca` +
+your CA, deduped by SHA-256 fingerprint) and `kubectl apply`s ConfigMap
+`kamiwaza-trust-bundle` (key `ca-certificates.crt`) into `kamiwaza`,
+`kamiwaza-system`, and `kamiwaza-extensions`.
+
+```bash
+# From a local CA PEM (root + intermediate):
+security/tls-trust/build-trust-bundle-configmap.sh \
+  --ca-file /path/to/root+intermediate.pem
+
+# ...or rely on the kamiwaza-org-ca Secret created in Step 1 (omit --ca-file):
+security/tls-trust/build-trust-bundle-configmap.sh
+
+# Preview the assembled ConfigMap without applying:
+security/tls-trust/build-trust-bundle-configmap.sh --ca-file /path/to/ca.pem --dry-run
+
+# Kaizen follow-on: also write the ConfigMap to kamiwaza-sandboxes:
+security/tls-trust/build-trust-bundle-configmap.sh --ca-file /path/to/ca.pem --include-sandboxes
+```
+
+By default the public baseline is **harvested from the running scheduler pod**
+(`deploy/core-scheduler`, container `core`) — its image already ships the Mozilla set,
+so this is air-gap-friendly. For a fully offline / deterministic run with no running
+pod, pass `--baseline-file <mozilla/system CA PEM>`. The platform `root-ca` comes from
+Secret `root-ca` (ns `kamiwaza`, key `ca.crt`) and is included by default.
+
+> The script is **idempotent** — re-running it re-harvests, re-dedupes, and re-applies
+> the ConfigMap, which is exactly what you do on CA rotation (then roll the pods; see
+> [Recovery](#recovery--rollback-bad-ca)).
+
+### 3. Merge the values snippet into `cluster/values/overrides.yaml`
 
 Copy [`trust-bundle-values-snippet.yaml`](trust-bundle-values-snippet.yaml) into your
 highest-priority values file. It sets:
 
-- `ca.trustBundle.customerCASecret: kamiwaza-org-ca` (`customerCASecret` is the chart's key name)
-- `core.trustManager.enabled: true`  ← mounts the bundle on scheduler + Ray
+- `ca.trustBundle.enabled: false`  ← no inert Bundle CR (there is no controller to
+  reconcile it; the ConfigMap is produced by the build script)
+- `core.trustManager.enabled: true`  ← mounts the script-built `kamiwaza-trust-bundle`
+  ConfigMap on scheduler + Ray (a legacy misnomer — it only mounts a ConfigMap and
+  needs **no** controller)
 - `core.scheduler.extraEnv` → **`SSL_CERT_FILE`** (covers stdlib `ssl`, httpx, and the
   LiteLLM/Bedrock path) **+ `AWS_CA_BUNDLE`** (covers any direct boto3 use)
 
@@ -364,7 +371,7 @@ highest-priority values file. It sets:
 > **top-level** `trustManager:` key that the `core` subchart never reads. The working
 > key is **`core.trustManager.enabled`**. (Tracked separately — document, don't patch base.)
 
-### 3. Sync and wait for rollout
+### 4. Sync and wait for rollout
 
 ```bash
 helmfile -f cluster/helmfile.yaml.gotmpl -e full sync
@@ -372,7 +379,7 @@ kubectl -n kamiwaza rollout status deploy/core-scheduler
 kubectl -n kamiwaza rollout status statefulset/core-raycluster-head   # name may vary
 ```
 
-### 4. (Fallback, rarely needed) certifi overlay
+### 5. (Fallback, rarely needed) certifi overlay
 
 **You usually do not need this.** With `SSL_CERT_FILE` set (Step 2), httpx 0.28 and
 litellm 1.83 already trust your CA. The certifi overlay is only a fallback for a client
@@ -410,7 +417,7 @@ Manual equivalents:
 kubectl -n kamiwaza get configmap kamiwaza-trust-bundle \
   -o jsonpath='{.data.ca-certificates\.crt}' | grep -c "BEGIN CERTIFICATE"
 
-# (b) synced to all three namespaces
+# (b) written to all three namespaces by the build script
 for ns in kamiwaza kamiwaza-system kamiwaza-extensions; do
   kubectl -n "$ns" get configmap kamiwaza-trust-bundle >/dev/null && echo "$ns OK"
 done
@@ -443,7 +450,8 @@ remaining 0.13.0 Kaizen slice.
 
 That follow-on does four things:
 
-1. extends the trust-bundle sync target list to `kamiwaza-sandboxes`
+1. re-runs the build script with `--include-sandboxes` to also write the
+   `kamiwaza-trust-bundle` ConfigMap to `kamiwaza-sandboxes`
 2. patches a live Kaizen `KamiwazaExtension` CR so the declared backend pod mounts
    the bundle, keeps verification ON, and is allowed external egress
 3. verifies (via a live TLS probe) whether the spawned sandbox actually trusts
@@ -468,28 +476,29 @@ sandbox-controller / operator behavior, not customer values.
 
 ## Recovery / rollback (bad CA)
 
-The whole recipe is Helm values + one Secret, so revert is a values rollback:
+The ConfigMap is rebuilt by the script, so revert is "re-run the script with the
+corrected CA, then roll the pods":
 
 ```bash
-# remove the bad CA from the bundle: drop ca.trustBundle.customerCASecret, re-sync
-helmfile -f cluster/helmfile.yaml.gotmpl -e full sync
-# or roll the Secret back to known-good content and let trust-manager re-sync (seconds)
+# re-render the ConfigMap with the corrected CA (or drop the bad --ca-file):
+security/tls-trust/build-trust-bundle-configmap.sh --ca-file /path/to/good-ca.pem
+# ...or, if the bad CA came from the Secret, fix it and re-run with no --ca-file:
 kubectl -n kamiwaza apply -f security/tls-trust/org-ca-secret.template.yaml
+security/tls-trust/build-trust-bundle-configmap.sh
 ```
 
-No data loss; trust-manager re-renders the ConfigMap in seconds. **However**, the
-bundle is mounted with `subPath`, so kubelet does **not** refresh the file inside
-running containers when the ConfigMap changes. To make a new bundle visible to
-already-running pods you must roll them:
+The re-run re-renders the `kamiwaza-trust-bundle` ConfigMap (it dedupes, so it is safe
+to run repeatedly). **However**, the bundle is mounted with `subPath`, so kubelet does
+**not** refresh the file inside running containers when the ConfigMap changes. To make
+the new bundle visible to already-running pods you must roll them:
 
 ```bash
 kubectl -n kamiwaza rollout restart deploy/core-scheduler
 kubectl -n kamiwaza delete pod -l ray.io/cluster=core-raycluster,ray.io/node-type=head
 ```
 
-This applies any time you change the customer CA Secret content too — the Bundle CR
-will update the ConfigMap, but live pods keep their old `/etc/ssl/certs/ca-certificates.crt`
-until they restart.
+This applies any time you rebuild the bundle — the updated ConfigMap lands immediately,
+but live pods keep their old `/etc/ssl/certs/ca-certificates.crt` until they restart.
 
 ---
 

@@ -4,7 +4,8 @@ kind: Kustomization
 namespace: kamiwaza
 
 generatorOptions:
-  # Stable name so `ca.trustBundle.customerCASecret: kamiwaza-org-ca` resolves.
+  # Stable name so build-trust-bundle-configmap.sh can read it as the customer CA
+  # source (or pass `--ca-file <pem>` instead).
   disableNameSuffixHash: true
 
 secretGenerator:

@@ -63,17 +63,20 @@ values — stop calling the packet complete.
 
 | File | Purpose |
 | --- | --- |
-| [`sandbox-target-namespaces-values-snippet.yaml`](sandbox-target-namespaces-values-snippet.yaml) | Generic follow-on values snippet: adds `kamiwaza-sandboxes` to the trust-bundle sync targets. |
+| [`sandbox-target-namespaces-values-snippet.yaml`](sandbox-target-namespaces-values-snippet.yaml) | Note: run the build script with `--include-sandboxes` to also write the ConfigMap to `kamiwaza-sandboxes` (no values change needed without trust-manager). |
 | [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.py) | Kaizen-specific helper: patches a live Kaizen `KamiwazaExtension` CR so its declared services pick up the generic trust pattern. |
 | [`verify-kaizen.sh`](verify-kaizen.sh) | Kaizen-specific verifier: checks declared backend trust wiring **and** whether the spawned sandbox pod inherited it. |
 | [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/) | Offline / local-catalog livepatch for future Kaizen launches: 30-day lifetime / retention plus selected `0.13.1` startup and memory fixes. |
+| [`kaizen-sandbox-trust/`](kaizen-sandbox-trust/) | **Spawned-sandbox trust (config-only controller overlay).** Overlays the sandbox-controller's pod-builder so every spawned Kaizen sandbox mounts `kamiwaza-trust-bundle` automatically — no new image, no `docker`, no trust-manager. Validated end-to-end against live 1.8.13. This is the in-repo answer to the spawned-sandbox gap noted below. |
 
 ## Apply order
 
 1. Apply the parent packet in [`../README.md`](../README.md) and make `../verify.sh`
    pass for core / Ray.
-2. Merge [`sandbox-target-namespaces-values-snippet.yaml`](sandbox-target-namespaces-values-snippet.yaml)
-   into the same Deploy values layer as the parent trust snippet, then sync.
+2. Run `security/tls-trust/build-trust-bundle-configmap.sh --include-sandboxes`
+   so the `kamiwaza-trust-bundle` ConfigMap is also written to `kamiwaza-sandboxes`
+   (see [`sandbox-target-namespaces-values-snippet.yaml`](sandbox-target-namespaces-values-snippet.yaml);
+   no values change is needed without trust-manager).
 3. For **declared extension pods generally**, apply the generic pattern:
    mount `kamiwaza-trust-bundle`, inject the CA envs, keep verification ON, and
    allow external egress only when needed.
