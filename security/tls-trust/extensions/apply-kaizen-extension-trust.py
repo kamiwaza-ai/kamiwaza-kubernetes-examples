@@ -30,9 +30,17 @@ CA_ENV = {
     "AWS_CA_BUNDLE": BUNDLE_PATH,
 }
 
+# Set as DIRECT service env on the backend. A container's direct `env` overrides
+# any same-key value coming from `envFrom` (the operator-generated
+# `<deployment-id>-config` ConfigMap). When the platform was generated in insecure
+# TLS mode it leaves a stale direct `KAMIWAZA_TLS_REJECT_UNAUTHORIZED=0` on the
+# backend that shadows the ConfigMap's value, so we must override it here as a
+# direct env too — setting only spec.kamiwaza.tlsRejectUnauthorized (ConfigMap)
+# is not enough.
 BACKEND_VERIFY_ENV = {
     "AGENT_DISABLE_SSL_VERIFY": "false",
     "KAMIWAZA_VERIFY_SSL": "true",
+    "KAMIWAZA_TLS_REJECT_UNAUTHORIZED": "1",
 }
 
 
@@ -167,6 +175,36 @@ def _patch_spec(obj: Dict[str, Any], backend_extra_env: Dict[str, str]) -> Dict[
     return cleaned
 
 
+def _warn_if_internal_https_api_url(obj: Dict[str, Any]) -> None:
+    """Warn when verify-on will break the extension's own KAMIWAZA_API_URL.
+
+    The platform sometimes sets spec.kamiwaza.apiUrl to an internal HTTPS service
+    hostname (e.g. https://traefik.kamiwaza.svc.cluster.local/api). That hostname
+    does NOT match the Traefik serving cert (*.kamiwaza.test), so turning
+    verification ON makes the extension's calls to its own API fail TLS hostname
+    validation even though the CA is trusted. Surface it loudly before patching.
+    """
+    api_url = ((obj.get("spec") or {}).get("kamiwaza") or {}).get("apiUrl") or ""
+    if not api_url.startswith("https://"):
+        return
+    try:
+        netloc = api_url.split("/", 3)[2]
+    except IndexError:
+        netloc = ""
+    if ".svc" not in netloc and ".cluster.local" not in netloc:
+        return  # public/external HTTPS host; assume cert-matching
+    sys.stderr.write(
+        "\nWARNING: spec.kamiwaza.apiUrl is an internal HTTPS hostname:\n"
+        f"    {api_url}\n"
+        "Turning verification ON (this patcher) will make the extension's calls to\n"
+        "that URL fail TLS hostname validation, because the Traefik serving cert is\n"
+        "for *.kamiwaza.test, not an internal *.svc name. Fix it cert-matching:\n"
+        "  - point apiUrl at the public origin, e.g. https://kamiwaza.test/api, or\n"
+        "  - add the internal hostname to the Traefik cert SANs.\n"
+        "Then run verify-kaizen.sh (step 3a fails closed on this exact mismatch).\n\n"
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Patch a live Kaizen KamiwazaExtension CR for the 0.13.0 trust-bundle hotfix."
@@ -200,6 +238,7 @@ def main() -> int:
     args = parser.parse_args()
 
     obj = _load_extension(args.name, args.namespace)
+    _warn_if_internal_https_api_url(obj)
     backend_extra_env = {
         key: value
         for key, value in {

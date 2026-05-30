@@ -103,6 +103,31 @@ check_env_if_expected "backend" "$BACKEND_ENV" "HTTPS_PROXY" "$EXPECT_HTTPS_PROX
 check_env_if_expected "backend" "$BACKEND_ENV" "HTTP_PROXY" "$EXPECT_HTTP_PROXY"
 check_env_if_expected "backend" "$BACKEND_ENV" "NO_PROXY" "$EXPECT_NO_PROXY"
 
+# Turning verification ON only helps if the extension's OWN KAMIWAZA_API_URL is
+# reachable under verification. The platform sometimes hands extensions an
+# internal HTTPS hostname (e.g. https://traefik.kamiwaza.svc.cluster.local/api)
+# that does NOT match the Traefik cert (*.kamiwaza.test) — so verify-ON breaks the
+# extension's own API connection even though the CA is trusted. Fail closed on it.
+info "3a. Backend reaches its own KAMIWAZA_API_URL with verification ON"
+API_PROBE="$(kubectl -n "$EXT_NS" exec "$BACKEND_POD" -- python3 -c '
+import httpx, os, sys
+url = os.environ.get("KAMIWAZA_API_URL", "")
+if not url.startswith("https"):
+    print("SKIP " + (url or "(unset)")); sys.exit(0)
+try:
+    r = httpx.get(url.rstrip("/") + "/models/", timeout=10)  # verify=True -> uses SSL_CERT_FILE bundle
+    print("OK " + str(r.status_code))
+except Exception as e:
+    m = str(e)
+    kind = "hostname-mismatch" if "Hostname mismatch" in m else ("unknown-CA" if "unable to get local issuer" in m else type(e).__name__)
+    print("FAIL " + kind)
+' 2>/dev/null || echo "FAIL exec-failed")"
+case "$API_PROBE" in
+  OK*)   pass "backend KAMIWAZA_API_URL verifies under verify-ON (HTTP ${API_PROBE#OK })" ;;
+  SKIP*) pass "backend KAMIWAZA_API_URL is plain HTTP (TLS not applicable): ${API_PROBE#SKIP }" ;;
+  *)     fail "backend cannot reach its KAMIWAZA_API_URL with verification ON (${API_PROBE#FAIL }). The platform gave this extension an HTTPS API URL whose hostname does not match the Traefik cert (*.kamiwaza.test). Point KAMIWAZA_API_URL at the public origin (https://kamiwaza.test/api) or add the internal hostname to the cert SANs — see README 'The internal API URL is the most common real-world tripwire'." ;;
+esac
+
 if [ -n "$PROBE_URL" ]; then
   info "3. Live backend TLS probe to $PROBE_URL"
   probe_httpx "backend" "$BACKEND_POD" "$EXT_NS" "$PROBE_URL"

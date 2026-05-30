@@ -137,16 +137,30 @@ For the live Kaizen `KamiwazaExtension` CR, the patcher patches the **declared**
 **Re-asserting the platform's secure TLS defaults (only matters if TLS was turned off):**
 
 - `spec.kamiwaza.tlsRejectUnauthorized: "1"` — the operator surfaces this to the
-  pod as env `KAMIWAZA_TLS_REJECT_UNAUTHORIZED`
-- `AGENT_DISABLE_SSL_VERIFY=false`
-- `KAMIWAZA_VERIFY_SSL=true`
+  pod via the `<deployment-id>-config` ConfigMap (`envFrom`)
+- `AGENT_DISABLE_SSL_VERIFY=false` — set as a **direct** `env` on the backend service
+- `KAMIWAZA_VERIFY_SSL=true` — set as a **direct** `env` on the backend service
+- `KAMIWAZA_TLS_REJECT_UNAUTHORIZED=1` — also set as a **direct** `env` on the
+  backend service. This is required, not redundant: when the platform was
+  generated in insecure mode it leaves a stale **direct** `env`
+  `KAMIWAZA_TLS_REJECT_UNAUTHORIZED=0` on the backend, and a container's direct
+  `env` **overrides** the same key coming from `envFrom`. So setting only
+  `spec.kamiwaza.tlsRejectUnauthorized` (which lands in the ConfigMap) is shadowed
+  by the stale direct env — the patcher must override it directly.
 
-  These three are the **secure defaults**. The platform derives all of them from a
-  single TLS setting (`AUTH_GATEWAY_TLS_INSECURE` / the platform TLS toggle), and
-  the operator already renders them this way for every extension. If they are
-  wrong, the root cause is that the platform was put in insecure mode — the
-  simplest fix is to restore the platform TLS setting once, rather than patching
-  each extension. The patcher re-asserts them idempotently as a safety net.
+  These are the **secure defaults**. The platform derives them from a single TLS
+  setting (`AUTH_GATEWAY_TLS_INSECURE` / the platform TLS toggle), and the operator
+  already renders them this way for every extension. If they are wrong, the root
+  cause is that the platform was put in insecure mode — the simplest fix is to
+  restore the platform TLS setting once, rather than patching each extension. The
+  patcher re-asserts them idempotently as a safety net.
+
+> **Timing: the patch lands after the operator reconciles.** The patcher applies
+> the `KamiwazaExtension` CR; the operator then reconciles it into the Deployment
+> and rolls the pod. A `kubectl rollout status` run *immediately* after the patch
+> can return "successfully rolled out" against the **pre-reconcile** Deployment.
+> Re-check the running pod's env (or rerun `verify-kaizen.sh`) a few seconds later
+> to confirm the new values landed.
 
 **Allowing egress + optional proxy:**
 
@@ -255,3 +269,41 @@ customer CA, this packet can still work. If the endpoint is configured as an
 IP-literal HTTPS URL, fix the endpoint naming first or use a different routing
 pattern; do not assume a wildcard DNS cert or generic private CA patch will
 make the IP literal verify.
+
+### The internal API URL is the most common real-world tripwire (verify this first)
+
+This is **not** only about IP literals or sandbox model endpoints. The platform
+also hands each extension a `KAMIWAZA_API_URL` for calling the Kamiwaza API, and
+on some builds that value is an **internal HTTPS service hostname** such as
+`https://traefik.kamiwaza.svc.cluster.local/api`. That hostname does **not** match
+the Traefik serving cert (`*.kamiwaza.test` / `*.default.deployment.kamiwaza.ai`),
+so the moment this packet turns verification **on**, the extension's calls to its
+own `KAMIWAZA_API_URL` fail with a **hostname mismatch** — even though the CA is
+now trusted. With verification off (the platform default) that mismatch was
+silently ignored, so it surfaces *only after applying this packet*. Symptom in the
+extension: "Unable to connect to Kamiwaza API" / model auto-discovery fails, or
+chat 502s, despite the CA being correctly trusted.
+
+**Check before patching** what the extension actually calls:
+
+```bash
+kubectl -n kamiwaza-extensions exec <kaizen-backend-pod> -- \
+  sh -c 'echo "API=$KAMIWAZA_API_URL"; echo "PUBLIC=$KAMIWAZA_PUBLIC_API_URL"'
+```
+
+- `KAMIWAZA_API_URL` is **HTTP** (e.g. `http://core-api.kamiwaza.svc:7777/api`):
+  verification does not apply to it — safe to patch.
+- `KAMIWAZA_API_URL` is **HTTPS to an internal `.svc` hostname**: verification ON
+  will break it. Before (or instead of) flipping verify on, make it cert-matching:
+  - point the extension at the public origin
+    (`https://kamiwaza.test/api` — the same host Kaizen already uses for *model*
+    calls, which **does** verify cleanly), **or**
+  - have the platform serve a Traefik cert whose SANs include the internal
+    hostname (`traefik.kamiwaza.svc.cluster.local`).
+
+> Model calls from Kaizen already use the public origin
+> (`https://kamiwaza.test/runtime/models/...`), which matches the cert and verifies
+> cleanly. It is specifically the **internal `KAMIWAZA_API_URL`** that can be a
+> non-cert-matching hostname. `verify-kaizen.sh` now probes the backend's real
+> `KAMIWAZA_API_URL` under verification-on (step 3a) so it **fails closed** on this
+> mismatch instead of letting you ship a packet that silently breaks the extension.
