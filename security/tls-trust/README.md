@@ -98,6 +98,8 @@ sudo env "PATH=$PATH" KIND_EXPERIMENTAL_PROVIDER=podman \
 If the first check prints `still-present`, or the second still lists
 `kamiwaza-prod`, stop and fully remove the old cluster before reinstalling.
 
+> Apply the `maxPods: 1000` change first — this step only adds its `/22` per-node pod CIDR companion.
+
 **Already running and can't recreate?** Patch the live cluster in place — the
 per-node pod CIDR is immutable, so the node object is deleted and re-registers
 under the new `/22`:
