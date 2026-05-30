@@ -20,6 +20,7 @@ This folder follows a scenario-first layout: one subdirectory per runnable secur
 | [cac](cac)                       | CAC/PIV certificate login    | RBAC/ReBAC compatible        | mTLS + cert-forwarding | `AUTH_GATEWAY_CAC_*`, `AUTH_GATEWAY_MTLS_REQUIRED`, Traefik `tlsOptions.mtls`  | Values snippet + secret templates + kustomize secret generator                             |
 | [rebac](rebac)                   | Keycloak JWT claims          | ReBAC (tenant-scoped tuples) | TLS                    | `core.rebac.*`, `core.scheduler.rebac.*`, optional tenant registry enforcement | Values snippets + tenant manifest examples                                                 |
 | [ldap](ldap)                     | LDAP via Keycloak federation | RBAC/ReBAC compatible        | TLS                    | `auth.enabled: true` + declarative Keycloak federation bundle                  | Kustomize stack (OpenLDAP, UI, Jobs) + declarative Keycloak bundle + optional LDIF samples |
+| [tls-trust](tls-trust)           | N/A (transport trust)        | N/A                          | Custom CA + BYO TLS     | `ca.trustBundle.customerCASecret`, `core.trustManager.enabled`, `AWS_CA_BUNDLE`/`SSL_CERT_FILE` | Values snippet + CA Secret (kustomize/template) + BYO ingress manifests + verify.sh |
 
 ## Structure expectations for new scenarios
 

@@ -1,0 +1,29 @@
+{
+  "_comment": "Reference payload to register a custom AWS Bedrock endpoint via the API, bypassing the frontend's non-amazonaws.com URL rejection (the backend has no host whitelist on 0.13.0). POST to /api/models/. Replace every REPLACE_* token. Do NOT commit real credentials.",
+  "_shape_notes": [
+    "external_endpoint MUST be a JSON-encoded string, not a nested object. The storage layer cannot insert dicts into model_config_kvs and returns 500 'can't adapt type dict'.",
+    "Use 'protocol' (not legacy 'service') for Bedrock chat — the chat handler dispatches on the protocol discriminator.",
+    "engine_name 'aws_bedrock' is the request-time discriminator. The server normalizes it to 'external_chat' on storage; both reads will show the normalized value.",
+    "The 'auth' block is a discriminated union. This example uses IAM. For Bedrock API Key (bearer), replace auth with: {\"type\":\"bedrock_api_key\",\"token\":\"REPLACE_BEDROCK_API_KEY\"}.",
+    "'inference_profile_arn' is optional — include for cross-region inference profiles, omit otherwise.",
+    "'display_name' is optional UI label; safe to leave or remove."
+  ],
+  "name": "bedrock-custom-endpoint",
+  "description": "Custom Bedrock endpoint",
+  "hub": "external",
+  "purpose": "external",
+  "modelfamily": "external",
+  "repo_modelId": "REPLACE_MODEL_ID",
+  "source_repository": "AWS Bedrock",
+  "private": true,
+  "default_config": {
+    "name": "bedrock-custom-endpoint External Endpoint",
+    "default": true,
+    "description": "Custom Bedrock endpoint config",
+    "config": {
+      "engine_name": "aws_bedrock",
+      "external_endpoint": "{\"protocol\":\"aws_bedrock\",\"model_id\":\"REPLACE_MODEL_ID\",\"region\":\"REPLACE_WITH_REGION\",\"endpoint_url\":\"https://REPLACE_REAL_CUSTOM_ENDPOINT\",\"display_name\":\"bedrock-custom-endpoint\",\"auth\":{\"type\":\"iam_access_key\",\"access_key_id\":\"REPLACE_ACCESS_KEY\",\"secret_access_key\":\"REPLACE_SECRET_KEY\"}}"
+    },
+    "system_config": {}
+  }
+}

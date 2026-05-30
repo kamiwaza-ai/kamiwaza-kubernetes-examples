@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kamiwaza
+
+generatorOptions:
+  # Stable name so `ca.trustBundle.customerCASecret: kamiwaza-org-ca` resolves.
+  disableNameSuffixHash: true
+
+secretGenerator:
+  - name: kamiwaza-org-ca
+    files:
+      # Place your real (root + intermediate) PEM here — gitignored.
+      # Add more `key=path` entries to include additional CAs in the same Secret.
+      - org-ca.pem=local-secrets/org-ca.pem

@@ -1,0 +1,19 @@
+# Repoint Traefik's default TLSStore at a BYO leaf cert or a CA-issuer leaf.
+#
+# Required on 0.13.0 (manifest path). On later releases the network chart manages the
+# `default` TLSStore natively — do NOT hand-apply this there or helm/Argo will fight it.
+#
+# secretName must match either:
+#   - BYO leaf cert: the kubernetes.io/tls Secret you created (org-ingress-tls), or
+#   - CA-issuer:     the secretName produced by the reissued wildcard Certificate.
+apiVersion: traefik.io/v1alpha1
+kind: TLSStore
+metadata:
+  name: default
+  namespace: kamiwaza
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/part-of: network
+spec:
+  defaultCertificate:
+    secretName: org-ingress-tls

@@ -1,0 +1,59 @@
+# CA-issuer approach (0.13.0 manifest path): cert-manager issues the ingress leaf
+# from YOUR CA in-cluster and rotates it.
+#
+# Prereq: Secret `org-ca-keypair` (kubernetes.io/tls layout) in ns kamiwaza,
+#   tls.crt = your CA cert, tls.key = your CA private key:
+#
+#     kubectl -n kamiwaza create secret tls org-ca-keypair \
+#       --cert=/path/to/org-ca.crt --key=/path/to/org-ca.key
+#
+# The internal app-ca / infra-ca / root-ca hierarchy is left untouched.
+#
+# NOTE on naming: on 0.13.0 the network subchart already manages a Certificate
+# named `traefik-wildcard-public` (issued by `app-ca`, secret `traefik-wildcard-public-tls`).
+# This example uses DISTINCT names (`traefik-wildcard-byo`, secret `org-ingress-tls`)
+# so a kubectl apply does NOT collide with the Helm-owned Certificate. Only the
+# `TLSStore/default` repoint (in tlsstore-default-byo.yaml) stays Helm-conflicted.
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: org-ca
+  namespace: kamiwaza
+  labels:
+    app.kubernetes.io/name: org-ca
+    app.kubernetes.io/part-of: network
+spec:
+  ca:
+    secretName: org-ca-keypair
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  # Distinct from the chart-managed `traefik-wildcard-public` Certificate so kubectl
+  # apply does not patch (and silently inherit fields from) the Helm-owned resource.
+  name: traefik-wildcard-byo
+  namespace: kamiwaza
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/part-of: network
+spec:
+  # Distinct from the chart-managed secret `traefik-wildcard-public-tls`. The
+  # TLSStore in tlsstore-default-byo.yaml points at this name.
+  secretName: org-ingress-tls
+  commonName: "*.REPLACE_WITH_YOUR_DOMAIN"
+  dnsNames:
+    - "REPLACE_WITH_YOUR_DOMAIN"
+    - "*.REPLACE_WITH_YOUR_DOMAIN"
+  privateKey:
+    algorithm: RSA
+    size: 2048
+    rotationPolicy: Always
+  duration: 8760h   # 1 year
+  renewBefore: 720h # 30 days
+  usages:
+    - server auth
+  # Point at your CA Issuer instead of the platform `app-ca`.
+  issuerRef:
+    name: org-ca
+    kind: Issuer

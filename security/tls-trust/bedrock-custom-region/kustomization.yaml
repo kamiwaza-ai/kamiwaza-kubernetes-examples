@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kamiwaza
+
+generatorOptions:
+  # Stable name so the values snippet's volume reference resolves.
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: botocore-region-hotfix
+    files:
+      - sitecustomize.py

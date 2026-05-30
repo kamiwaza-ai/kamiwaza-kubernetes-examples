@@ -1,0 +1,16 @@
+# Extension / Kaizen follow-on: add the sandbox namespace to the trust-bundle sync set.
+#
+# Merge into the SAME higher-priority Deploy values file as the parent
+# trust-bundle snippet. This replaces the default targetNamespaces list with an
+# explicit 4-namespace list that includes sandbox pods spawned by Kaizen.
+#
+# Parent packet reference:
+#   security/tls-trust/trust-bundle-values-snippet.yaml
+
+ca:
+  trustBundle:
+    targetNamespaces:
+      - kamiwaza
+      - kamiwaza-system
+      - kamiwaza-extensions
+      - kamiwaza-sandboxes
