@@ -141,6 +141,14 @@ kubectl -n kamiwaza rollout restart deploy/core-embedding
 
 ## Notes
 
+- **Raise the embedding timeout (strongly recommended).** `CONTEXT_SERVICE_EMBEDDING_TIMEOUT`
+  defaults to **30 seconds and is *not* overridden by the charts**, and it applies **per batch**
+  of `CONTEXT_SERVICE_EMBEDDING_BATCH_SIZE` chunks (default 32), not per file. On real workloads —
+  large documents, slow or loaded embedders, CPU-only nodes — a single batch routinely exceeds 30s
+  and the import fails with `Failed to reach embedding service` (ReadTimeout). The values snippet
+  sets it to **600s**; raise further if one batch on your hardware can take longer, and/or lower
+  the batch size. (The overall per-job ceiling is separate: context-service `job_timeout_seconds`,
+  default 3600 / 1h.)
 - **Format:** the embedder needs a **GGUF**; a safetensors-only repo won't load.
   Convert offline if your hub only has the original sentence-transformers repo.
 - **Redirect reachability:** HuggingFace `/resolve/` URLs 302 to a separate

@@ -29,6 +29,18 @@ core:
       #     secretKeyRef:
       #       name: <hf-token-secret>
       #       key: token
+      # Embedding-call timeout (SECONDS). Applied PER batch of CONTEXT_SERVICE_EMBEDDING_BATCH_SIZE
+      # chunks (default 32) — NOT per file. The default of 30s is too low for large documents
+      # or slow/loaded embedders: a single batch that exceeds it fails the whole import with
+      # "Failed to reach embedding service" (ReadTimeout). 600s (10 min/batch) is a safe headroom;
+      # raise further if one batch on your hardware can take longer. (Overall job ceiling is
+      # separate: context-service job_timeout_seconds, default 3600 / 1h.)
+      - name: CONTEXT_SERVICE_EMBEDDING_TIMEOUT
+        value: "600"
+      # Optional complementary knob: smaller batches finish faster per call (lower timeout risk,
+      # more incremental progress) at the cost of more round-trips.
+      # - name: CONTEXT_SERVICE_EMBEDDING_BATCH_SIZE
+      #   value: "16"
 
 # core-embedding (Graphiti's embedder): the chart's init container curls this.
 embedding:
