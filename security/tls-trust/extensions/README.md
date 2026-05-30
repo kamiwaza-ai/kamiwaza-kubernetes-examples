@@ -126,15 +126,20 @@ Then:
 ```bash
 /opt/kamiwaza/bin/uninstall-prod.sh
 
-# Expect no output from either check before reinstalling
-kind get clusters | grep -Fx kamiwaza-prod
-sudo podman ps -a --format '{{.Names}}' | grep -Fx kamiwaza-prod-control-plane
+# Expect "gone"
+sudo podman inspect kamiwaza-prod-control-plane >/dev/null 2>&1 && echo still-present || echo gone
+
+# Expect no kamiwaza-prod entry
+sudo env "PATH=$PATH" KIND_EXPERIMENTAL_PROVIDER=podman \
+  CONTAINER_HOST=unix:///run/podman/podman.sock \
+  "$(command -v kind)" get clusters
 
 /opt/kamiwaza/bin/install-prod.sh --offline
 ```
 
-If either check still returns output, the old cluster was not fully wiped; stop
-and remove it before reinstalling.
+If the first check prints `still-present`, or the second still lists
+`kamiwaza-prod`, the old cluster was not fully wiped; stop and remove it before
+reinstalling.
 
 That forces the Kind cluster to be recreated so the patched config is used on
 cluster creation.
