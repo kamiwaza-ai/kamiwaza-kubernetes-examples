@@ -1,0 +1,35 @@
+# Embedding throughput tuning — raise core-embedding CPU + parallel slots.
+#
+# Merge into Deploy `cluster/values/overrides.yaml`. TUNE THE NUMBERS TO YOUR NODE.
+# Read the README "Risk" section first: the CPU limit is a ceiling, but on a node
+# without spare cores this can starve co-located pods and cause restarts. If you had
+# to reduce reservations to fit the platform on this box, you probably do NOT have the
+# headroom for this — check `kubectl top nodes` before applying.
+#
+# This addresses the `core-embedding` service (Graphiti's embedder, and Context RAG
+# when RAG is pointed at it). A separately deployed RAG model is tuned at deploy time
+# via engine_args/resources instead — see README step 3.
+#
+# Prereq for LARGE files: also set CONTEXT_SERVICE_OMNIPARSE_DEFAULT_MAX_TOKENS=500
+# (offline-embedding runbook) or an oversize chunk will still fail the whole file.
+
+embedding:
+  runtime:
+    # Throughput headroom for the server. Does NOT change the per-input 512-token
+    # ceiling (that's the chunk cap). 2048 lets a slot batch more efficiently.
+    ctxSize: 2048            # default 512
+    # Inference slots. Size to the cores you grant below — more slots than cores
+    # just adds contention. Default (no flag) behaves as a single effective slot
+    # under the 2-core cap.
+    extraArgs:
+      - "--parallel"
+      - "4"
+
+  # Pod resources. limits.cpu is the lever; SIZE IT TO YOUR NODE'S SPARE CORES.
+  resources:
+    requests:
+      cpu: "1"               # keep low so scheduling isn't starved; burst happens under load
+      memory: "1Gi"
+    limits:
+      cpu: "4"               # <-- the knob. 4 only if `kubectl top nodes` shows the headroom.
+      memory: "4Gi"          # raised from 2Gi to cover 4 slots x 2048 context
