@@ -9,11 +9,6 @@ internal hub via Helm values — no image rebuild, no manual copy into pods.
 
 **Tags:** #deployment #offline #airgap #embedding #huggingface #rag
 
-> **Storage first.** This assumes model storage is already configured and writable
-> on the cluster. Configure it **before** downloading any model — a missing/unwritable
-> models path surfaces later as confusing `MISSING_FILES` / download-does-nothing
-> symptoms, not a clear storage error.
-
 > **TLS companion.** If your internal hub is HTTPS with a private/enterprise CA,
 > pair this with [`../../security/tls-trust`](../../security/tls-trust) so downloads
 > trust it with verification **on**. The embedding chart's download init container
