@@ -106,21 +106,38 @@ sudo env "PATH=$PATH" KIND_EXPERIMENTAL_PROVIDER=podman \
 If the first check prints `still-present`, or the second still lists
 `kamiwaza-prod`, stop and fully remove the old cluster before reinstalling.
 
-> Apply the `maxPods: 1000` change first — this step only adds its `/22` per-node pod CIDR companion.
+**Already running and can't recreate?** Patch the live cluster in place. Both
+halves land in a **single kubelet restart** — they reach the kubelet two
+different ways:
 
-**Already running and can't recreate?** Patch the live cluster in place — the
-per-node pod CIDR is immutable, so the node object is deleted and re-registers
-under the new `/22`:
+- **maxPods** is a kubelet setting → edit the node's kubelet config. The new
+  ceiling is picked up on kubelet restart; no node deletion needed.
+- **per-node pod CIDR** is immutable on the Node object → set
+  `node-cidr-mask-size` on the controller-manager, then delete the node so it
+  re-registers under the new `/22`.
 
 ```bash
 NODE=kamiwaza-prod-control-plane
+
+# (1) kubelet ceiling — set maxPods in the node's kubelet config
+sudo podman exec "$NODE" sh -lc "grep -q '^maxPods:' /var/lib/kubelet/config.yaml && sed -i 's/^maxPods:.*/maxPods: 1000/' /var/lib/kubelet/config.yaml || printf 'maxPods: 1000\n' >> /var/lib/kubelet/config.yaml"
+
+# (2) per-node pod CIDR — set node-cidr-mask-size on the controller-manager
 sudo podman exec "$NODE" sh -lc "grep -q -- '--node-cidr-mask-size=' /etc/kubernetes/manifests/kube-controller-manager.yaml && sed -i 's/--node-cidr-mask-size=.*/--node-cidr-mask-size=22/' /etc/kubernetes/manifests/kube-controller-manager.yaml || sed -i '/--cluster-cidr=/a\    - --node-cidr-mask-size=22' /etc/kubernetes/manifests/kube-controller-manager.yaml"
+
+# Delete the node so it re-registers under the new /22, then bounce kubelet once
+# — the single restart picks up BOTH the new maxPods and the re-registration.
 sudo kubectl delete node "$NODE"
 sudo podman exec "$NODE" systemctl restart kubelet
 sudo kubectl wait --for=condition=Ready node/"$NODE" --timeout=180s
 sudo kubectl -n kube-system rollout restart ds/kindnet
 sudo kubectl -n kube-system rollout status ds/kindnet --timeout=120s || true
 ```
+
+> On an already-running 0.13.0 node editing `config.yaml` is sufficient — kind
+> sets no `--max-pods` kubelet flag by default, so nothing overrides it. Like
+> the CIDR half, this survives restarts/reboots but a cluster **recreate** resets
+> it, so fold the config patch above in when you next rebuild.
 
 Verify **both** limits — the kubelet ceiling and the per-node IP block:
 
