@@ -29,6 +29,14 @@ backport when you need the Kind pod ceiling raised to `1000`. `release/0.13.1`
 already carries this change; this section is the standalone live backport path
 for `0.13.0`.
 
+**Pick the path that matches your cluster:**
+
+- **Fresh install / can recreate** → apply the config patch below, then recreate.
+  Both `maxPods` and the CIDR land together and persist across rebuilds.
+- **Already running / can't recreate** → use the in-place patch further down.
+  It survives restarts and reboots, but a later cluster recreate resets it — so
+  fold the config patch in when you next rebuild.
+
 Patch:
 
 `/opt/kamiwaza/cluster/kind/generated-kamiwaza-prod.yaml`
