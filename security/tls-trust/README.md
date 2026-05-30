@@ -20,6 +20,62 @@ endpoint whose certificate is signed by a corporate CA.
 
 ---
 
+## Read this first: raise the Kind pod ceiling to 1000 on live 0.13.0 prod
+
+If you are using this packet for Kaizen / extension follow-on work on a live
+offline RHEL install already running `release/0.13.0`, patch the existing Kind
+config before reinstalling. `release/0.13.1` already carries this change; this
+section is the live backport path for `0.13.0`.
+
+Patch:
+
+`/opt/kamiwaza/cluster/kind/generated-kamiwaza-prod.yaml`
+
+Make the control-plane entry include:
+
+```yaml
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        max-pods: "1000"
+  - |
+    kind: KubeletConfiguration
+    maxPods: 1000
+```
+
+Then recreate the cluster so the patched config is actually used:
+
+```bash
+/opt/kamiwaza/bin/uninstall-prod.sh
+
+# Expect "gone"
+sudo podman inspect kamiwaza-prod-control-plane >/dev/null 2>&1 && echo still-present || echo gone
+
+# Expect no kamiwaza-prod entry
+sudo env "PATH=$PATH" KIND_EXPERIMENTAL_PROVIDER=podman \
+  CONTAINER_HOST=unix:///run/podman/podman.sock \
+  "$(command -v kind)" get clusters
+
+/opt/kamiwaza/bin/install-prod.sh --offline
+```
+
+If the first check prints `still-present`, or the second still lists
+`kamiwaza-prod`, stop and fully remove the old cluster before reinstalling.
+
+Verify:
+
+```bash
+kubectl get node -o jsonpath='{.items[0].status.allocatable.pods}'
+```
+
+Expect `1000`.
+
+---
+
 ## Compatibility / version pin
 
 | Item | Status |
@@ -167,7 +223,7 @@ re-installing it would conflict with the Helm-owned CRD.
 | [`verify.sh`](verify.sh) | End-to-end verification (ConfigMap contents, namespace sync, pod env/mount, optional live TLS probe). |
 | [`bedrock-custom-region/`](bedrock-custom-region/) | **Companion** — custom Bedrock **region** enablement. Declarative botocore hotfix so boto3 *accepts* a non-default region; pair with this recipe so no `SSL_VERIFY=False` is needed. |
 | [`ingress/`](ingress/) | BYO ingress cert — manifest path required on 0.13.0 (not needed on later releases). |
-| [`extensions/`](extensions/) | Two-layer follow-on: generic extension trust pattern for declared pods, plus the Kaizen-specific sandbox verification path. |
+| [`extensions/`](extensions/) | Kaizen / extension follow-on: generic declared-pod trust pattern, sandbox verification path, and the offline template livepatch for future Kaizen launches. |
 
 ---
 
@@ -293,16 +349,19 @@ kubectl -n kamiwaza exec <ray-pod> -- python -c \
 Once the core / Ray packet above is green, use [`extensions/`](extensions/) for the
 remaining 0.13.0 Kaizen slice.
 
-That follow-on does three things:
+That follow-on does four things:
 
 1. extends the trust-bundle sync target list to `kamiwaza-sandboxes`
 2. patches a live Kaizen `KamiwazaExtension` CR so the declared backend pod mounts
    the bundle, keeps verification ON, and is allowed external egress
 3. verifies whether the spawned sandbox pod also receives the bundle + CA env
+4. includes
+   [`extensions/kaizen-offline-template-livepatch/`](extensions/kaizen-offline-template-livepatch/)
+   for offline / local-catalog `0.13.0` systems that also need future Kaizen
+   launches to pick up selected `0.13.1` template fixes
 
-If you expect large Kaizen sandbox fan-out on `0.13.0`, also read the
-[`extensions/` scaling note](extensions/README.md#scale-note-raise-the-kind-pod-ceiling-to-1000-on-0130)
-for patching the Ansible-managed Kind kubelet `maxPods` ceiling to `1000`.
+If you expect large Kaizen sandbox fan-out on live offline `0.13.0`, do the
+max-pods backport at the top of this README before you reinstall.
 
 **Important:** a green backend pod is not enough for Kaizen. If the sandbox pod does
 not show `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` / `AWS_CA_BUNDLE` plus the mounted
