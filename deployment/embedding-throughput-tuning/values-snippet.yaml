@@ -25,11 +25,11 @@ embedding:
       - "--parallel"
       - "4"
 
-  # Pod resources. limits.cpu is the lever; SIZE IT TO YOUR NODE'S SPARE CORES.
+  # Pod resources. ONLY raise limits — leave requests (reservations) at the chart
+  # default so the scheduling/reservation footprint is unchanged. The pod reserves
+  # little and bursts up to the limit under import load. Do NOT add a requests: block
+  # here (Helm deep-merges, so the chart's default requests are preserved).
   resources:
-    requests:
-      cpu: "1"               # keep low so scheduling isn't starved; burst happens under load
-      memory: "1Gi"
     limits:
       cpu: "4"               # <-- the knob. 4 only if `kubectl top nodes` shows the headroom.
       memory: "4Gi"          # raised from 2Gi to cover 4 slots x 2048 context

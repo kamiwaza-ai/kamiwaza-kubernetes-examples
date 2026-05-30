@@ -72,8 +72,10 @@ platform on this box** — that usually means little spare CPU. So:
   total) or already busy, **do not** apply this — accept the slow import instead.
 - **Size `--parallel` to the cores you grant** (e.g. `--parallel 4` with `limit: "4"`).
   More slots than cores just adds contention.
-- **Keep `requests` low** (≈1 core) so normal scheduling isn't starved; the pod only
-  bursts under import load.
+- **Only change `limits` — never `requests`.** Leave the reservation (requests) at the
+  chart default so the pod's scheduling footprint is unchanged; it reserves little and
+  *bursts* up to the limit under load. (Raising requests would re-inflate the very
+  reservations a constrained box was trimmed to fit.)
 - **Bump the memory limit** alongside (4 slots × a 2048 context needs more than the
   default 2Gi).
 - **It's fully reversible** — see Recovery.
