@@ -28,19 +28,7 @@ PATCH_SUSPENDED_DAYS=30
 WORKDIR=$(mktemp -d)
 ```
 
-## 3. Confirm this is the offline/local-catalog case
-
-```bash
-kubectl -n "$NS" get cm core-config -o jsonpath='{.data.KAMIWAZA_EXTENSION_STAGE}{"\n"}'
-```
-
-This should print:
-
-```text
-LOCAL
-```
-
-## 4. Port-forward the ingress service
+## 3. Port-forward the ingress service
 
 ```bash
 INGRESS_SVC=$(kubectl -n "$NS" get svc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -E '^(traefik|istio-ingressgateway)$' | head -n1)
@@ -49,14 +37,14 @@ PF_PID=$!
 sleep 5
 ```
 
-## 5. Get a token
+## 4. Get a token
 
 ```bash
 SVC_CORE_PASS=$(kubectl -n "$NS" get secret kamiwaza-user-svc-core -o jsonpath='{.data.password}' | base64 -d)
 TOKEN=$(curl -sk "https://127.0.0.1:${LOCAL_PORT}/api/auth/token" -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'username=svc-core' --data-urlencode "password=${SVC_CORE_PASS}" | jq -r '.access_token')
 ```
 
-## 6. Export the current Kaizen template and back it up
+## 5. Export the current Kaizen template and back it up
 
 ```bash
 curl -sk "https://127.0.0.1:${LOCAL_PORT}/api/apps/app_templates" \
@@ -68,7 +56,7 @@ cp "$WORKDIR/kaizen-template.json" /tmp/kaizen-template.backup.json
 TEMPLATE_ID=$(jq -r '.id' "$WORKDIR/kaizen-template.json")
 ```
 
-## 7. Build the patch payload
+## 6. Build the patch payload
 
 ```bash
 python3 - "$WORKDIR/kaizen-template.json" "$WORKDIR/kaizen-template.patch.json" "$PATCH_MAX_HOURS" "$PATCH_SUSPENDED_DAYS" <<'PY'
@@ -113,7 +101,7 @@ with open(dst, "w", encoding="utf-8") as f:
 PY
 ```
 
-## 8. Apply the patch
+## 7. Apply the patch
 
 ```bash
 curl -sk -X PUT "https://127.0.0.1:${LOCAL_PORT}/api/apps/app_templates/${TEMPLATE_ID}" \
@@ -123,7 +111,7 @@ curl -sk -X PUT "https://127.0.0.1:${LOCAL_PORT}/api/apps/app_templates/${TEMPLA
   | jq '{id, name}'
 ```
 
-## 9. Verify it
+## 8. Verify it
 
 ```bash
 curl -sk "https://127.0.0.1:${LOCAL_PORT}/api/apps/app_templates/${TEMPLATE_ID}" \
@@ -149,7 +137,7 @@ You should see:
 }
 ```
 
-## 10. Stop the port-forward
+## 9. Stop the port-forward
 
 ```bash
 kill "$PF_PID"
