@@ -135,7 +135,7 @@ renders — which fails to unmarshal — or the node was not recreated).
 | `core-scheduler` | ✅ | bundle mounted at `/etc/ssl/certs/ca-certificates.crt` |
 | Ray head + workers | ✅ | same mount; this is where Bedrock/LiteLLM runs |
 | Declared extension pods | ⚠️ generic follow-on | use [`extensions/`](extensions/) for the reusable declared-pod trust pattern: mount the bundle, set CA env, keep verification ON |
-| Kaizen spawned sandboxes | ❌ Kaizen-specific follow-on | Kaizen adds a second boundary: config-only is not proven until the spawned sandbox pod itself shows bundle mount + CA env |
+| Kaizen spawned sandboxes | ❌ Kaizen-specific follow-on | Kaizen adds a second boundary: the sandbox's CA file is owned by the sandbox-controller, not Helm — not proven until a live TLS probe from the sandbox to a corporate-CA endpoint succeeds |
 
 > **Hostname caveat for Kaizen / custom endpoints:** this packet adds **CA
 > trust**, not hostname rewrites. If a sandbox or extension is configured to
@@ -405,7 +405,9 @@ That follow-on does four things:
 1. extends the trust-bundle sync target list to `kamiwaza-sandboxes`
 2. patches a live Kaizen `KamiwazaExtension` CR so the declared backend pod mounts
    the bundle, keeps verification ON, and is allowed external egress
-3. verifies whether the spawned sandbox pod also receives the bundle + CA env
+3. verifies (via a live TLS probe) whether the spawned sandbox actually trusts
+   the corporate CA — structural checks alone can pass on the agent image's
+   default bundle
 4. includes
    [`extensions/kaizen-offline-template-livepatch/`](extensions/kaizen-offline-template-livepatch/)
    for offline / local-catalog `0.13.0` systems that also need future Kaizen
@@ -414,9 +416,11 @@ That follow-on does four things:
 If you expect large Kaizen sandbox fan-out on live offline `0.13.0`, make sure
 the standalone max-pods backport at the top of this README is already done.
 
-**Important:** a green backend pod is not enough for Kaizen. If the sandbox pod does
-not show `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` / `AWS_CA_BUNDLE` plus the mounted
-bundle file, the current config-only packet stops there and the remaining gap is
+**Important:** a green backend pod is not enough for Kaizen. The sandbox's CA file
+(`/etc/ssl/certs/ca-certificates.crt`, which the Kaizen agent entrypoint already
+points `SSL_CERT_FILE`/`REQUESTS_CA_BUNDLE` at) is owned by the sandbox-controller,
+not by Helm values — so if a live TLS probe from the sandbox to a corporate-CA
+endpoint fails, the config-only packet stops there and the remaining gap is
 sandbox-controller / operator behavior, not customer values.
 
 ---
