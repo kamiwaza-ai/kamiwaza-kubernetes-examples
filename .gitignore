@@ -5,3 +5,6 @@ tmp/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# openssl serial files (demo PKI build artifacts)
+*.srl
