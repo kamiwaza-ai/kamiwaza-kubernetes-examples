@@ -36,6 +36,12 @@ Patch:
 Make the control-plane entry include:
 
 ```yaml
+# Top-level Cluster field (sibling of `nodes:`), not under a node.
+# Must be wide enough to carve one per-node block of the size implied by
+# node-cidr-mask-size below. /16 ÷ /22 = 64 node blocks of 1022 IPs each —
+# ample for the single-node prod box.
+networking:
+  podSubnet: "10.244.0.0/16"
 nodes:
 - role: control-plane
   kubeadmConfigPatches:
@@ -47,7 +53,31 @@ nodes:
   - |
     kind: KubeletConfiguration
     maxPods: 1000
+  # COMPANION PATCH — required, not optional. maxPods raises only the kubelet
+  # ceiling; each node still gets a /24 pod CIDR (~254 usable IPs) by default,
+  # so without this the node caps at ~254 pods regardless of maxPods=1000.
+  # Widen the per-node pod CIDR to /22 (1022 usable IPs) so 1000 pods can
+  # actually get an IP.
+  - |
+    kind: ClusterConfiguration
+    controllerManager:
+      extraArgs:
+        # kubeadm v1beta4 (k8s 1.31+) — extraArgs is a LIST of {name,value}.
+        # The pre-1.31 map form (node-cidr-mask-size: "22") is silently
+        # ignored on v1beta4, so the /24 default would stay in effect.
+        - name: node-cidr-mask-size
+          value: "22"
 ```
+
+> **Why both halves are mandatory.** `maxPods` is a kubelet limit; the per-node
+> pod CIDR is an IPAM limit. They are independent. On a default Kind cluster the
+> control-plane node is handed `podCIDR: 10.244.0.0/24` — confirm yours with
+> `kubectl get node -o jsonpath='{.items[0].spec.podCIDR}'`. A /24 is ~254
+> usable addresses, so a node with `maxPods: 1000` but a /24 pod CIDR still
+> stops scheduling new pods at ~254 (pods stuck `ContainerCreating`, kubelet/CNI
+> logs show "failed to allocate for range 0: no IP addresses available"). The
+> `node-cidr-mask-size: 22` patch above raises the per-node block to 1022 IPs so
+> the kubelet ceiling is the real limit.
 
 Then recreate the cluster so the patched config is actually used:
 
@@ -68,13 +98,21 @@ sudo env "PATH=$PATH" KIND_EXPERIMENTAL_PROVIDER=podman \
 If the first check prints `still-present`, or the second still lists
 `kamiwaza-prod`, stop and fully remove the old cluster before reinstalling.
 
-Verify:
+Verify **both** limits — the kubelet ceiling and the per-node IP block:
 
 ```bash
-kubectl get node -o jsonpath='{.items[0].status.allocatable.pods}'
+# (1) kubelet ceiling
+kubectl get node -o jsonpath='{.items[0].status.allocatable.pods}{"\n"}'
+# Expect: 1000
+
+# (2) per-node pod CIDR — must be wider than /24 or you cap at ~254
+kubectl get node -o jsonpath='{.items[0].spec.podCIDR}{"\n"}'
+# Expect: a /22 (e.g. 10.244.0.0/22), NOT /24
 ```
 
-Expect `1000`.
+If (1) shows `1000` but (2) still shows a `/24`, the `node-cidr-mask-size`
+companion patch did not take effect (most often the pre-1.31 map syntax was used
+instead of the v1beta4 `{name,value}` list, or the node was not recreated).
 
 ---
 
