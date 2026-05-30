@@ -62,11 +62,11 @@ nodes:
     kind: ClusterConfiguration
     controllerManager:
       extraArgs:
-        # kubeadm v1beta4 (k8s 1.31+) — extraArgs is a LIST of {name,value}.
-        # The pre-1.31 map form (node-cidr-mask-size: "22") is silently
-        # ignored on v1beta4, so the /24 default would stay in effect.
-        - name: node-cidr-mask-size
-          value: "22"
+        # The 0.13.0 release pins kindest/node:v1.31.6, which kind renders as a
+        # v1beta3 ClusterConfiguration — there extraArgs is a map[string]string.
+        # The v1beta4 list-of-{name,value} form fails to unmarshal against it
+        # ("cannot unmarshal array into ... map") and aborts control-plane init.
+        node-cidr-mask-size: "22"
 ```
 
 > **Why both halves are mandatory.** `maxPods` is a kubelet limit; the per-node
@@ -111,8 +111,9 @@ kubectl get node -o jsonpath='{.items[0].spec.podCIDR}{"\n"}'
 ```
 
 If (1) shows `1000` but (2) still shows a `/24`, the `node-cidr-mask-size`
-companion patch did not take effect (most often the pre-1.31 map syntax was used
-instead of the v1beta4 `{name,value}` list, or the node was not recreated).
+companion patch did not take effect (most often the v1beta4 `{name,value}` list
+syntax was used against the v1beta3 ClusterConfiguration that kindest/node:v1.31.6
+renders — which fails to unmarshal — or the node was not recreated).
 
 ---
 
@@ -260,6 +261,7 @@ re-installing it would conflict with the Helm-owned CRD.
 | [`org-ca-secret.template.yaml`](org-ca-secret.template.yaml) | Direct-apply `kamiwaza-org-ca` Secret template. |
 | [`kustomization.yaml`](kustomization.yaml) | Local-secret-driven generator for the same Secret (keeps PEM out of hand-edited YAML). |
 | [`org-ca.pem.example`](org-ca.pem.example) | Placeholder PEM. |
+| [`demo-pki/`](demo-pki/) | **FAKE, throwaway** root+intermediate+leaf PKI and ready-to-apply Secret manifests, so the whole cycle (outbound trust **and** BYO ingress) runs with zero generation. Regenerable via `demo-pki/generate.sh`. Never use for anything real. |
 | [`verify.sh`](verify.sh) | End-to-end verification (ConfigMap contents, namespace sync, pod env/mount, optional live TLS probe). |
 | [`bedrock-custom-region/`](bedrock-custom-region/) | **Companion** — custom Bedrock **region** enablement. Declarative botocore hotfix so boto3 *accepts* a non-default region; pair with this recipe so no `SSL_VERIFY=False` is needed. |
 | [`ingress/`](ingress/) | BYO ingress cert — manifest path required on 0.13.0 (not needed on later releases). |
@@ -273,6 +275,15 @@ re-installing it would conflict with the Helm-owned CRD.
 
 A single Secret can carry root **and** intermediate(s) — the Bundle uses
 `includeAllKeys: true`.
+
+> **Just want to see it work?** A committed, **fake** demo PKI lives in
+> [`demo-pki/`](demo-pki/) so you can run the whole cycle with zero generation:
+> ```bash
+> kubectl apply -f security/tls-trust/demo-pki/secret-kamiwaza-org-ca.yaml
+> ```
+> That creates `kamiwaza-org-ca` from the demo root+intermediate. It is
+> throwaway material — **never** use it for anything real. For a real deployment
+> use one of the options below with your own CA.
 
 ```bash
 # Option A (recommended): kustomize from a local PEM file (gitignored)
@@ -439,8 +450,10 @@ until they restart.
 
 ## Notes
 
-- This example never generates PKI. Bring your org root/intermediate PEM.
-- Do **not** commit real CA material — `local-secrets/` is gitignored.
+- For real deployments, bring your own org root/intermediate PEM. The committed
+  [`demo-pki/`](demo-pki/) material is **fake and throwaway** — for the live demo only.
+- Do **not** commit real CA material — `local-secrets/` is gitignored. The only
+  sanctioned committed keys are the fake ones under `demo-pki/`.
 - Ingress (BYO) cert is a separate concern — see [`ingress/`](ingress/).
 - Code-side follow-ups (retire `AUTH_GATEWAY_TLS_INSECURE`, point the `httpx` client
   factory at the CA path, boto3 `verify=`, per-endpoint CA field) are tracked as

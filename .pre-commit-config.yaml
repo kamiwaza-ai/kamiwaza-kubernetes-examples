@@ -33,6 +33,12 @@ repos:
         files: ^(kamiwaza-kubernetes-examples/)?(README\.md|security/)
       - id: detect-private-key
         files: ^(kamiwaza-kubernetes-examples/)?security/
+        # The tls-trust example deliberately ships a FAKE, throwaway demo PKI
+        # (root+intermediate+leaf keys) so its manifests apply with zero local
+        # generation. This material is regenerable via demo-pki/generate.sh and
+        # must NEVER be reused anywhere real. It is the only sanctioned private
+        # key in this tree; everything else still trips the hook.
+        exclude: ^(kamiwaza-kubernetes-examples/)?security/tls-trust/demo-pki/
       - id: check-added-large-files
         args: [--maxkb=800]
         files: ^(kamiwaza-kubernetes-examples/)?security/

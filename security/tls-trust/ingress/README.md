@@ -65,6 +65,14 @@ Realistic options on 0.13.0:
 
 ## Approach 1 — BYO leaf cert
 
+> **Zero-generation demo.** The committed fake [`../demo-pki/`](../demo-pki/) ships a
+> ready leaf Secret for `*.kamiwaza.test`, so steps 1–2 collapse to:
+> ```bash
+> kubectl apply -f security/tls-trust/demo-pki/secret-org-ingress-tls.yaml
+> kubectl apply -f security/tls-trust/ingress/tlsstore-default-byo.yaml
+> ```
+> Then jump to step 3. **Demo material only — never serve it for real.**
+
 ```bash
 # 1. Create the kubernetes.io/tls Secret from your cert + key (gitignored material)
 kubectl -n kamiwaza create secret tls org-ingress-tls \
@@ -78,9 +86,14 @@ kubectl apply -f security/tls-trust/ingress/tlsstore-default-byo.yaml
 # 3. Verify the served chain
 echo | openssl s_client -connect <host>:443 -servername <your-domain> 2>/dev/null \
   | openssl x509 -noout -issuer -subject
+#   For the demo CA, verify it fully chains:
+#   echo | openssl s_client -connect <host>:443 -servername kamiwaza.test 2>/dev/null \
+#     | openssl x509 > /tmp/served.pem
+#   openssl verify -CAfile security/tls-trust/demo-pki/ca-chain.pem /tmp/served.pem
 ```
 
 **Pass:** handshake completes; issuer chain leads to **your CA**, not `app-ca`.
+With the demo PKI the issuer is `Kamiwaza Demo Intermediate CA (FAKE - do not trust)`.
 
 ---
 
@@ -89,6 +102,18 @@ echo | openssl s_client -connect <host>:443 -servername <your-domain> 2>/dev/nul
 Provide a Secret holding the **CA cert + CA private key**; cert-manager mints the
 leaf and rotates it.
 
+> **Zero-generation demo.** [`../demo-pki/`](../demo-pki/) ships the demo intermediate
+> as a ready CA keypair Secret. The bundled `ca-issuer-and-cert.yaml` has
+> `REPLACE_WITH_YOUR_DOMAIN` placeholders, so substitute the demo domain on apply:
+> ```bash
+> kubectl apply -f security/tls-trust/demo-pki/secret-org-ca-keypair.yaml
+> sed 's/REPLACE_WITH_YOUR_DOMAIN/kamiwaza.test/g' \
+>   security/tls-trust/ingress/ca-issuer-and-cert.yaml | kubectl apply -f -
+> kubectl apply -f security/tls-trust/ingress/tlsstore-default-byo.yaml
+> ```
+> cert-manager then mints (and rotates) the leaf from the demo intermediate.
+> **Demo material only.**
+
 ```bash
 # 1. CA cert + key Secret (kubernetes.io/tls layout: tls.crt = CA cert, tls.key = CA key)
 kubectl -n kamiwaza create secret tls org-ca-keypair \
@@ -96,6 +121,7 @@ kubectl -n kamiwaza create secret tls org-ca-keypair \
   --key=/path/to/org-ca.key
 
 # 2. Issuer (kind: CA) + repointed wildcard Certificate
+#    Replace REPLACE_WITH_YOUR_DOMAIN in ca-issuer-and-cert.yaml first.
 kubectl apply -f security/tls-trust/ingress/ca-issuer-and-cert.yaml
 
 # 3. Point the default TLSStore at the reissued secret (same as Approach 1 step 2,
@@ -131,3 +157,4 @@ beyond reapplying the known-good Secret.
 | [`byo-ingress-tls-secret.template.yaml`](byo-ingress-tls-secret.template.yaml) | `kubernetes.io/tls` Secret template (BYO leaf cert). |
 | [`tlsstore-default-byo.yaml`](tlsstore-default-byo.yaml) | Repoint Traefik default `TLSStore` (0.13.0 manifest path). |
 | [`ca-issuer-and-cert.yaml`](ca-issuer-and-cert.yaml) | cert-manager `Issuer` (kind: CA) + repointed wildcard `Certificate` (CA-issuer approach). |
+| [`../demo-pki/`](../demo-pki/) | **FAKE** committed PKI + ready Secret manifests for both approaches, so the ingress cycle runs with zero generation. Never use for real. |

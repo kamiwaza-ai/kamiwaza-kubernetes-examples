@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# Regenerate the committed DEMO PKI for the tls-trust example.
+#
+# ⚠️  THE OUTPUT OF THIS SCRIPT IS FAKE, TEST-ONLY CRYPTO MATERIAL. ⚠️
+# The private keys are committed to a PUBLIC repo on purpose so the example
+# manifests apply with zero generation. NEVER use any of it for anything real,
+# and never reuse these keys in a production trust store.
+#
+# Produces a 3-level hierarchy:
+#
+#   root-ca  (self-signed, CA:TRUE)
+#     └── intermediate-ca  (CA:TRUE, pathlen:0)
+#           └── ingress leaf  (server auth, SAN *.kamiwaza.test)
+#
+# Outputs (all in this directory):
+#   root-ca.key / root-ca.crt                 root of trust
+#   intermediate-ca.key / intermediate-ca.crt issuing CA
+#   ca-chain.pem                              root + intermediate (OUTBOUND trust anchor;
+#                                             used as org-ca.pem for the kamiwaza-org-ca Secret)
+#   ingress.key / ingress.crt                 leaf serving cert for *.kamiwaza.test
+#   ingress-fullchain.pem                     leaf + intermediate (what Traefik serves INBOUND)
+#
+# Ready-to-apply demo Secret manifests (so cert material and YAML never drift):
+#   secret-kamiwaza-org-ca.yaml    OUTBOUND trust Secret  (org-ca.pem = ca-chain)
+#   secret-org-ingress-tls.yaml    INBOUND BYO leaf       (Approach 1: leaf fullchain + key)
+#   secret-org-ca-keypair.yaml     INBOUND CA-issuer      (Approach 2: intermediate cert + key)
+#
+# Re-run to rotate (serials/dates change; the chain shape stays identical):
+#   ./generate.sh
+#
+# Override the served domain (default kamiwaza.test):
+#   DOMAIN=corp.example ./generate.sh
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+DOMAIN="${DOMAIN:-kamiwaza.test}"
+DAYS_CA="${DAYS_CA:-3650}"   # 10y for the CAs so the demo doesn't rot quickly
+DAYS_LEAF="${DAYS_LEAF:-825}" # 825d — within the 825-day max browsers accept
+
+say() { printf '\033[1m==> %s\033[0m\n' "$1"; }
+
+tmp_cfg="$(mktemp)"
+trap 'rm -f "$tmp_cfg" *.csr *.srl' EXIT
+
+# ---------------------------------------------------------------------------
+say "1/4 root CA (self-signed, CA:TRUE)"
+openssl genrsa -out root-ca.key 4096
+cat >"$tmp_cfg" <<'EOF'
+[req]
+distinguished_name = dn
+x509_extensions = v3_ca
+prompt = no
+[dn]
+O  = Kamiwaza Demo (FAKE) PKI
+CN = Kamiwaza Demo Root CA (FAKE - do not trust)
+[v3_ca]
+basicConstraints = critical, CA:TRUE
+keyUsage = critical, keyCertSign, cRLSign
+subjectKeyIdentifier = hash
+EOF
+openssl req -x509 -new -key root-ca.key -sha256 -days "$DAYS_CA" \
+  -config "$tmp_cfg" -extensions v3_ca -out root-ca.crt
+
+# ---------------------------------------------------------------------------
+say "2/4 intermediate CA (signed by root, CA:TRUE pathlen:0)"
+openssl genrsa -out intermediate-ca.key 4096
+cat >"$tmp_cfg" <<'EOF'
+[req]
+distinguished_name = dn
+prompt = no
+[dn]
+O  = Kamiwaza Demo (FAKE) PKI
+CN = Kamiwaza Demo Intermediate CA (FAKE - do not trust)
+EOF
+openssl req -new -key intermediate-ca.key -config "$tmp_cfg" -out intermediate-ca.csr
+
+cat >"$tmp_cfg" <<'EOF'
+basicConstraints = critical, CA:TRUE, pathlen:0
+keyUsage = critical, keyCertSign, cRLSign
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always
+EOF
+openssl x509 -req -in intermediate-ca.csr -CA root-ca.crt -CAkey root-ca.key \
+  -CAcreateserial -sha256 -days "$DAYS_CA" -extfile "$tmp_cfg" \
+  -out intermediate-ca.crt
+
+# ---------------------------------------------------------------------------
+say "3/4 ingress leaf (signed by intermediate, SAN *.$DOMAIN)"
+openssl genrsa -out ingress.key 2048
+cat >"$tmp_cfg" <<EOF
+[req]
+distinguished_name = dn
+prompt = no
+[dn]
+O  = Kamiwaza Demo (FAKE) PKI
+CN = *.$DOMAIN
+EOF
+openssl req -new -key ingress.key -config "$tmp_cfg" -out ingress.csr
+
+cat >"$tmp_cfg" <<EOF
+basicConstraints = critical, CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always
+subjectAltName = DNS:$DOMAIN, DNS:*.$DOMAIN
+EOF
+openssl x509 -req -in ingress.csr -CA intermediate-ca.crt -CAkey intermediate-ca.key \
+  -CAcreateserial -sha256 -days "$DAYS_LEAF" -extfile "$tmp_cfg" \
+  -out ingress.crt
+
+# ---------------------------------------------------------------------------
+say "4/4 bundles + verify"
+# Outbound trust anchor: root + intermediate (consumed as org-ca.pem).
+cat root-ca.crt intermediate-ca.crt >ca-chain.pem
+# Inbound served chain: leaf + intermediate (Traefik presents this).
+cat ingress.crt intermediate-ca.crt >ingress-fullchain.pem
+
+# Prove the leaf verifies to the root through the intermediate.
+openssl verify -CAfile root-ca.crt -untrusted intermediate-ca.crt ingress.crt
+
+# ---------------------------------------------------------------------------
+say "5/5 ready-to-apply demo Secret manifests"
+
+# Emit a namespaced Secret whose stringData keys are filled from PEM files.
+# Args: <out.yaml> <secret-name> <type> <key1> <file1> [<key2> <file2>]
+emit_secret() {
+  local out="$1" name="$2" stype="$3"
+  shift 3
+  {
+    printf '# GENERATED by demo-pki/generate.sh — do NOT edit by hand. FAKE/TEST-ONLY material.\n'
+    printf 'apiVersion: v1\n'
+    printf 'kind: Secret\n'
+    printf 'metadata:\n'
+    printf '  name: %s\n' "$name"
+    printf '  namespace: kamiwaza\n'
+    printf '  labels:\n'
+    printf '    app.kubernetes.io/part-of: tls-trust-demo\n'
+    printf 'type: %s\n' "$stype"
+    printf 'stringData:\n'
+    while [ "$#" -gt 0 ]; do
+      printf '  %s: |\n' "$1"
+      sed 's/^/    /' "$2"
+      shift 2
+    done
+  } >"$out"
+}
+
+# OUTBOUND: the kamiwaza-org-ca Secret (root + intermediate as the trust anchor).
+emit_secret secret-kamiwaza-org-ca.yaml kamiwaza-org-ca Opaque \
+  org-ca.pem ca-chain.pem
+# INBOUND Approach 1: BYO leaf Secret (leaf fullchain + key).
+emit_secret secret-org-ingress-tls.yaml org-ingress-tls kubernetes.io/tls \
+  tls.crt ingress-fullchain.pem tls.key ingress.key
+# INBOUND Approach 2: CA keypair for the cert-manager CA Issuer (intermediate is the issuer).
+emit_secret secret-org-ca-keypair.yaml org-ca-keypair kubernetes.io/tls \
+  tls.crt intermediate-ca.crt tls.key intermediate-ca.key
+
+chmod 644 ./*.key ./*.crt ./*.pem ./*.yaml
+say "done — all material under $(pwd)"
