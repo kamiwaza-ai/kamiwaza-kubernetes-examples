@@ -125,8 +125,16 @@ Then:
 
 ```bash
 /opt/kamiwaza/bin/uninstall-prod.sh
+
+# Expect no output from either check before reinstalling
+kind get clusters | grep -Fx kamiwaza-prod
+sudo podman ps -a --format '{{.Names}}' | grep -Fx kamiwaza-prod-control-plane
+
 /opt/kamiwaza/bin/install-prod.sh --offline
 ```
+
+If either check still returns output, the old cluster was not fully wiped; stop
+and remove it before reinstalling.
 
 That forces the Kind cluster to be recreated so the patched config is used on
 cluster creation.
