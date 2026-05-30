@@ -11,9 +11,7 @@ image, no image rebuild, no trust-manager.
 > This is the **recommended dynamic mechanism** for extension CA trust. It supersedes
 > per-extension mount patching — it keys on namespace + extension labels, so any
 > app / tool / MCP server / sandbox using those labels is covered automatically,
-> **including extensions deployed after the webhook is installed**. The
-> [`../kaizen-sandbox-trust/`](../kaizen-sandbox-trust/) controller overlay remains only
-> as a niche fallback (single stable extension, no admission webhook wanted).
+> **including extensions deployed after the webhook is installed**.
 
 ---
 
@@ -131,8 +129,7 @@ kubectl -n kamiwaza-extensions get pod <pod> \
 ```
 
 For the **Kaizen sandbox** path specifically — the structural checks **plus** the live
-TLS probe that is the only real proof of corporate-CA trust — use the existing
-sandbox tooling: see [`../kaizen-sandbox-trust/`](../kaizen-sandbox-trust/) and run
+TLS probe that is the only real proof of corporate-CA trust — run
 [`../verify-kaizen.sh`](../verify-kaizen.sh):
 
 ```bash

@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
-"""Patch a live Kaizen KamiwazaExtension CR for the 0.13.0 TLS trust hotfix.
+"""Patch a live Kaizen KamiwazaExtension CR for the 0.13.0 TLS-trust remediation.
 
-This script updates the declared Kaizen services in-place:
-  - backend
-  - sandbox-controller
+The generic CA-trust mount + CA env is now provided cluster-wide by the mutating
+admission webhook in extension-trust-webhook/. Run this patcher for the
+Kaizen-specific remediation the webhook does NOT do, on the declared backend /
+sandbox-controller services:
+  - re-assert the secure verify-on flags (AGENT_DISABLE_SSL_VERIFY=false,
+    KAMIWAZA_VERIFY_SSL=true, KAMIWAZA_TLS_REJECT_UNAUTHORIZED=1) when the platform
+    was generated in insecure mode
+  - fix a non-cert-matching internal KAMIWAZA_API_URL (repoint to the public origin)
+  - open egress (allowExternalAccess) and optionally inject HTTP(S)_PROXY / NO_PROXY
 
-It does NOT claim to solve spawned sandbox pods; use verify-kaizen.sh after
-opening a Kaizen conversation to prove whether the sandbox path inherits trust.
+It still upserts the trust-bundle mount + CA env idempotently as a belt-and-suspenders
+/ no-webhook fallback for the declared services. It does NOT touch spawned sandbox pods
+— those get the bundle from the webhook; use verify-kaizen.sh (with a corporate-CA
+https:// URL) to prove the sandbox path actually trusts the CA.
 """
 
 from __future__ import annotations
