@@ -373,10 +373,28 @@ highest-priority values file. It sets:
 > **top-level** `trustManager:` key that the `core` subchart never reads. The working
 > key is **`core.trustManager.enabled`**. (Tracked separately — document, don't patch base.)
 
-### 4. Sync and wait for rollout
+### 4. Redeploy so the mount lands, and wait for rollout
+
+`core.trustManager.enabled: true` only takes effect on a redeploy. **Pick the path that
+matches your cluster** — both are config-only, and neither needs the internet (the
+`kamiwaza-trust-bundle` ConfigMap was already built by the script in Step 2 and does not
+depend on this step):
+
+**Dev / repo-driven cluster:**
 
 ```bash
 helmfile -f cluster/helmfile.yaml.gotmpl -e full sync
+kubectl -n kamiwaza rollout status deploy/core-scheduler
+kubectl -n kamiwaza rollout status statefulset/core-raycluster-head   # name may vary
+```
+
+**Offline / air-gapped prod (`release/0.13.0`):** do **not** run a dev `helmfile sync` —
+merge the snippet into the offline values layer (e.g.
+`/opt/kamiwaza/cluster/values/overrides.yaml`), then re-run the offline installer, which
+redeploys from the local chart/image cache (no internet):
+
+```bash
+/opt/kamiwaza/bin/install-prod.sh --offline
 kubectl -n kamiwaza rollout status deploy/core-scheduler
 kubectl -n kamiwaza rollout status statefulset/core-raycluster-head   # name may vary
 ```
