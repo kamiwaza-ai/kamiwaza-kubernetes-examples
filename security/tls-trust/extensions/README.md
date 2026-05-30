@@ -11,6 +11,10 @@ The goal here is two-layered:
 This stays within the same emergency `0.13.0` constraint: additive trust bundle,
 verification left ON, and no new images.
 
+If you need the live `maxPods: 1000` backport for offline `release/0.13.0`
+production, use the top of the parent [`../README.md`](../README.md). It is
+documented there once on purpose.
+
 ## Two layers
 
 ### 1. Generic extension trust pattern
@@ -45,6 +49,7 @@ Kaizen adds one more boundary:
 | [`sandbox-target-namespaces-values-snippet.yaml`](sandbox-target-namespaces-values-snippet.yaml) | Generic follow-on values snippet: adds `kamiwaza-sandboxes` to the trust-bundle sync targets. |
 | [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.py) | Kaizen-specific helper: patches a live Kaizen `KamiwazaExtension` CR so its declared services pick up the generic trust pattern. |
 | [`verify-kaizen.sh`](verify-kaizen.sh) | Kaizen-specific verifier: checks declared backend trust wiring **and** whether the spawned sandbox pod inherited it. |
+| [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/) | Offline / local-catalog livepatch for future Kaizen launches: 30-day lifetime / retention plus selected `0.13.1` startup and memory fixes. |
 
 ## Apply order
 
@@ -84,7 +89,10 @@ Kaizen adds one more boundary:
 
 4. For Kaizen, open or resume a conversation so the sandbox-controller actually
    spawns an agent pod in `kamiwaza-sandboxes`.
-5. For Kaizen, run the verifier:
+5. If this customer is on offline / local catalog `0.13.0` and future Kaizen
+   launches also need the selected `0.13.1` template fixes, run
+   [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/).
+6. For Kaizen, run the verifier:
 
    ```bash
    security/tls-trust/extensions/verify-kaizen.sh <extension-name>
@@ -95,62 +103,6 @@ Kaizen adds one more boundary:
    ```bash
    security/tls-trust/extensions/verify-kaizen.sh <extension-name> https://bedrock.example.com
    ```
-
-## Scale note: raise the Kind pod ceiling to 1000 on 0.13.0
-
-For a live offline RHEL install already running `release/0.13.0`, a plain
-installer rerun is not enough. Patch:
-
-`/opt/kamiwaza/cluster/kind/generated-kamiwaza-prod.yaml`
-
-This is the live backport path for systems not yet moved to `release/0.13.1`.
-
-Make the control-plane entry include:
-
-```yaml
-nodes:
-- role: control-plane
-  kubeadmConfigPatches:
-  - |
-    kind: InitConfiguration
-    nodeRegistration:
-      kubeletExtraArgs:
-        max-pods: "1000"
-  - |
-    kind: KubeletConfiguration
-    maxPods: 1000
-```
-
-Then:
-
-```bash
-/opt/kamiwaza/bin/uninstall-prod.sh
-
-# Expect "gone"
-sudo podman inspect kamiwaza-prod-control-plane >/dev/null 2>&1 && echo still-present || echo gone
-
-# Expect no kamiwaza-prod entry
-sudo env "PATH=$PATH" KIND_EXPERIMENTAL_PROVIDER=podman \
-  CONTAINER_HOST=unix:///run/podman/podman.sock \
-  "$(command -v kind)" get clusters
-
-/opt/kamiwaza/bin/install-prod.sh --offline
-```
-
-If the first check prints `still-present`, or the second still lists
-`kamiwaza-prod`, the old cluster was not fully wiped; stop and remove it before
-reinstalling.
-
-That forces the Kind cluster to be recreated so the patched config is used on
-cluster creation.
-
-Verify with:
-
-```bash
-kubectl get node -o jsonpath='{.items[0].status.allocatable.pods}'
-```
-
-Expect `1000`.
 
 ## What the Kaizen patcher changes
 
