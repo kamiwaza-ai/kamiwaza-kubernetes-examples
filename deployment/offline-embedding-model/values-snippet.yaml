@@ -41,6 +41,14 @@ core:
       # more incremental progress) at the cost of more round-trips.
       # - name: CONTEXT_SERVICE_EMBEDDING_BATCH_SIZE
       #   value: "16"
+      # Chunk size (TOKENS). The 0.13.0 default (800) exceeds all-MiniLM-L6-v2's 512-token
+      # ceiling: a single oversize chunk makes llama-server return HTTP 500 (empty body) and
+      # FAILS THE WHOLE FILE — not just slow, broken. 500 keeps every chunk inside the model
+      # context (512 − 2 BERT special tokens, ~2% margin). Required on 0.13.0; the platform
+      # default is lowered to 500 in 0.13.1. (Raising the embedding timeout above does NOT fix
+      # this — it's a content-size failure, not a latency one.)
+      - name: CONTEXT_SERVICE_OMNIPARSE_DEFAULT_MAX_TOKENS
+        value: "500"
 
 # core-embedding (Graphiti's embedder): the chart's init container curls this.
 embedding:

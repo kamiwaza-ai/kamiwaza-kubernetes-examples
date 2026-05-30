@@ -128,6 +128,30 @@ generated.
 
 ---
 
+## Known 0.13.0 import issues (fixed in 0.13.1)
+
+Three context-import issues ship in 0.13.0 and are fixed in **0.13.1**. If you are
+pinned to 0.13.0 (e.g. an offline/air-gapped install that cannot take new bits),
+the first is a **correctness** problem and is worth working around with config; the
+other two are latency only.
+
+| Issue | Impact on 0.13.0 | Workaround on 0.13.0 (no new bits) |
+| --- | --- | --- |
+| **Chunk size exceeds embedding context** (ENG-6111) | The chunker default (800 tokens) is larger than `all-MiniLM-L6-v2`'s 512-token ceiling. A single oversize chunk makes llama-server return **HTTP 500 (empty body)**, which **fails the entire file** — not slow, *broken*. Content-dependent, so it hits any sufficiently long/dense document regardless of hardware. | **Config override** — set `CONTEXT_SERVICE_OMNIPARSE_DEFAULT_MAX_TOKENS=500` (in the values snippet). Keeps every chunk inside the model context. This is the 0.13.1 default applied early. |
+| **Single-slot embedder** (ENG-6075) | The embedding deployment runs `--parallel 1` on CPU (~3s/vector). Large imports are slow, and a 32-chunk batch (~85–110s) blows the default 30s call timeout → `Failed to reach embedding service` (ReadTimeout). | **Raise the timeout** — `CONTEXT_SERVICE_EMBEDDING_TIMEOUT=600` (in the values snippet). Does **not** speed up embedding, just stops the premature timeout. |
+| **Per-file readiness wait** (ENG-6094) | The pipeline waits up to 120s **per file** for a VectorDB readiness probe that has already passed — pure wasted latency, no functional impact. | **None via config** (it's a logic bug, not a tunable). Eat the latency on 0.13.0; it's gone in 0.13.1. |
+
+> **The chunk-size override and the timeout bump are independent.** Raising the
+> timeout does nothing for the oversize-chunk failure — that's a content-size 500,
+> not a slow call. On 0.13.0 you want **both** env vars set.
+
+**Trade-off of the 500-token chunk size:** smaller chunks mean more chunks per
+document (slightly more vectors stored and more embedding round-trips), often with
+*better* RAG retrieval precision. Safe regardless of which embedding model you
+deploy — if you later bind a larger-context model, 500-token chunks still work.
+
+---
+
 ## Recovery
 
 ```bash
