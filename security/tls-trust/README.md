@@ -98,6 +98,20 @@ sudo env "PATH=$PATH" KIND_EXPERIMENTAL_PROVIDER=podman \
 If the first check prints `still-present`, or the second still lists
 `kamiwaza-prod`, stop and fully remove the old cluster before reinstalling.
 
+**Already running and can't recreate?** Patch the live cluster in place — the
+per-node pod CIDR is immutable, so the node object is deleted and re-registers
+under the new `/22`:
+
+```bash
+NODE=kamiwaza-prod-control-plane
+sudo podman exec "$NODE" sh -lc "grep -q -- '--node-cidr-mask-size=' /etc/kubernetes/manifests/kube-controller-manager.yaml && sed -i 's/--node-cidr-mask-size=.*/--node-cidr-mask-size=22/' /etc/kubernetes/manifests/kube-controller-manager.yaml || sed -i '/--cluster-cidr=/a\    - --node-cidr-mask-size=22' /etc/kubernetes/manifests/kube-controller-manager.yaml"
+sudo kubectl delete node "$NODE"
+sudo podman exec "$NODE" systemctl restart kubelet
+sudo kubectl wait --for=condition=Ready node/"$NODE" --timeout=180s
+sudo kubectl -n kube-system rollout restart ds/kindnet
+sudo kubectl -n kube-system rollout status ds/kindnet --timeout=120s || true
+```
+
 Verify **both** limits — the kubelet ceiling and the per-node IP block:
 
 ```bash
