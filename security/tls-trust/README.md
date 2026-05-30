@@ -20,12 +20,14 @@ endpoint whose certificate is signed by a corporate CA.
 
 ---
 
-## Read this first: raise the Kind pod ceiling to 1000 on live 0.13.0 prod
+## Read this first: standalone scaling backport for live 0.13.0 prod
 
-If you are using this packet for Kaizen / extension follow-on work on a live
-offline RHEL install already running `release/0.13.0`, patch the existing Kind
-config before reinstalling. `release/0.13.1` already carries this change; this
-section is the live backport path for `0.13.0`.
+This is a **cluster-scaling patch**, not an extensions-only step.
+
+For any live offline RHEL install already running `release/0.13.0`, use this
+backport when you need the Kind pod ceiling raised to `1000`. `release/0.13.1`
+already carries this change; this section is the standalone live backport path
+for `0.13.0`.
 
 Patch:
 
@@ -360,8 +362,8 @@ That follow-on does four things:
    for offline / local-catalog `0.13.0` systems that also need future Kaizen
    launches to pick up selected `0.13.1` template fixes
 
-If you expect large Kaizen sandbox fan-out on live offline `0.13.0`, do the
-max-pods backport at the top of this README before you reinstall.
+If you expect large Kaizen sandbox fan-out on live offline `0.13.0`, make sure
+the standalone max-pods backport at the top of this README is already done.
 
 **Important:** a green backend pod is not enough for Kaizen. If the sandbox pod does
 not show `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` / `AWS_CA_BUNDLE` plus the mounted
