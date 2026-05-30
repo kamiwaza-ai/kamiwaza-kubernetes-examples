@@ -5,3 +5,4 @@ Deployment scenarios: each folder documents a concrete deployment topology, expe
 | Scenario | Path | Focus |
 | --- | --- | --- |
 | Environment profile matrix | [env-profile-matrix](env-profile-matrix) | Lite/full/dev/dev-full topology and expected behavior |
+| Offline embedding model | [offline-embedding-model](offline-embedding-model) | Repoint embedding model downloads at an internal HuggingFace for air-gapped clusters |

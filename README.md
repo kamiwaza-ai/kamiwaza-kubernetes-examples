@@ -55,6 +55,7 @@ Category indexes:
 | Scenario                                            | Path                                                                             | Tags                                         |
 | --------------------------------------------------- | -------------------------------------------------------------------------------- | -------------------------------------------- |
 | Environment profile matrix (lite/full/dev/dev-full) | [deployment/env-profile-matrix](deployment/env-profile-matrix)                   | #deployment #topology #helmfile              |
+| Offline embedding model from an internal HuggingFace | [deployment/offline-embedding-model](deployment/offline-embedding-model)         | #deployment #offline #airgap #embedding #huggingface |
 | Grafana + Prometheus monitoring                     | [monitoring/grafana-prometheus](monitoring/grafana-prometheus)                    | #monitoring #prometheus #grafana #loki        |
 | Service access patterns                             | [networking/external-access](networking/external-access)                         | #networking #port-forward #ingress            |
 | Backup and restore                                  | [operations/backup-restore](operations/backup-restore)                           | #operations #backup #postgres #etcd           |

@@ -1,0 +1,51 @@
+# Offline embedding model — route model downloads at an INTERNAL HuggingFace.
+#
+# Merge into Deploy `cluster/values/overrides.yaml`. Two independent download paths
+# feed the two embedding consumers (see README): set BOTH.
+#
+#   1) HF_ENDPOINT  -> models service `huggingface_hub` pulls (the embedding model you
+#                      Download+Deploy for Context RAG, and any LLMs). Ray head + workers
+#                      read scheduler.extraEnv too, so this one block covers them all.
+#   2) embedding.model.downloadUrl -> the `core-embedding` chart's curl init container
+#                      (the embedder Graphiti uses).
+#
+# Prereqs:
+#   - Model storage configured + writable BEFORE downloading (see README step 1).
+#   - The file is a GGUF served at a /resolve/ URL; the /resolve/ redirect target
+#     (LFS/CDN backend) is reachable in-cluster.
+#   - sha256 matches the served bytes (from `<hub>/<repo>/raw/<branch>/<file>` LFS pointer).
+#   - HTTPS w/ a private CA? pair with ../../security/tls-trust (the curl init has no -k),
+#     or serve over HTTP (integrity is still enforced by sha256).
+
+core:
+  scheduler:
+    extraEnv:
+      # Routes huggingface_hub downloads (Models UI/API) at the internal hub.
+      - name: HF_ENDPOINT
+        value: "https://<internal-hf>"
+      # Optional: token for an auth-gated hub (huggingface_hub reads HF_TOKEN).
+      # - name: HF_TOKEN
+      #   valueFrom:
+      #     secretKeyRef:
+      #       name: <hf-token-secret>
+      #       key: token
+
+# core-embedding (Graphiti's embedder): the chart's init container curls this.
+embedding:
+  model:
+    # Internal-hub URL for the embedding GGUF (default model: all-MiniLM-L6-v2 Q8_0).
+    downloadUrl: "https://<internal-hf>/sudomoniker/all-MiniLM-L6-v2-Q8_0-GGUF/resolve/main/all-minilm-l6-v2-q8_0.gguf"
+    fileName: "all-minilm-l6-v2-q8_0.gguf"
+    sha256: "<sha256-of-the-file-your-hub-serves>"
+    runtimeModelName: "all-MiniLM-L6-v2"
+
+  # Only if your internal hub requires a bearer token. Create out-of-band:
+  #   kubectl -n kamiwaza create secret generic <secret> --from-literal=token=<TOKEN>
+  # huggingface:
+  #   existingSecret: "<secret>"
+  #   secretKey: token
+
+# NOTE: release pins core.context.embedding.autoProvision=false, so Context RAG will
+# NOT auto-deploy an embedding model — you must Download + Deploy one (README step 4).
+# Do NOT flip autoProvision on to "fix" this unless you intend the platform to manage
+# the embedding deployment itself.
