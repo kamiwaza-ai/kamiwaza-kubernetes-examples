@@ -113,6 +113,11 @@ kubectl -n kamiwaza-extensions rollout status deploy/<sandbox-controller-deploy>
 ../verify-kaizen.sh kaizen-a1b2c3d4 https://<corp-ca-endpoint>
 ```
 
+> `--ca-file` in step 1 is optional: if you already created the `kamiwaza-org-ca` Secret
+> per the parent packet, omit it and the build script reads that Secret. `--include-sandboxes`
+> is the part that matters here. The in-image module path the overlay mounts over is
+> **auto-detected** from the running controller (`--site-packages-path` overrides it).
+
 Useful flags (full set in the applier docstring / `--help`):
 
 | Flag | Default | Purpose |

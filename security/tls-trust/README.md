@@ -164,6 +164,7 @@ renders — which fails to unmarshal — or the node was not recreated).
 | Item | Status |
 | --- | --- |
 | Validated against | **Kamiwaza 0.13.0** |
+| Kaizen sandbox overlay validated against | **Kaizen controller 1.8.13** (distinct from the platform version) — see [`extensions/kaizen-sandbox-trust/`](extensions/kaizen-sandbox-trust/) |
 | Outbound CA trust (this folder) | **Config-only on 0.13.0** — no trust-manager controller needed. Build the `kamiwaza-trust-bundle` ConfigMap with [`build-trust-bundle-configmap.sh`](build-trust-bundle-configmap.sh), then `core.trustManager.enabled` + `core.scheduler.extraEnv` mount it. |
 | BYO ingress cert | **Manifest path on 0.13.0** — there is no native values knob, but the network subchart already manages a `default` TLSStore + wildcard Certificate, so the BYO manifests collide with Helm-owned resources. Read the [Helm-ownership caveat](ingress/#helm-ownership-on-0130) in `ingress/` before applying. **Not needed on later releases**, which serve a BYO ingress cert through a native values knob. |
 
@@ -177,7 +178,7 @@ renders — which fails to unmarshal — or the node was not recreated).
 | `core-scheduler` | ✅ | bundle mounted at `/etc/ssl/certs/ca-certificates.crt` |
 | Ray head + workers | ✅ | same mount; this is where Bedrock/LiteLLM runs |
 | Declared extension pods | ⚠️ generic follow-on | use [`extensions/`](extensions/) for the reusable declared-pod trust pattern: mount the bundle, set CA env, keep verification ON |
-| Kaizen spawned sandboxes | ❌ Kaizen-specific follow-on | Kaizen adds a second boundary: the sandbox's CA file is owned by the sandbox-controller, not Helm — not proven until a live TLS probe from the sandbox to a corporate-CA endpoint succeeds |
+| Kaizen spawned sandboxes | ✅ via config-only controller overlay | Kaizen adds a second boundary — the sandbox's CA file is owned by the sandbox-controller, not Helm — but it is now closed by [`extensions/kaizen-sandbox-trust/`](extensions/kaizen-sandbox-trust/), which overlays the sandbox-controller pod-builder so every spawned sandbox mounts the same bundle at the same path (validated live, Kaizen 1.8.13). A live TLS probe from the sandbox to a corporate-CA endpoint is still the only proof the corporate CA (not the agent image's default bundle) is trusted |
 
 > **Hostname caveat for Kaizen / custom endpoints:** this packet adds **CA
 > trust**, not hostname rewrites. If a sandbox or extension is configured to
@@ -276,6 +277,7 @@ either be up first, or you must feed the baseline from a file. Two clean orderin
 | [`bedrock-custom-region/`](bedrock-custom-region/) | **Companion** — custom Bedrock **region** enablement. Declarative botocore hotfix so boto3 *accepts* a non-default region; pair with this recipe so no `SSL_VERIFY=False` is needed. |
 | [`ingress/`](ingress/) | BYO ingress cert — manifest path required on 0.13.0 (not needed on later releases). |
 | [`extensions/`](extensions/) | Kaizen / extension follow-on: generic declared-pod trust pattern, sandbox verification path, and the offline template livepatch for future Kaizen launches. |
+| [`extensions/kaizen-sandbox-trust/`](extensions/kaizen-sandbox-trust/) | Config-only spawned-sandbox trust — overlays the Kaizen sandbox-controller pod-builder so every spawned sandbox mounts `kamiwaza-trust-bundle`. No new image, no trust-manager. Validated live (Kaizen 1.8.13). |
 
 ---
 
@@ -448,16 +450,19 @@ kubectl -n kamiwaza exec <ray-pod> -- python -c \
 Once the core / Ray packet above is green, use [`extensions/`](extensions/) for the
 remaining 0.13.0 Kaizen slice.
 
-That follow-on does four things:
+That follow-on does five things:
 
 1. re-runs the build script with `--include-sandboxes` to also write the
    `kamiwaza-trust-bundle` ConfigMap to `kamiwaza-sandboxes`
 2. patches a live Kaizen `KamiwazaExtension` CR so the declared backend pod mounts
    the bundle, keeps verification ON, and is allowed external egress
-3. verifies (via a live TLS probe) whether the spawned sandbox actually trusts
+3. applies [`extensions/kaizen-sandbox-trust/`](extensions/kaizen-sandbox-trust/) — a
+   config-only overlay of the sandbox-controller pod-builder so every spawned sandbox
+   mounts the bundle at `/etc/ssl/certs/ca-certificates.crt` (validated live, Kaizen 1.8.13)
+4. verifies (via a live TLS probe) whether the spawned sandbox actually trusts
    the corporate CA — structural checks alone can pass on the agent image's
    default bundle
-4. includes
+5. includes
    [`extensions/kaizen-offline-template-livepatch/`](extensions/kaizen-offline-template-livepatch/)
    for offline / local-catalog `0.13.0` systems that also need future Kaizen
    launches to pick up selected `0.13.1` template fixes
@@ -468,9 +473,14 @@ the standalone max-pods backport at the top of this README is already done.
 **Important:** a green backend pod is not enough for Kaizen. The sandbox's CA file
 (`/etc/ssl/certs/ca-certificates.crt`, which the Kaizen agent entrypoint already
 points `SSL_CERT_FILE`/`REQUESTS_CA_BUNDLE` at) is owned by the sandbox-controller,
-not by Helm values — so if a live TLS probe from the sandbox to a corporate-CA
-endpoint fails, the config-only packet stops there and the remaining gap is
-sandbox-controller / operator behavior, not customer values.
+not by Helm values. That boundary is now closed config-only by
+[`extensions/kaizen-sandbox-trust/`](extensions/kaizen-sandbox-trust/): it overlays the
+sandbox-controller pod-builder so every spawned sandbox mounts the same bundle at the
+same path (no new image, no trust-manager; validated live, Kaizen 1.8.13). Apply the
+overlay before spawning — it is new-pods-only, so resume/start a new conversation after
+the controller rolls. Even then, a live TLS probe from the sandbox to a corporate-CA
+endpoint remains the only proof the corporate CA (not the agent image's default bundle)
+is actually trusted.
 
 ---
 

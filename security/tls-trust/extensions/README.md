@@ -37,7 +37,10 @@ Kaizen adds one more boundary:
 - declared `backend` / `sandbox-controller` services must pick up the trust
   bundle like any other extension
 - **spawned sandbox pods** in `kamiwaza-sandboxes` must also end up trusting the
-  corporate CA
+  corporate CA. The config-only way to satisfy this on `0.13.0` is the
+  controller overlay in [`kaizen-sandbox-trust/`](kaizen-sandbox-trust/); the
+  rest of this section explains why an overlay (not Helm values or a CR patch) is
+  required.
 
 **What the sandbox actually needs (and why it's simpler than it looks).** The
 Kaizen agent image entrypoint already pins trust to a fixed path — it runs
@@ -48,10 +51,14 @@ injection at all** — the single requirement is that the corporate CA is presen
 in that one file **inside the sandbox pod**.
 
 That file is owned by the spawned pod, which the **sandbox-controller** creates —
-not the operator and not Helm values. Customer config (this packet) cannot add a
-volume to it. So if a live probe from the sandbox to a corporate-CA endpoint
-fails, the remaining gap is sandbox-controller / operator behavior, not customer
-values — stop calling the packet complete.
+not the operator and not Helm values. Neither Helm values nor the CR `services`
+list can add a volume to a pod the controller invents at spawn time. The in-repo
+fix is to overlay the controller's pod-builder so every spawned sandbox mounts
+`kamiwaza-trust-bundle` — see
+[`kaizen-sandbox-trust/`](kaizen-sandbox-trust/) (validated live, Kaizen
+1.8.13). So if a live probe from the sandbox to a corporate-CA endpoint fails, it
+means the overlay hasn't been applied (or the bundle isn't present in
+`kamiwaza-sandboxes`) — not that the gap is unfixable.
 
 > **Structural checks alone do not prove sandbox trust.** The agent image already
 > ships a full CA bundle (Mozilla set + the Traefik cert it installs), so a
@@ -107,12 +114,24 @@ values — stop calling the packet complete.
    still not assumed to reach spawned sandboxes; that remains a verification
    gate below.
 
-4. For Kaizen, open or resume a conversation so the sandbox-controller actually
-   spawns an agent pod in `kamiwaza-sandboxes`.
-5. If this customer is on offline / local catalog `0.13.0` and future Kaizen
+4. For **Kaizen spawned sandboxes**, apply the config-only controller overlay:
+
+   ```bash
+   security/tls-trust/extensions/kaizen-sandbox-trust/apply-sandbox-controller-trust.py <extension-name>
+   ```
+
+   This overlays the sandbox-controller pod-builder so every newly spawned
+   sandbox mounts `kamiwaza-trust-bundle`. Full guide:
+   [`kaizen-sandbox-trust/`](kaizen-sandbox-trust/). Wait for the controller to
+   roll (reconcile is async) before spawning.
+5. For Kaizen, open or resume a conversation so the sandbox-controller actually
+   spawns an agent pod in `kamiwaza-sandboxes`. The overlay from the previous
+   step only affects pods spawned **after** the controller rollout, so this must
+   come after that rollout has landed.
+6. If this customer is on offline / local catalog `0.13.0` and future Kaizen
    launches also need the selected `0.13.1` template fixes, run
    [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/).
-6. For Kaizen, run the verifier:
+7. For Kaizen, run the verifier:
 
    ```bash
    security/tls-trust/extensions/verify-kaizen.sh <extension-name>
@@ -176,9 +195,11 @@ For the live Kaizen `KamiwazaExtension` CR, the patcher patches the **declared**
 > verification-ON path it forwards only `MCP_VERIFY_SSL` and
 > `KAMIWAZA_TRUST_TRAEFIK_CERT` — **not** `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` /
 > `AWS_CA_BUNDLE`, and **not** the proxy vars. Patching the backend therefore does
-> not reach the sandbox; that remains the verification gate below.
+> not reach the sandbox. The CA bundle instead reaches the sandbox via the
+> controller overlay in [`kaizen-sandbox-trust/`](kaizen-sandbox-trust/), which
+> mounts `kamiwaza-trust-bundle` into the spawned pod — not via `forward_env`.
 
-## Why this is a script and not a plain manifest (and the durable fix)
+## Why the declared-backend patch is a script, not a manifest
 
 The patcher is imperative on purpose — on `0.13.0` the mount **cannot** be added
 to a live `KamiwazaExtension` declaratively:
@@ -197,15 +218,16 @@ read-modify-write merge** of a ConfigMap volume + CA env into the live CR. A
 `jq`/`kubectl` rewrite is possible but is the same imperative merge in a less
 readable form — it buys nothing.
 
-**The durable fix is platform-side, not in this repo.** The clean solution mirrors
-the core `trustManager.enabled` pattern: have the **extension operator** inject
-the `kamiwaza-trust-bundle` mount + `SSL_CERT_FILE`/`REQUESTS_CA_BUNDLE` into
+**The cleanest LONG-TERM fix is platform-side.** It mirrors the core
+`trustManager.enabled` pattern: have the **extension operator** inject the
+`kamiwaza-trust-bundle` mount + `SSL_CERT_FILE`/`REQUESTS_CA_BUNDLE` into
 extension service pods (gated by a value), and propagate that mount into the
-**spawned sandbox pod** template via the sandbox-controller. That is the only path
-that is both declarative *and* able to close the sandbox gap — but it requires
-changes to the platform Helm charts and the operator/sandbox-controller images,
-which live outside this examples repo. Until that ships, this script is the
-supported **interim** path for live `0.13.0` clusters.
+**spawned sandbox pod** template via the sandbox-controller. That is the path
+that is declarative end-to-end, but it requires changes to the platform Helm
+charts and the operator/sandbox-controller images, which live outside this
+examples repo. TODAY, though, **both boundaries are closed config-only in this
+repo**: this script for the declared backend, and
+[`kaizen-sandbox-trust/`](kaizen-sandbox-trust/) for the spawned sandboxes.
 
 ## Pass / fail criteria
 
@@ -239,8 +261,11 @@ supported **interim** path for live `0.13.0` clusters.
 - no sandbox pod exists yet: create or resume a Kaizen conversation, then rerun
 - sandbox pod exists but the live probe to a corporate-CA endpoint fails (the
   corporate CA is not in the sandbox's `/etc/ssl/certs/ca-certificates.crt`): the
-  current `0.13.0` config-only packet stops here; the remaining gap is
-  sandbox-controller / operator behavior, not customer Helm values
+  sandbox is still on the agent image's default bundle. Apply the controller
+  overlay in [`kaizen-sandbox-trust/`](kaizen-sandbox-trust/), confirm
+  `kamiwaza-trust-bundle` exists in `kamiwaza-sandboxes`
+  (`build-trust-bundle-configmap.sh --include-sandboxes`), resume or open a new
+  conversation so a fresh sandbox spawns, then re-run the probe
 
 ## Important hostname constraint
 
