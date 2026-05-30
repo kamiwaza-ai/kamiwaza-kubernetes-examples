@@ -29,6 +29,14 @@ backport when you need the Kind pod ceiling raised to `1000`. `release/0.13.1`
 already carries this change; this section is the standalone live backport path
 for `0.13.0`.
 
+**Pick the path that matches your cluster:**
+
+- **Fresh install / can recreate** → apply the config patch below, then recreate.
+  Both `maxPods` and the CIDR land together and persist across rebuilds.
+- **Already running / can't recreate** → use the in-place patch further down.
+  It survives restarts and reboots, but a later cluster recreate resets it — so
+  fold the config patch in when you next rebuild.
+
 Patch:
 
 `/opt/kamiwaza/cluster/kind/generated-kamiwaza-prod.yaml`
@@ -97,6 +105,22 @@ sudo env "PATH=$PATH" KIND_EXPERIMENTAL_PROVIDER=podman \
 
 If the first check prints `still-present`, or the second still lists
 `kamiwaza-prod`, stop and fully remove the old cluster before reinstalling.
+
+> Apply the `maxPods: 1000` change first — this step only adds its `/22` per-node pod CIDR companion.
+
+**Already running and can't recreate?** Patch the live cluster in place — the
+per-node pod CIDR is immutable, so the node object is deleted and re-registers
+under the new `/22`:
+
+```bash
+NODE=kamiwaza-prod-control-plane
+sudo podman exec "$NODE" sh -lc "grep -q -- '--node-cidr-mask-size=' /etc/kubernetes/manifests/kube-controller-manager.yaml && sed -i 's/--node-cidr-mask-size=.*/--node-cidr-mask-size=22/' /etc/kubernetes/manifests/kube-controller-manager.yaml || sed -i '/--cluster-cidr=/a\    - --node-cidr-mask-size=22' /etc/kubernetes/manifests/kube-controller-manager.yaml"
+sudo kubectl delete node "$NODE"
+sudo podman exec "$NODE" systemctl restart kubelet
+sudo kubectl wait --for=condition=Ready node/"$NODE" --timeout=180s
+sudo kubectl -n kube-system rollout restart ds/kindnet
+sudo kubectl -n kube-system rollout status ds/kindnet --timeout=120s || true
+```
 
 Verify **both** limits — the kubelet ceiling and the per-node IP block:
 
