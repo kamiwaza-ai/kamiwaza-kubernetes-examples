@@ -96,6 +96,62 @@ Kaizen adds one more boundary:
    security/tls-trust/extensions/verify-kaizen.sh <extension-name> https://bedrock.example.com
    ```
 
+## Scale note: raise the Kind pod ceiling to 1000 on 0.13.0
+
+For a live offline RHEL install already running `release/0.13.0`, a plain
+installer rerun is not enough. Patch:
+
+`/opt/kamiwaza/cluster/kind/generated-kamiwaza-prod.yaml`
+
+This is the live backport path for systems not yet moved to `release/0.13.1`.
+
+Make the control-plane entry include:
+
+```yaml
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        max-pods: "1000"
+  - |
+    kind: KubeletConfiguration
+    maxPods: 1000
+```
+
+Then:
+
+```bash
+/opt/kamiwaza/bin/uninstall-prod.sh
+
+# Expect "gone"
+sudo podman inspect kamiwaza-prod-control-plane >/dev/null 2>&1 && echo still-present || echo gone
+
+# Expect no kamiwaza-prod entry
+sudo env "PATH=$PATH" KIND_EXPERIMENTAL_PROVIDER=podman \
+  CONTAINER_HOST=unix:///run/podman/podman.sock \
+  "$(command -v kind)" get clusters
+
+/opt/kamiwaza/bin/install-prod.sh --offline
+```
+
+If the first check prints `still-present`, or the second still lists
+`kamiwaza-prod`, the old cluster was not fully wiped; stop and remove it before
+reinstalling.
+
+That forces the Kind cluster to be recreated so the patched config is used on
+cluster creation.
+
+Verify with:
+
+```bash
+kubectl get node -o jsonpath='{.items[0].status.allocatable.pods}'
+```
+
+Expect `1000`.
+
 ## What the Kaizen patcher changes
 
 For the live Kaizen `KamiwazaExtension` CR, the patcher:

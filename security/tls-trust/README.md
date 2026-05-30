@@ -300,6 +300,10 @@ That follow-on does three things:
    the bundle, keeps verification ON, and is allowed external egress
 3. verifies whether the spawned sandbox pod also receives the bundle + CA env
 
+If you expect large Kaizen sandbox fan-out on `0.13.0`, also read the
+[`extensions/` scaling note](extensions/README.md#scale-note-raise-the-kind-pod-ceiling-to-1000-on-0130)
+for patching the Ansible-managed Kind kubelet `maxPods` ceiling to `1000`.
+
 **Important:** a green backend pod is not enough for Kaizen. If the sandbox pod does
 not show `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` / `AWS_CA_BUNDLE` plus the mounted
 bundle file, the current config-only packet stops there and the remaining gap is
