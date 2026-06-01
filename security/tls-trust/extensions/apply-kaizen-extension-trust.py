@@ -30,9 +30,17 @@ CA_ENV = {
     "AWS_CA_BUNDLE": BUNDLE_PATH,
 }
 
+# Set as DIRECT service env on the backend. A container's direct `env` overrides
+# any same-key value coming from `envFrom` (the operator-generated
+# `<deployment-id>-config` ConfigMap). When the platform was generated in insecure
+# TLS mode it leaves a stale direct `KAMIWAZA_TLS_REJECT_UNAUTHORIZED=0` on the
+# backend that shadows the ConfigMap's value, so we must override it here as a
+# direct env too — setting only spec.kamiwaza.tlsRejectUnauthorized (ConfigMap)
+# is not enough.
 BACKEND_VERIFY_ENV = {
     "AGENT_DISABLE_SSL_VERIFY": "false",
     "KAMIWAZA_VERIFY_SSL": "true",
+    "KAMIWAZA_TLS_REJECT_UNAUTHORIZED": "1",
 }
 
 
@@ -118,7 +126,30 @@ def _patch_service(service: Dict[str, Any], extra_env: Dict[str, str]) -> None:
     _upsert_volume_mount(service)
 
 
-def _patch_spec(obj: Dict[str, Any], backend_extra_env: Dict[str, str]) -> Dict[str, Any]:
+def _derive_backend_base_url(
+    obj: Dict[str, Any],
+    explicit_base_url: str,
+) -> str:
+    if explicit_base_url:
+        return explicit_base_url
+
+    kamiwaza_spec = ((obj.get("spec") or {}).get("kamiwaza") or {})
+    for key in ("apiUrl", "publicApiUrl"):
+        value = str(kamiwaza_spec.get(key) or "").strip()
+        if value:
+            return value
+
+    raise RuntimeError(
+        "Unable to derive KAMIWAZA_BASE_URL from spec.kamiwaza.{apiUrl,publicApiUrl}; "
+        "pass --kamiwaza-base-url explicitly."
+    )
+
+
+def _patch_spec(
+    obj: Dict[str, Any],
+    backend_extra_env: Dict[str, str],
+    backend_base_url: str,
+) -> Dict[str, Any]:
     spec = obj.setdefault("spec", {})
 
     kamiwaza = spec.setdefault("kamiwaza", {})
@@ -139,7 +170,14 @@ def _patch_spec(obj: Dict[str, Any], backend_extra_env: Dict[str, str]) -> Dict[
     for service in services:
         name = service.get("name")
         if name == "backend":
-            _patch_service(service, {**BACKEND_VERIFY_ENV, **backend_extra_env})
+            _patch_service(
+                service,
+                {
+                    **BACKEND_VERIFY_ENV,
+                    "KAMIWAZA_BASE_URL": backend_base_url,
+                    **backend_extra_env,
+                },
+            )
             found_backend = True
         elif name == "sandbox-controller":
             _patch_service(service, {})
@@ -165,6 +203,36 @@ def _patch_spec(obj: Dict[str, Any], backend_extra_env: Dict[str, str]) -> Dict[
     if metadata.get("annotations"):
         cleaned["metadata"]["annotations"] = metadata["annotations"]
     return cleaned
+
+
+def _warn_if_internal_https_api_url(obj: Dict[str, Any], backend_base_url: str) -> None:
+    """Warn when verify-on will break the Kaizen backend's own API base URL.
+
+    Kaizen's backend uses KAMIWAZA_BASE_URL, not KAMIWAZA_API_URL directly. This
+    patcher mirrors a platform URL into KAMIWAZA_BASE_URL. If that chosen URL is
+    an internal HTTPS service hostname (e.g. https://traefik.kamiwaza.svc.cluster.local/api),
+    verification ON will fail TLS hostname validation even though the CA is
+    trusted. Surface it loudly before patching.
+    """
+    if not backend_base_url.startswith("https://"):
+        return
+    try:
+        netloc = backend_base_url.split("/", 3)[2]
+    except IndexError:
+        netloc = ""
+    if ".svc" not in netloc and ".cluster.local" not in netloc:
+        return  # public/external HTTPS host; assume cert-matching
+    sys.stderr.write(
+        "\nWARNING: chosen KAMIWAZA_BASE_URL is an internal HTTPS hostname:\n"
+        f"    {backend_base_url}\n"
+        "Turning verification ON (this patcher) will make the Kaizen backend's\n"
+        "calls to that URL fail TLS hostname validation, because the Traefik\n"
+        "serving cert is for *.kamiwaza.test, not an internal *.svc name.\n"
+        "Fix it cert-matching:\n"
+        "  - rerun with --kamiwaza-base-url https://kamiwaza.test/api, or\n"
+        "  - add the internal hostname to the Traefik cert SANs.\n"
+        "Then run verify-kaizen.sh (step 3a fails closed on this exact mismatch).\n\n"
+    )
 
 
 def main() -> int:
@@ -197,9 +265,19 @@ def main() -> int:
         default=os.environ.get("NO_PROXY", ""),
         help="Optional NO_PROXY value to inject into the Kaizen backend",
     )
+    parser.add_argument(
+        "--kamiwaza-base-url",
+        default=os.environ.get("KAMIWAZA_BASE_URL", ""),
+        help=(
+            "Explicit KAMIWAZA_BASE_URL for the Kaizen backend. "
+            "Defaults to spec.kamiwaza.apiUrl, then publicApiUrl."
+        ),
+    )
     args = parser.parse_args()
 
     obj = _load_extension(args.name, args.namespace)
+    backend_base_url = _derive_backend_base_url(obj, args.kamiwaza_base_url)
+    _warn_if_internal_https_api_url(obj, backend_base_url)
     backend_extra_env = {
         key: value
         for key, value in {
@@ -209,7 +287,7 @@ def main() -> int:
         }.items()
         if value
     }
-    cleaned = _patch_spec(obj, backend_extra_env)
+    cleaned = _patch_spec(obj, backend_extra_env, backend_base_url)
     rendered = json.dumps(cleaned, indent=2) + "\n"
 
     if args.print_only:
@@ -218,6 +296,7 @@ def main() -> int:
 
     _run("kubectl", "apply", "-f", "-", input_text=rendered)
     print(f"patched Kaizen extension {args.namespace}/{args.name}")
+    print(f"set backend KAMIWAZA_BASE_URL={backend_base_url}")
     if backend_extra_env:
         print(f"injected backend proxy env: {', '.join(sorted(backend_extra_env))}")
     print("next: open or resume a Kaizen conversation, then run verify-kaizen.sh")

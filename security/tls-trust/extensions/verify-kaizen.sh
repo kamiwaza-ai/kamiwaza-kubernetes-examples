@@ -32,6 +32,15 @@ pass() { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 fail() { printf '  \033[31m✗\033[0m %s\n' "$1"; exit 1; }
 info() { printf '\033[1m%s\033[0m\n' "$1"; }
 
+check_env_present() {
+  local label="$1"
+  local text="$2"
+  local key="$3"
+  echo "$text" | grep -q "^${key}=" \
+    && pass "${label} ${key} is set" \
+    || fail "${label} missing ${key}"
+}
+
 check_env_equals() {
   local label="$1"
   local text="$2"
@@ -99,9 +108,37 @@ check_env_equals "backend" "$BACKEND_ENV" "AWS_CA_BUNDLE" "$BUNDLE_PATH"
 check_env_equals "backend" "$BACKEND_ENV" "AGENT_DISABLE_SSL_VERIFY" "false"
 check_env_equals "backend" "$BACKEND_ENV" "KAMIWAZA_VERIFY_SSL" "true"
 check_env_equals "backend" "$BACKEND_ENV" "KAMIWAZA_TLS_REJECT_UNAUTHORIZED" "1"
+check_env_present "backend" "$BACKEND_ENV" "KAMIWAZA_BASE_URL"
 check_env_if_expected "backend" "$BACKEND_ENV" "HTTPS_PROXY" "$EXPECT_HTTPS_PROXY"
 check_env_if_expected "backend" "$BACKEND_ENV" "HTTP_PROXY" "$EXPECT_HTTP_PROXY"
 check_env_if_expected "backend" "$BACKEND_ENV" "NO_PROXY" "$EXPECT_NO_PROXY"
+
+# Turning verification ON only helps if the Kaizen backend's OWN
+# KAMIWAZA_BASE_URL is reachable under verification. Some platform builds hand
+# extensions a KAMIWAZA_API_URL/publicApiUrl that must be mirrored into
+# KAMIWAZA_BASE_URL for the Python backend, and an internal HTTPS hostname still
+# fails if it does not match the Traefik cert SANs. Fail closed on it.
+info "3a. Backend reaches its own KAMIWAZA_BASE_URL with verification ON"
+API_PROBE="$(kubectl -n "$EXT_NS" exec "$BACKEND_POD" -- python3 -c '
+import httpx, os, sys
+url = os.environ.get("KAMIWAZA_BASE_URL", "") or os.environ.get("KAMIWAZA_API_URL", "")
+if not url:
+    print("FAIL unset"); sys.exit(0)
+if not url.startswith("https"):
+    print("SKIP " + (url or "(unset)")); sys.exit(0)
+try:
+    r = httpx.get(url.rstrip("/") + "/models/", timeout=10)  # verify=True -> uses SSL_CERT_FILE bundle
+    print("OK " + str(r.status_code))
+except Exception as e:
+    m = str(e)
+    kind = "hostname-mismatch" if "Hostname mismatch" in m else ("unknown-CA" if "unable to get local issuer" in m else type(e).__name__)
+    print("FAIL " + kind)
+' 2>/dev/null || echo "FAIL exec-failed")"
+case "$API_PROBE" in
+  OK*)   pass "backend KAMIWAZA_BASE_URL verifies under verify-ON (HTTP ${API_PROBE#OK })" ;;
+  SKIP*) pass "backend KAMIWAZA_BASE_URL is plain HTTP (TLS not applicable): ${API_PROBE#SKIP }" ;;
+  *)     fail "backend cannot reach its KAMIWAZA_BASE_URL with verification ON (${API_PROBE#FAIL }). Kaizen's backend consumes KAMIWAZA_BASE_URL, not KAMIWAZA_API_URL directly. Set KAMIWAZA_BASE_URL to a cert-matching public origin (https://kamiwaza.test/api) or a safe internal HTTP API URL — see README." ;;
+esac
 
 if [ -n "$PROBE_URL" ]; then
   info "3. Live backend TLS probe to $PROBE_URL"
@@ -114,17 +151,26 @@ SANDBOX_POD="$(kubectl -n "$SANDBOX_NS" get pods -l "kamiwaza.io/parent-extensio
 SANDBOX_ENV="$(kubectl -n "$SANDBOX_NS" exec "$SANDBOX_POD" -- sh -c "ls $BUNDLE_PATH >/dev/null 2>&1 && env" 2>/dev/null || true)"
 [ -n "$SANDBOX_ENV" ] && pass "sandbox has $BUNDLE_PATH mounted" \
   || fail "sandbox missing $BUNDLE_PATH mount (current config-only packet stops here)"
+# NOTE: structural checks confirm a CA bundle is present and that the agent's
+# SSL_CERT_FILE/REQUESTS_CA_BUNDLE point at it — NOT that the corporate CA is in
+# it. The Kaizen agent image already ships a full bundle (Mozilla + Traefik cert),
+# so these can pass with the default bundle. The live probe (step 5) is the only
+# proof the corporate CA is trusted.
+#
+# AWS_CA_BUNDLE and proxy vars are intentionally NOT checked here: the Kaizen
+# backend's forward_env (conversation_manager.py) carries only MCP_VERIFY_SSL +
+# KAMIWAZA_TRUST_TRAEFIK_CERT in the verify-ON path, so neither reaches sandboxes.
+# The agent entrypoint sets SSL_CERT_FILE + REQUESTS_CA_BUNDLE itself.
 check_cert_count "sandbox" "$SANDBOX_POD" "$SANDBOX_NS"
 check_env_equals "sandbox" "$SANDBOX_ENV" "SSL_CERT_FILE" "$BUNDLE_PATH"
 check_env_equals "sandbox" "$SANDBOX_ENV" "REQUESTS_CA_BUNDLE" "$BUNDLE_PATH"
-check_env_equals "sandbox" "$SANDBOX_ENV" "AWS_CA_BUNDLE" "$BUNDLE_PATH"
-check_env_if_expected "sandbox" "$SANDBOX_ENV" "HTTPS_PROXY" "$EXPECT_HTTPS_PROXY"
-check_env_if_expected "sandbox" "$SANDBOX_ENV" "HTTP_PROXY" "$EXPECT_HTTP_PROXY"
-check_env_if_expected "sandbox" "$SANDBOX_ENV" "NO_PROXY" "$EXPECT_NO_PROXY"
 
 if [ -n "$PROBE_URL" ]; then
-  info "5. Live sandbox TLS probe to $PROBE_URL"
+  info "5. Live sandbox TLS probe to $PROBE_URL (the real proof of corporate-CA trust)"
   probe_httpx "sandbox" "$SANDBOX_POD" "$SANDBOX_NS" "$PROBE_URL"
+else
+  info "5. (skipped) No probe URL given — structural checks above do NOT prove the"
+  printf '  corporate CA is trusted in the sandbox. Re-run with a corporate-CA https:// URL.\n'
 fi
 
 info "Kaizen trust validation passed."
