@@ -59,6 +59,7 @@ Category indexes:
 | Service access patterns                             | [networking/external-access](networking/external-access)                         | #networking #port-forward #ingress            |
 | Backup and restore                                  | [operations/backup-restore](operations/backup-restore)                           | #operations #backup #postgres #etcd           |
 | Kaizen offline template livepatch                   | [security/tls-trust/extensions/kaizen-offline-template-livepatch](security/tls-trust/extensions/kaizen-offline-template-livepatch) | #security #tls #kaizen #offline #livepatch |
+| Kaizen offline frontend font hotfix                 | [security/tls-trust/extensions/kaizen-offline-frontend-font-hotfix](security/tls-trust/extensions/kaizen-offline-frontend-font-hotfix) | #kaizen #offline #frontend #nextjs |
 | Consent modal + classification banners              | [security/consent-banner](security/consent-banner)                               | #security #compliance #helm-values           |
 | CAC / PIV login (mTLS forwarding)                   | [security/cac](security/cac)                                                     | #security #cac #mtls #helm-values            |
 | Custom TLS trust + BYO ingress cert                 | [security/tls-trust](security/tls-trust)                                         | #security #tls #pki #ca-trust #bedrock       |

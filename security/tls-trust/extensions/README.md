@@ -16,6 +16,9 @@ ON, no new images.
 If you need the live `maxPods: 1000` backport for offline `release/0.13.0` production, use
 the top of the parent [`../README.md`](../README.md). It is documented there once on purpose.
 
+The separate frontend font hotfix below is an image-tar workaround for a different
+offline startup failure: Next.js rebuilds that try to fetch Google Fonts.
+
 ## What the webhook covers (and what it doesn't)
 
 A single `MutatingWebhookConfiguration` injects the `kamiwaza-trust-bundle` mount + the CA
@@ -45,6 +48,7 @@ Those live in [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.p
 | [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.py) | **Kaizen-specific remediation the webhook does not do:** re-asserts the secure verify-on flags, fixes the internal-`KAMIWAZA_API_URL` mismatch, and opens egress / injects a proxy on the declared backend CR. The mount + CA env is the webhook's job now, so run this **only** for that remediation. |
 | [`verify-kaizen.sh`](verify-kaizen.sh) | Kaizen verifier: checks declared-backend trust wiring **and** whether the spawned sandbox inherited it (including the live TLS probe — the only real proof of corporate-CA trust). |
 | [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/) | Offline / local-catalog livepatch for future Kaizen launches: 30-day lifetime / retention plus selected `0.13.1` startup and memory fixes. Unrelated to CA trust. |
+| [`kaizen-offline-frontend-font-hotfix/`](kaizen-offline-frontend-font-hotfix/) | Offline image-tar hotfix for `0.13.0` Kaizen frontend startup rebuilds that fail on `next/font/google` / Google Fonts access. |
 
 ## Apply order
 
@@ -98,7 +102,11 @@ Those live in [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.p
 6. If this customer is on offline / local catalog `0.13.0` and future Kaizen launches also
    need the selected `0.13.1` template fixes, run
    [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/).
-7. Verify:
+7. If this customer is on a fully disconnected `0.13.0` install and the Kaizen
+   frontend fails its startup rebuild while trying to fetch Google Fonts, patch
+   the bundled frontend image tar with
+   [`kaizen-offline-frontend-font-hotfix/`](kaizen-offline-frontend-font-hotfix/).
+8. Verify:
 
    ```bash
    security/tls-trust/extensions/verify-kaizen.sh <extension-name>
