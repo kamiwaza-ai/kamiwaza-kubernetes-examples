@@ -21,6 +21,43 @@ corporate CA.
 
 ---
 
+## Read this first: 0.13.0 offline reinstall prep
+
+The RHEL9 offline test machine was validated with several live patches, including a
+minor global DNS fail-fast patch for non-cluster DNS search suffixes. Before a new
+0.13.0 offline install on that machine, reset the environment in this order so the
+install and post-install re-patching are repeatable:
+
+1. Confirm the intended IPv6 state before touching Podman. If IPv6 must be disabled,
+   do **not** use the kernel-level `ipv6.disable=1` boot arg with Podman/netavark;
+   it removes `/proc/sys/net/ipv6/...` and can break Kind container startup. Prefer
+   sysctl-level disablement so the IPv6 sysctl tree still exists.
+2. Run the production uninstall:
+
+   ```bash
+   /opt/kamiwaza/bin/uninstall-prod.sh
+   ```
+
+   This removes the `kamiwaza-prod` Kind cluster, including
+   `kamiwaza-prod-control-plane`, plus scoped Kamiwaza/Kind containers, images,
+   networks, volumes, model storage, and kubeconfig. It keeps the Podman package by
+   default.
+3. Before and after uninstall, confirm required offline inputs remain available:
+   S3/offline bundle artifacts, `/opt/kamiwaza/prereqs`, and any install override
+   files such as `/opt/kamiwaza/cluster/values/overrides.yaml`.
+4. Reboot the host after uninstall so stale Podman tmpfs/`userdata/shm` mount state is
+   fully cleared:
+
+   ```bash
+   sudo reboot
+   ```
+
+5. Reinstall 0.13.0 offline with the required overrides.
+6. Apply the global DNS fail-fast patch at the end of this README, then apply the
+   TLS trust / Kaizen follow-on patches needed for the customer scenario.
+
+---
+
 ## Read this first: standalone scaling backport for live 0.13.0 prod
 
 This is a **cluster-scaling patch**, not an extensions-only step.
@@ -540,3 +577,127 @@ but live pods keep their old `/etc/ssl/certs/ca-certificates.crt` until they res
 - Code-side follow-ups (retire `AUTH_GATEWAY_TLS_INSECURE`, point the `httpx` client
   factory at the CA path, boto3 `verify=`, per-endpoint CA field) are tracked as
   platform follow-up work.
+
+---
+
+## Global DNS fail-fast patch for offline clusters
+
+Use this CoreDNS workaround when a disconnected cluster spends 6-12 seconds on
+non-cluster DNS search suffixes before reaching the real Kubernetes service name.
+It makes CoreDNS immediately return NXDOMAIN for those non-cluster suffixes while
+leaving the normal cluster DNS path untouched.
+
+This was validated on the RHEL9 0.13.0 offline test host. Before the patch,
+lookups such as `traefik.kamiwaza.svc.cluster.local.dns.podman` and the Azure
+`*.internal.cloudapp.net` search suffix took about 12 seconds to fail. After the
+patch they failed in about 1 ms, and
+`traefik.kamiwaza.svc.cluster.local` continued to resolve normally.
+
+Back up the current CoreDNS ConfigMap:
+
+```bash
+sudo KUBECONFIG=/root/.kube/config kubectl -n kube-system get configmap coredns -o yaml \
+  | sudo tee /root/coredns.before-offline-nxdomain.yaml >/dev/null
+```
+
+Edit CoreDNS:
+
+```bash
+sudo KUBECONFIG=/root/.kube/config kubectl -n kube-system edit configmap coredns
+```
+
+Add the relevant non-cluster suffix blocks before the existing `.:53 { ... }`
+block. For the RHEL9 Azure test host, the observed suffixes were `dns.podman`
+and `*.internal.cloudapp.net`:
+
+```text
+dns.podman:53 {
+    errors
+    template IN ANY dns.podman {
+        rcode NXDOMAIN
+    }
+    cache 30
+}
+
+internal.cloudapp.net:53 {
+    errors
+    template IN ANY internal.cloudapp.net {
+        rcode NXDOMAIN
+    }
+    cache 30
+}
+```
+
+Restart CoreDNS:
+
+```bash
+sudo KUBECONFIG=/root/.kube/config kubectl -n kube-system rollout restart deploy/coredns
+sudo KUBECONFIG=/root/.kube/config kubectl -n kube-system rollout status deploy/coredns --timeout=120s
+```
+
+Verify from a pod:
+
+```bash
+POD=$(sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza-extensions get pod \
+  -l extensions.kamiwaza.io/name=Kaizen,extensions.kamiwaza.io/service=backend \
+  -o jsonpath='{.items[0].metadata.name}')
+
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza-extensions exec -i "$POD" -- python - <<'PY'
+import socket, time
+
+for name in [
+    "traefik.kamiwaza.svc.cluster.local",
+    "traefik.kamiwaza.svc.cluster.local.dns.podman",
+]:
+    start = time.monotonic()
+    try:
+        socket.getaddrinfo(name, 443)
+        print(name, "OK", round(time.monotonic() - start, 3))
+    except Exception as exc:
+        print(name, type(exc).__name__, round(time.monotonic() - start, 3), exc)
+PY
+```
+
+Expected result: the real service name resolves quickly, and the non-cluster suffix
+returns NXDOMAIN immediately instead of timing out.
+
+On EC2 or another cloud, replace `internal.cloudapp.net` with the non-cluster search
+suffix actually present in pod `/etc/resolv.conf` (for example,
+`ec2.internal` or `<region>.compute.internal`).
+
+---
+
+## Auth refresh / Keycloak lockout stabilization for 0.13.0
+
+Apply these after reinstall if the offline 0.13.0 environment shows repeated auth
+refresh calls, browser sessions that do not receive refreshed cookies, or Keycloak
+lockout pressure.
+
+1. Patch Traefik so ForwardAuth refresh cookies actually get back to the browser:
+
+   ```bash
+   NS=kamiwaza
+   kubectl -n "$NS" patch middlewares.traefik.io core-forwardauth --type=merge -p '{"spec":{"forwardAuth":{"addAuthCookiesToResponse":["access_token","access_token_refresh","access_token_refresh_ts","access_token_id"]}}}'
+   kubectl -n "$NS" get middlewares.traefik.io core-forwardauth -o jsonpath='{.spec.forwardAuth.addAuthCookiesToResponse[*]}'; echo
+   ```
+
+2. Stop Keycloak lockout pressure and raise the 0.13.0 refresh interval.
+3. Turn off debug logging, then restart core once:
+
+   ```bash
+   NS=kamiwaza
+   kubectl -n "$NS" patch configmap core-config --type=merge -p '{"data":{
+     "AUTH_GATEWAY_REFRESH_MIN_INTERVAL_SECONDS":"3600",
+     "AUTH_GATEWAY_REFRESH_EXPIRY_THRESHOLD_SECONDS":"300",
+     "AUTH_GATEWAY_JWKS_TTL_SECONDS":"86400",
+     "LOG_LEVEL":"INFO",
+     "AUTH_GATEWAY_LOG_LEVEL":"INFO",
+     "KAMIWAZA_DEBUG":"false",
+     "KAMIWAZA_DEBUG_MODE":"false",
+     "KAMIWAZA_DEBUG_RAY":"false",
+     "KAMIWAZA_DEBUG_DOWNLOAD":"false"
+   }}'
+
+   kubectl -n "$NS" rollout restart deploy/core-scheduler
+   kubectl -n "$NS" delete pod -l ray.io/cluster=core-raycluster,ray.io/node-type=head
+   ```
