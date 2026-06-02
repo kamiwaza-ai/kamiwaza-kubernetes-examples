@@ -4,7 +4,7 @@ Use this only for disconnected `release/0.13.0` installs where one or more
 Kaizen frontends fail during their App Garden startup rebuild because
 `next/font/google` tries to reach Google Fonts.
 
-For the slim copy/paste procedure, use [README-manual.md](README-manual.md).
+For the slim copy/paste procedure, use [MANUAL.md](MANUAL.md).
 
 The hotfix derives a new frontend image from the bundled offline image tar. It
 does **not** run `npm install`, does **not** need source checkout, and does
