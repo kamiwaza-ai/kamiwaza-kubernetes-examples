@@ -694,6 +694,37 @@ If the Ray cluster has more than one worker group, repeat the
 `/spec/workerGroupSpecs/<index>/template/spec/dnsConfig` JSON patch for each worker
 group index. If it has no worker groups, omit the worker-group patch operation.
 
+Patch Traefik's ForwardAuth target as well. This call is made by Traefik itself, so
+it does not use `KAMIWAZA_API_URL` and it is not affected by the Core/Ray `ndots`
+patch above.
+
+First, check whether the cluster is using the optional ForwardAuth cache:
+
+```bash
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza get middleware.traefik.io core-forwardauth \
+  -o jsonpath='{.spec.forwardAuth.address}{"\n"}'
+```
+
+If the address points directly at Ray/Core, patch it to the trailing-dot service
+FQDN:
+
+```bash
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza patch middleware.traefik.io core-forwardauth --type=merge -p '{"spec":{"forwardAuth":{"address":"http://core-raycluster-headless.kamiwaza.svc.cluster.local.:7777/api/auth/forward/validate"}}}'
+```
+
+If the address points at `core-forwardauth-cache`, patch both Traefik's target and
+the cache proxy's upstream Core target:
+
+```bash
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza patch middleware.traefik.io core-forwardauth --type=merge -p '{"spec":{"forwardAuth":{"address":"http://core-forwardauth-cache.kamiwaza.svc.cluster.local.:7777/api/auth/forward/validate"}}}'
+
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza set env deploy/core-forwardauth-cache \
+  FORWARDAUTH_CACHE_UPSTREAM_URL='http://core-raycluster-head-svc.kamiwaza.svc.cluster.local.:7777/api/auth/forward/validate'
+
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza rollout restart deploy/core-forwardauth-cache
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza rollout status deploy/core-forwardauth-cache --timeout=180s
+```
+
 Then point extension backends at the trailing-dot internal Traefik API URL. The broad
 pass below is simple and safe for the observed 0.13.0 offline failure mode; for a
 narrower patch, run the same `set env` command only against the Workroom Manager and
@@ -716,11 +747,15 @@ sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza get deploy core-scheduler
 sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza get raycluster core-raycluster \
   -o jsonpath='{.spec.headGroupSpec.template.spec.dnsConfig.options[?(@.name=="ndots")].value}{"\n"}'
 
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza get middleware.traefik.io core-forwardauth \
+  -o jsonpath='{.spec.forwardAuth.address}{"\n"}'
+
 sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza-extensions get deploy \
   -o custom-columns=NAME:.metadata.name,KAMIWAZA_API_URL:.spec.template.spec.containers[*].env[?(@.name=="KAMIWAZA_API_URL")].value
 ```
 
-Expected result: Core and Ray show `3`, and Workroom/Kaizen extension backends use
+Expected result: Core and Ray show `3`, Traefik ForwardAuth uses a
+`*.svc.cluster.local.` target, and Workroom/Kaizen extension backends use
 `http://traefik-internal.kamiwaza.svc.cluster.local.:8081/api`.
 
 This does **not** replace the durable app/operator fixes. It does not rewrite every
