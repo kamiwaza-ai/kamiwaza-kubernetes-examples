@@ -735,7 +735,8 @@ sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza-extensions set env deploy
   KAMIWAZA_API_URL='http://traefik-internal.kamiwaza.svc.cluster.local.:8081/api' \
   KAMIWAZA_INTERNAL_API_URL='http://traefik-internal.kamiwaza.svc.cluster.local.:8081/api'
 
-sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza-extensions rollout restart deploy --all
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza-extensions get deploy -o name \
+  | xargs -r sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza-extensions rollout restart
 ```
 
 Quick verification:
