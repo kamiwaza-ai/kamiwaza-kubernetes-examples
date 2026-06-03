@@ -76,6 +76,59 @@ def status_label(entry: dict) -> str:
     return "0/blocked"
 
 
+def header_value(headers: list[dict], name: str) -> str:
+    name = name.lower()
+    for header in headers or []:
+        if (header.get("name") or "").lower() == name:
+            return header.get("value") or ""
+    return ""
+
+
+def request_source(entry: dict, request: dict, pages: dict[str, str]) -> str:
+    """Describe where a request came from, to make external origins debuggable.
+
+    Chrome DevTools HARs record an ``_initiator`` (the script or parser that
+    triggered the request); fall back to the ``Referer`` header, then to the
+    page the entry belongs to.
+    """
+    initiator = entry.get("_initiator") or {}
+    itype = initiator.get("type")
+
+    stack = initiator.get("stack") or {}
+    frames = stack.get("callFrames") or []
+    if frames:
+        frame = frames[0]
+        location = frame.get("url") or "?"
+        line = frame.get("lineNumber")
+        if isinstance(line, int):
+            # DevTools line numbers are 0-based; show 1-based for readability.
+            location = f"{location}:{line + 1}"
+            column = frame.get("columnNumber")
+            if isinstance(column, int):
+                location = f"{location}:{column + 1}"
+        return f"script {location}"
+
+    if initiator.get("url"):
+        location = initiator["url"]
+        line = initiator.get("lineNumber")
+        if isinstance(line, int):
+            location = f"{location}:{line + 1}"
+        return f"{itype or 'initiator'} {location}"
+
+    referer = header_value(request.get("headers"), "referer")
+    if referer:
+        return f"referer {referer}"
+
+    pageref = entry.get("pageref")
+    if pageref and pageref in pages:
+        return f"page {pages[pageref]}"
+
+    if itype:
+        return itype
+
+    return "unknown"
+
+
 def main() -> int:
     args = parse_args()
 
@@ -85,7 +138,13 @@ def main() -> int:
     with args.har.open("r", encoding="utf-8") as f:
         har = json.load(f)
 
-    entries = har.get("log", {}).get("entries", [])
+    log = har.get("log", {})
+    entries = log.get("entries", [])
+    pages = {
+        page.get("id"): (page.get("title") or page.get("id") or "")
+        for page in log.get("pages", [])
+        if page.get("id")
+    }
     allowed: dict[str, OriginSummary] = defaultdict(OriginSummary)
     external: dict[str, OriginSummary] = defaultdict(OriginSummary)
 
@@ -111,7 +170,7 @@ def main() -> int:
         summary.methods[request.get("method") or "?"] += 1
         summary.statuses[status_label(entry)] += 1
         if len(summary.examples) < 3:
-            summary.examples.append(url)
+            summary.examples.append(f"{url}  <- {request_source(entry, request, pages)}")
 
     print(f"HAR: {args.har}")
     print(f"Allowed hosts: {', '.join(sorted(allowed_hosts)) or '(none)'}")

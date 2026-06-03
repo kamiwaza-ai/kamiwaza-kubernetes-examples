@@ -5,7 +5,9 @@ param(
     [string]$ChromePath = "",
     [string]$UserDataDir = "$env:TEMP\kamiwaza-airgap-chrome",
     [string]$ProxyServer = "http://127.0.0.1:9",
-    [string[]]$ExtraBypass = @()
+    [string[]]$ExtraBypass = @(),
+    [string]$NetLog = "$env:USERPROFILE\Downloads\kamiwaza-airgap.netlog",
+    [switch]$NoNetLog
 )
 
 if ($KamiwazaUrl -notmatch "^[a-zA-Z][a-zA-Z0-9+.-]*://") {
@@ -44,18 +46,36 @@ if ($hostName -notmatch "^\d+(\.\d+){3}$" -and $hostName -notmatch ":") {
 $bypass += $ExtraBypass
 $bypassList = ($bypass -join ";")
 
+$args = @(
+    "--user-data-dir=$UserDataDir",
+    "--disable-extensions",
+    "--proxy-server=$ProxyServer",
+    "--proxy-bypass-list=$bypassList"
+)
+
+$netLogDisplay = "(disabled)"
+if (-not $NoNetLog) {
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $NetLog) | Out-Null
+    $args += "--log-net-log=$NetLog"
+    $netLogDisplay = $NetLog
+}
+
+$args += $KamiwazaUrl
+
 Write-Host "Launching: $ChromePath"
 Write-Host "URL:       $KamiwazaUrl"
 Write-Host "Proxy:     $ProxyServer"
 Write-Host "Bypass:    $bypassList"
 Write-Host "Profile:   $UserDataDir"
+Write-Host "NetLog:    $netLogDisplay"
 
-$args = @(
-    "--user-data-dir=$UserDataDir",
-    "--disable-extensions",
-    "--proxy-server=$ProxyServer",
-    "--proxy-bypass-list=$bypassList",
-    $KamiwazaUrl
-)
+if (-not $NoNetLog) {
+    Write-Host ""
+    Write-Host "Session NetLog is recording. Browse the full workflow matrix, refresh freely,"
+    Write-Host "then quit Chrome (close all windows) to finalize the log. Summarize with:"
+    Write-Host ""
+    Write-Host "  python3 $PSScriptRoot\summarize-netlog-origins.py ``"
+    Write-Host "    --netlog `"$NetLog`" --allow-host `"$hostName`" --allow-host localhost --allow-host 127.0.0.1"
+}
 
 Start-Process -FilePath $ChromePath -ArgumentList $args

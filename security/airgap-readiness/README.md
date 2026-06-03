@@ -16,6 +16,7 @@ against the installed system.
 | --- | --- |
 | [`scripts/launch-airgap-chrome.sh`](scripts/launch-airgap-chrome.sh) | macOS/Linux Chrome launcher with a dead proxy and a Kamiwaza-only bypass list. |
 | [`scripts/Launch-AirgapChrome.ps1`](scripts/Launch-AirgapChrome.ps1) | Windows PowerShell version of the Chrome dead-proxy launcher. |
+| [`scripts/summarize-netlog-origins.py`](scripts/summarize-netlog-origins.py) | Reads a session-wide Chrome NetLog and reports non-Kamiwaza origins, including blocked attempts. |
 | [`scripts/summarize-har-origins.py`](scripts/summarize-har-origins.py) | Reads an exported Chrome DevTools HAR and reports non-Kamiwaza origins. |
 | [`scripts/client-lockdown-nft.sh`](scripts/client-lockdown-nft.sh) | Disposable Linux client VM output firewall: allow Kamiwaza and optional DNS only. |
 | [`scripts/server-egress-probe.sh`](scripts/server-egress-probe.sh) | Server-side evidence collector for public egress probes, pod probes, and image references. |
@@ -87,16 +88,33 @@ On Windows PowerShell:
   -KamiwazaUrl "https://test.kamiwaza.dev"
 ```
 
-In Chrome DevTools:
+The launcher records a session-wide Chrome NetLog by default (to
+`~/Downloads/kamiwaza-airgap.netlog`). Unlike the DevTools Network panel, this
+captures every request across all tabs, navigations, and refreshes for the whole
+browser run — and it records blocked/failed attempts too, so a dead-proxy
+rejection of an external origin still shows up as evidence. You do not need to
+keep DevTools open or export anything by hand.
 
-1. Open Network.
-2. Enable Preserve log.
-3. Disable cache.
-4. Reload the page.
-5. Run the core and Kaizen workflow matrix below.
-6. Export the network log as HAR.
+1. Run the core and Kaizen workflow matrix below. Navigate and refresh freely.
+2. Quit Chrome (close all windows) so the NetLog is finalized.
 
-Summarize the HAR:
+Summarize the session NetLog:
+
+```bash
+python3 security/airgap-readiness/scripts/summarize-netlog-origins.py \
+  --netlog ~/Downloads/kamiwaza-airgap.netlog \
+  --allow-host "$KAMIWAZA_HOST" \
+  --allow-host localhost \
+  --allow-host 127.0.0.1
+```
+
+Origins served by Kamiwaza show `statuses=[ok=...]`; external origins blocked by
+the dead proxy show a net error such as `ERR_PROXY_CONNECTION_FAILED`. Disable
+capture with `--no-netlog`, or change the path with `--netlog PATH`.
+
+If you prefer (or also want) a DevTools HAR for a single page, enable Preserve
+log and Disable cache in the Network panel, reload, run the workflows, export the
+HAR, then summarize it instead:
 
 ```bash
 python3 security/airgap-readiness/scripts/summarize-har-origins.py \
