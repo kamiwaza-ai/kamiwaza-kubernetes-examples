@@ -1,0 +1,153 @@
+# =============================================================================
+# Kamiwaza Debug — Pattern 1: long-running interactive jump pod
+# -----------------------------------------------------------------------------
+# Use when:
+#   * You want a persistent SRE console reachable via `kubectl exec`
+#   * You need k9s / helm / stern with real cluster RBAC
+#
+# Connect:
+#   kubectl -n kamiwaza-debug exec -it kamiwaza-debug-jump -- bash
+#   kubectl -n kamiwaza-debug exec -it kamiwaza-debug-jump -- k9s -A
+#
+# Skills: SKILL.md files are baked at /opt/kamiwaza/skills/ (exposed as
+# $KAMIWAZA_SKILLS_DIR). Any external LLM that operates inside this pod
+# (Cursor remote SSH, Claude Code over kubectl exec) can read them directly.
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kamiwaza-debug-jump
+  namespace: kamiwaza-debug
+  labels:
+    app.kubernetes.io/name: kamiwaza-debug
+    app.kubernetes.io/component: jump-pod
+  # ----- remaining accepted exceptions -----
+  # The drop-net-raw-capability annotation is no longer needed: this PR
+  # drops NET_RAW from the cap allowlist entirely (it was dead config —
+  # see securityContext block). Findings below are by-design.
+  annotations:
+    ignore-check.kube-linter.io/no-read-only-root-fs: "Read-only-root-fs is a separate ATO follow-up; triage console writes to /tmp and the operator's home (emptyDir-mounted). Tracked for the next hardening pass."
+    ignore-check.kube-linter.io/default-deny-ingress-policy: "Cluster-side NetworkPolicy is a separate ATO follow-up; the jump-pod itself listens on no ports."
+spec:
+  serviceAccountName: kamiwaza-debug
+  restartPolicy: Always
+  terminationGracePeriodSeconds: 10
+  # Pod-level security: enforce nonroot at admission. The image already
+  # defaults to USER 65532 (Dockerfile final stage); this redundant pin
+  # makes the manifest copy-pasteable into deployments where the image
+  # USER may have been overridden, and lets `runAsNonRoot:true` block
+  # admission cleanly if anyone ever flips the image USER back to root.
+  # Pattern 2 (node-daemonset.yaml) deliberately does NOT set
+  # runAsNonRoot — it runs uid 0 in-container so its capability
+  # allowlist lands in CapEff (see that manifest's header).
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  # Don't compete with vLLM / Ray for inference nodes
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: node-role.kamiwaza.ai/inference
+                operator: DoesNotExist
+  tolerations:
+    - operator: Exists
+      effect: NoSchedule
+  containers:
+    - name: debug
+      # Offline: set this to the tag you loaded from the tar (`docker load`
+      # prints it) and use IfNotPresent — there is no registry to pull from.
+      image: ghcr.io/kamiwaza-internal/kamiwaza-debug:1.2.0
+      imagePullPolicy: IfNotPresent
+      command: ["/bin/bash", "-c", "sleep infinity"]
+      tty: true
+      stdin: true
+      # ----- Claude Code (Bedrock) runtime config -----
+      # Explicit per-key allowlist from the OPTIONAL `kamiwaza-debug-bedrock`
+      # Secret (NOT envFrom): keys are optional so the baseline pod starts
+      # without the Secret, and an operator Secret can't override baked
+      # CLAUDE_CODE_ invariants or inject stray env. Populate via
+      # bedrock_preflight.py (platform repo); set ANTHROPIC_DEFAULT_HAIKU_MODEL
+      # = ANTHROPIC_MODEL.
+      # Proxy CA: set NODE_EXTRA_CA_CERTS to exactly the mount path below,
+      # /etc/kamiwaza/bedrock/proxy-ca.pem, with the cert in Secret
+      # `kamiwaza-debug-bedrock-ca` under key `proxy-ca.pem`.
+      # AWS_EC2_METADATA_DISABLED is Secret-sourced, not baked: it disables IMDS
+      # for aws-cli too, so a baseline pod must keep instance-role creds.
+      env:
+        - name: AWS_REGION
+          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: AWS_REGION, optional: true } }
+        - name: ANTHROPIC_BEDROCK_BASE_URL
+          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: ANTHROPIC_BEDROCK_BASE_URL, optional: true } }
+        - name: ANTHROPIC_MODEL
+          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: ANTHROPIC_MODEL, optional: true } }
+        - name: ANTHROPIC_DEFAULT_HAIKU_MODEL
+          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: ANTHROPIC_DEFAULT_HAIKU_MODEL, optional: true } }
+        - name: AWS_BEARER_TOKEN_BEDROCK
+          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: AWS_BEARER_TOKEN_BEDROCK, optional: true } }
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: AWS_ACCESS_KEY_ID, optional: true } }
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: AWS_SECRET_ACCESS_KEY, optional: true } }
+        - name: AWS_SESSION_TOKEN
+          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: AWS_SESSION_TOKEN, optional: true } }
+        - name: AWS_EC2_METADATA_DISABLED
+          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: AWS_EC2_METADATA_DISABLED, optional: true } }
+        - name: NODE_EXTRA_CA_CERTS
+          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: NODE_EXTRA_CA_CERTS, optional: true } }
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "256Mi"
+        limits:
+          cpu: "2"
+          memory: "2Gi"
+      securityContext:
+        readOnlyRootFilesystem: false
+        allowPrivilegeEscalation: false
+        # Pure drop-ALL capability boundary. The pod runs as uid 65532
+        # (pod-level runAsNonRoot:true above), so any caps in `add`
+        # would only land in the bounding/permitted sets, not effective —
+        # Linux clears the effective set for nonroot users. Combined with
+        # allowPrivilegeEscalation:false (no_new_privs) blocking file-cap
+        # elevation on exec, the practical capability surface here is
+        # ZERO whether or not we add caps.
+        #
+        # The previous form added NET_ADMIN/NET_RAW/SYS_PTRACE here, but
+        # those caps were dead config — tcpdump, iptables, conntrack all
+        # fail with "permission denied" / "CAP_NET_RAW required" inside
+        # this pod. The honest ATO-grade design: jump-pod is a CLI /
+        # observability console (kubectl, helm, k9s, kubectl-* plugins,
+        # kamiwaza CLI, dig/curl/wget, ss for read-only socket views).
+        # Packet capture, iptables, conntrack live in Pattern 2 (node-
+        # daemonset.yaml), where uid 0 + capabilities-only puts them
+        # into the effective set.
+        capabilities:
+          drop: ["ALL"]
+      volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: home
+          mountPath: /home/nonroot
+        # Claude Code writes under $HOME/.claude — the emptyDir `home` mount
+        # above makes that writable. The proxy CA (if Bedrock is configured)
+        # is mounted read-only at the NODE_EXTRA_CA_CERTS path; optional so
+        # the baseline pod starts without it.
+        - name: bedrock-proxy-ca
+          mountPath: /etc/kamiwaza/bedrock
+          readOnly: true
+  volumes:
+    - name: tmp
+      emptyDir: {}
+    - name: home
+      emptyDir: {}
+    - name: bedrock-proxy-ca
+      secret:
+        secretName: kamiwaza-debug-bedrock-ca
+        optional: true
