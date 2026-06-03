@@ -667,6 +667,171 @@ suffix actually present in pod `/etc/resolv.conf` (for example,
 
 ---
 
+## 0.13.0 runtime DNS/API mitigation for Workrooms and Kaizen
+
+Use this only when you need a **runtime/manual 0.13.0 mitigation** and cannot rebuild
+patched Workroom Manager, Kaizen, and extension-operator images. This reduces the
+observed 6-second DNS fallback path, but it is not the durable source fix for all
+existing and future extension-generated URLs.
+
+First, set `ndots:3` for Core and the Ray cluster templates:
+
+```bash
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza patch deploy core-scheduler --type=merge -p '{"spec":{"template":{"spec":{"dnsConfig":{"options":[{"name":"ndots","value":"3"}]}}}}}'
+
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza patch raycluster core-raycluster --type=json -p='[
+  {"op":"add","path":"/spec/headGroupSpec/template/spec/dnsConfig","value":{"options":[{"name":"ndots","value":"3"}]}},
+  {"op":"add","path":"/spec/workerGroupSpecs/0/template/spec/dnsConfig","value":{"options":[{"name":"ndots","value":"3"}]}}
+]'
+
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza rollout restart deploy/core-scheduler
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza rollout status deploy/core-scheduler --timeout=180s
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza delete pod -l ray.io/cluster=core-raycluster
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza wait --for=condition=Ready pod -l ray.io/cluster=core-raycluster --timeout=300s
+```
+
+If the Ray cluster has more than one worker group, repeat the
+`/spec/workerGroupSpecs/<index>/template/spec/dnsConfig` JSON patch for each worker
+group index. If it has no worker groups, omit the worker-group patch operation.
+
+Patch Traefik's ForwardAuth target as well. This call is made by Traefik itself, so
+it does not use `KAMIWAZA_API_URL` and it is not affected by the Core/Ray `ndots`
+patch above.
+
+First, check whether the cluster is using the optional ForwardAuth cache:
+
+```bash
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza get middleware.traefik.io core-forwardauth \
+  -o jsonpath='{.spec.forwardAuth.address}{"\n"}'
+```
+
+If the address points directly at Ray/Core, patch it to the trailing-dot service
+FQDN:
+
+```bash
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza patch middleware.traefik.io core-forwardauth --type=merge -p '{"spec":{"forwardAuth":{"address":"http://core-raycluster-headless.kamiwaza.svc.cluster.local.:7777/api/auth/forward/validate"}}}'
+```
+
+If the address points at `core-forwardauth-cache`, patch both Traefik's target and
+the cache proxy's upstream Core target:
+
+```bash
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza patch middleware.traefik.io core-forwardauth --type=merge -p '{"spec":{"forwardAuth":{"address":"http://core-forwardauth-cache.kamiwaza.svc.cluster.local.:7777/api/auth/forward/validate"}}}'
+
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza set env deploy/core-forwardauth-cache \
+  FORWARDAUTH_CACHE_UPSTREAM_URL='http://core-raycluster-head-svc.kamiwaza.svc.cluster.local.:7777/api/auth/forward/validate'
+
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza rollout restart deploy/core-forwardauth-cache
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza rollout status deploy/core-forwardauth-cache --timeout=180s
+```
+
+Then point the current extension CRs at the trailing-dot internal Traefik API URL.
+Patch the `KamiwazaExtension` resources instead of the generated Deployments; the
+extension operator owns those Deployments and will revert a direct
+`kubectl set env deploy ...` change.
+
+```bash
+NS=kamiwaza-extensions
+URL='http://traefik-internal.kamiwaza.svc.cluster.local.:8081/api'
+
+sudo KUBECONFIG=/root/.kube/config kubectl -n "$NS" get kext -o yaml \
+  > /tmp/kamiwaza-extensions.kext.before-api-url-hotfix.yaml
+
+sudo KUBECONFIG=/root/.kube/config python3 - <<'PY'
+import json
+import subprocess
+
+NS = "kamiwaza-extensions"
+URL = "http://traefik-internal.kamiwaza.svc.cluster.local.:8081/api"
+
+data = json.loads(subprocess.check_output([
+    "kubectl", "-n", NS, "get", "kext", "-o", "json"
+]))
+
+for item in data["items"]:
+    name = item["metadata"]["name"]
+    spec = item.setdefault("spec", {})
+    kamiwaza = spec.setdefault("kamiwaza", {})
+    patch = []
+
+    patch.append({
+        "op": "replace" if "apiUrl" in kamiwaza else "add",
+        "path": "/spec/kamiwaza/apiUrl",
+        "value": URL,
+    })
+
+    for si, svc in enumerate(spec.get("services", [])):
+        env = svc.get("env")
+        if env is None:
+            patch.append({"op": "add", "path": f"/spec/services/{si}/env", "value": []})
+            env = []
+
+        has_internal = False
+        for ei, entry in enumerate(env):
+            if entry.get("name") == "KAMIWAZA_API_URL":
+                patch.append({
+                    "op": "replace",
+                    "path": f"/spec/services/{si}/env/{ei}/value",
+                    "value": URL,
+                })
+            if entry.get("name") == "KAMIWAZA_INTERNAL_API_URL":
+                has_internal = True
+                patch.append({
+                    "op": "replace",
+                    "path": f"/spec/services/{si}/env/{ei}/value",
+                    "value": URL,
+                })
+
+        if not has_internal:
+            patch.append({
+                "op": "add",
+                "path": f"/spec/services/{si}/env/-",
+                "value": {"name": "KAMIWAZA_INTERNAL_API_URL", "value": URL},
+            })
+
+    subprocess.run([
+        "kubectl", "-n", NS, "patch", "kext", name,
+        "--type=json", "-p", json.dumps(patch),
+    ], check=True)
+PY
+
+sudo KUBECONFIG=/root/.kube/config kubectl -n "$NS" get deploy -o name \
+  | xargs -r sudo KUBECONFIG=/root/.kube/config kubectl -n "$NS" rollout restart
+```
+
+This patches all currently installed extension CRs. Re-run this block after creating
+new 0.13.0 extensions until the image/operator fixes are available.
+
+Quick verification:
+
+```bash
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza get deploy core-scheduler \
+  -o jsonpath='{.spec.template.spec.dnsConfig.options[?(@.name=="ndots")].value}{"\n"}'
+
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza get raycluster core-raycluster \
+  -o jsonpath='{.spec.headGroupSpec.template.spec.dnsConfig.options[?(@.name=="ndots")].value}{"\n"}'
+
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza get middleware.traefik.io core-forwardauth \
+  -o jsonpath='{.spec.forwardAuth.address}{"\n"}'
+
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza-extensions get kext \
+  -o jsonpath='{range .items[*]}{.metadata.name}{" apiUrl="}{.spec.kamiwaza.apiUrl}{"\n"}{end}'
+
+sudo KUBECONFIG=/root/.kube/config kubectl -n kamiwaza-extensions get deploy \
+  -o jsonpath='{range .items[*]}{.metadata.name}{" KAMIWAZA_API_URL="}{range .spec.template.spec.containers[*].env[?(@.name=="KAMIWAZA_API_URL")]}{.value}{end}{" KAMIWAZA_INTERNAL_API_URL="}{range .spec.template.spec.containers[*].env[?(@.name=="KAMIWAZA_INTERNAL_API_URL")]}{.value}{end}{"\n"}{end}'
+```
+
+Expected result: Core and Ray show `3`, Traefik ForwardAuth uses a
+`*.svc.cluster.local.` target, and current extension CRs and Deployments use
+`http://traefik-internal.kamiwaza.svc.cluster.local.:8081/api` for both
+`KAMIWAZA_API_URL` and `KAMIWAZA_INTERNAL_API_URL`.
+
+This does **not** replace the durable app/operator fixes. It does not rewrite every
+hardcoded fallback URL inside 0.13.0 images, nor does it stop the 0.13.0 extension
+operator from generating short dependency service names for future extension pods.
+
+---
+
 ## Auth refresh / Keycloak lockout stabilization for 0.13.0
 
 Apply these after reinstall if the offline 0.13.0 environment shows repeated auth
