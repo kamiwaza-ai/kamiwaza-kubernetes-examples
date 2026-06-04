@@ -19,6 +19,10 @@ the top of the parent [`../README.md`](../README.md). It is documented there onc
 The separate frontend font hotfix below is an image-tar workaround for a different
 offline startup failure: Next.js rebuilds that try to fetch Google Fonts.
 
+The separate Global Workroom backend hotfix below is a proof-of-life image-tar
+workaround for broken Workroom Manager / session binding environments where Kaizen
+must still launch from Global Workroom.
+
 ## What the webhook covers (and what it doesn't)
 
 A single `MutatingWebhookConfiguration` injects the `kamiwaza-trust-bundle` mount + the CA
@@ -49,6 +53,7 @@ Those live in [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.p
 | [`verify-kaizen.sh`](verify-kaizen.sh) | Kaizen verifier: checks declared-backend trust wiring **and** whether the spawned sandbox inherited it (including the live TLS probe — the only real proof of corporate-CA trust). |
 | [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/) | Offline / local-catalog livepatch for future Kaizen launches: 30-day lifetime / retention plus selected `0.13.1` startup and memory fixes. Unrelated to CA trust. |
 | [`kaizen-offline-frontend-font-hotfix/`](kaizen-offline-frontend-font-hotfix/) | Offline image-tar hotfix for `0.13.0` Kaizen frontend startup rebuilds that fail on `next/font/google` / Google Fonts access. |
+| [`kaizen-global-workroom-backend-hotfix/`](kaizen-global-workroom-backend-hotfix/) | Break-glass image-tar hotfix for `0.13.0` Kaizen backend instances where Global Workroom must be writable enough to launch and run a sandbox because Workroom Manager / session binding is unusable. |
 
 ## Apply order
 
@@ -106,7 +111,11 @@ Those live in [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.p
    frontend fails its startup rebuild while trying to fetch Google Fonts, patch
    the bundled frontend image tar with
    [`kaizen-offline-frontend-font-hotfix/`](kaizen-offline-frontend-font-hotfix/).
-8. Verify:
+8. If this customer cannot enter a scoped workroom because Workroom Manager /
+   session binding is unusable, but needs Kaizen proof-of-life from Global
+   Workroom, patch the bundled backend image tar with
+   [`kaizen-global-workroom-backend-hotfix/`](kaizen-global-workroom-backend-hotfix/).
+9. Verify:
 
    ```bash
    security/tls-trust/extensions/verify-kaizen.sh <extension-name>
