@@ -1,0 +1,140 @@
+# =============================================================================
+# Kamiwaza Debug — Namespace + RBAC
+# -----------------------------------------------------------------------------
+# Apply once per cluster. The ClusterRole is intentionally broad (read-all +
+# exec/portforward/logs) for SRE triage. For hardened-enclave deployments,
+# bind it only to short-TTL ServiceAccounts gated by your IdP (Keycloak / AWS SSO).
+#
+# RBAC is the only authorization boundary for this image. Anything an LLM or
+# human can do via `kubectl exec` into the jump pod is bounded by this role.
+# =============================================================================
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kamiwaza-debug
+  labels:
+    app.kubernetes.io/name: kamiwaza-debug
+    app.kubernetes.io/part-of: kamiwaza-platform
+    # The DaemonSet (separate manifest) needs privileged PSA. If you only
+    # deploy the jump pod, you can downgrade these to `baseline`.
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kamiwaza-debug
+  namespace: kamiwaza-debug
+# Pre-wired imagePullSecret reference so the jump-pod and node-debug
+# DaemonSet manifests pull cleanly when the GHCR package is private
+# (the default for org-owned packages on `kamiwaza-internal`).
+#
+# Operators create the `ghcr-pull` Secret per the Pre-flight section of
+# container/manifests/README.md. The kubelet behavior is:
+#   * Secret exists → kubelet uses it for the GHCR pull. Private package
+#     resolves cleanly.
+#   * Secret missing → kubelet logs a warning and falls through to
+#     anonymous pull. Public package: still works. Private package:
+#     ImagePullBackOff with a "no such secret" event line — no worse
+#     than the previous unwired state, and the event line is the actual
+#     diagnostic operators need.
+#   * Image mirrored to a private registry (manifests edited): the
+#     reference is ignored against a registry the secret doesn't cover.
+#
+# Net effect: manifest is zero-edit for the documented private-GHCR
+# path AND zero-edit for public packages. Mirrored deployments edit
+# `image:` anyway and may drop or replace this reference there.
+imagePullSecrets:
+  - name: ghcr-pull
+---
+# Patch the namespace's auto-created `default` ServiceAccount with the
+# same `ghcr-pull` imagePullSecret. `kubectl debug node` creates fresh
+# debugger pods WITHOUT setting spec.serviceAccountName — they run as
+# the namespace's default SA, NOT `kamiwaza-debug`. Without this patch
+# the documented break-glass workflow (`kubectl debug node
+# --profile=sysadmin --image=ghcr.io/kamiwaza-internal/kamiwaza-debug:
+# main`) ImagePullBackOffs on the documented private-GHCR setup.
+#
+# kubectl apply's strategic-merge semantics for ServiceAccount append
+# our entry to the existing `imagePullSecrets` array; the
+# kube-controller-manager creates the default SA when the namespace
+# is created and does not strip imagePullSecrets it didn't add, so
+# this patch survives across SA churn.
+#
+# Same kubelet fall-through semantics apply as for the kamiwaza-debug
+# SA above: missing secret → ImagePullBackOff with a clear event;
+# public package → anonymous pull works regardless; mirrored
+# registry → operators edit image: fields and this reference is
+# ignored against a registry the secret doesn't cover.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: kamiwaza-debug
+imagePullSecrets:
+  - name: ghcr-pull
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kamiwaza-debug
+  # ----- explicit, accepted RBAC exceptions -----
+  # The wildcard read + scoped exec/log/portforward verbs are the explicit
+  # SRE-triage contract. There is NO mutation verb (no create/update/patch
+  # on resources, only on pods/{exec,portforward}/log subresources).
+  # For hardened-enclave deployments: bind this ClusterRole only to short-TTL
+  # ServiceAccounts gated by your IdP (Keycloak / AWS SSO).
+  annotations:
+    ignore-check.kube-linter.io/cluster-admin-role-binding: "Not cluster-admin: read-only wildcard plus scoped exec/portforward/logs. No resource mutation verbs anywhere."
+    ignore-check.kube-linter.io/wildcard-in-rules: "Wildcard verbs are deliberately limited to get/list/watch; the mutation surface (pods/exec etc.) is enumerated explicitly so it remains auditable."
+rules:
+  # Read everything — k9s, kubectl get, stern
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch"]
+  # Logs + exec + port-forward
+  - apiGroups: [""]
+    resources: ["pods/log", "pods/exec", "pods/portforward", "pods/attach"]
+    verbs: ["get", "list", "create"]
+  # Allow auth-checks like `kubectl auth can-i --as=…`
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kamiwaza-debug
+subjects:
+  - kind: ServiceAccount
+    name: kamiwaza-debug
+    namespace: kamiwaza-debug
+roleRef:
+  kind: ClusterRole
+  name: kamiwaza-debug
+  apiGroup: rbac.authorization.k8s.io
+
+# NOTE: the namespace-scoped Role granting `pods:create / pods:delete`
+# (required for `kubectl debug node --profile=sysadmin`) is intentionally
+# NOT defined in this file. The Role lives in `node-debug-role.yaml`
+# and its CEL ValidatingAdmissionPolicy guard lives in `node-debug-
+# policy.yaml`. Splitting them across THREE files (this baseline +
+# policy + role) is a deliberate security boundary:
+#
+#   * `kubectl apply -f file.yaml` is non-atomic per-resource, so any
+#     single combined file risks a partial apply on a pre-1.30 cluster
+#     (Role lands; policy fails on the unknown
+#     admissionregistration.k8s.io/v1 ValidatingAdmissionPolicy kind);
+#     end state would be `pods:create` in a PSA-privileged namespace
+#     with no CEL guard — the exact escalation primitive the policy
+#     exists to close.
+#   * Two files (policy first, role second) force the operator into two
+#     separate `kubectl apply` invocations. A pre-1.30 apply of
+#     `node-debug-policy.yaml` fails cleanly with no privilege uplift
+#     (the policy file contains zero RBAC). Operators see the failure
+#     and stop before applying `node-debug-role.yaml`.
+#   * `make verify-rbac` enforces the same ordering automatically with
+#     a server-version gate; GitOps consumers can mirror it via
+#     argocd.argoproj.io/sync-wave (policy=0, role=1).
