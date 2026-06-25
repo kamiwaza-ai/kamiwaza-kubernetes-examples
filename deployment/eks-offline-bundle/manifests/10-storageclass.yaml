@@ -1,0 +1,15 @@
+# Default StorageClass for the platform's PVCs. The v0.13.3 charts use unqualified
+# PVCs (no storageClassName), so the cluster needs a default. EKS ships gp2 as
+# default; this gp3 (via the EBS CSI driver the cluster terraform installed) is
+# cheaper/faster and is marked default here so `make deploy` is self-contained.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: gp3

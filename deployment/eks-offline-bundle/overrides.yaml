@@ -1,0 +1,278 @@
+---
+### ============================================================================
+### Kamiwaza — offline → EKS — platform image & domain overrides
+### ============================================================================
+###
+### Helm values for the `kamiwaza` umbrella release, applied by `make deploy`:
+###     helmfile -l name=kamiwaza sync --values overrides.yaml
+###
+### --------------------------------------------------------------------------
+### You DON'T edit this file — it is a template. Every value is a ${PLACEHOLDER}
+### filled from config.env at deploy time (`make deploy` runs envsubst):
+###
+###   ${DOMAIN} ................. hostname the platform is served on
+###   ${REGISTRY} .............. ECR registry (from AWS_ACCOUNT / AWS_REGION)
+###   ${KAMIWAZA_VERSION} ...... tag for Kamiwaza-built images (core, frontend,
+###                              datahub-*, …) — tracks the release automatically
+###   ${KAMIWAZA_VERSION_SHORT}  bare version (release-0.13.3 → 0.13.3), for the
+###                              few `v`-prefixed tags (e.g. docs)
+###   ${KEYCLOAK_TAG}, ${POSTGRES_TAG}, … per-image third-party pins
+###
+### To change anything, edit config.env (not here). For a new bundle, refresh the
+### third-party pins with `make show-tags` and bump KAMIWAZA_VERSION in config.env.
+### The structure below maps those values onto the umbrella chart's image paths.
+### ============================================================================
+
+
+### ----------------------------------------------------------------------------
+### Global
+### ----------------------------------------------------------------------------
+global:
+
+  # Hostname the UI / API are served on. Traefik routes on it and the platform
+  # CA mints certs for it. Point DNS (or a hosts entry) at the Traefik LoadBalancer.
+  domain: ${DOMAIN}
+
+
+### ----------------------------------------------------------------------------
+### Auth — Keycloak (identity / OIDC)
+### ----------------------------------------------------------------------------
+auth:
+  keycloak:
+
+    image:                              # Keycloak server
+      registry: ${REGISTRY}
+      repository: images/keycloak
+      tag: ${KEYCLOAK_TAG}
+
+    postgresql:
+      image:                            # Keycloak's backing Postgres
+        registry: ${REGISTRY}
+        repository: images/postgres
+        tag: ${POSTGRES_TAG}
+
+    initUsers:
+      image:                            # one-shot job that creates the admin user
+        registry: ${REGISTRY}
+        repository: images/init-keycloak-users
+        tag: ${KAMIWAZA_VERSION}
+
+    cliClient:
+      image:                            # kcadm CLI helper
+        registry: ${REGISTRY}
+        repository: images/curl
+        tag: ${CURL_TAG}
+
+
+### ----------------------------------------------------------------------------
+### Core — scheduler / Ray / control plane
+### ----------------------------------------------------------------------------
+core:
+
+  scheduler:
+    image:                              # Kamiwaza core (scheduler + Ray head)
+      registry: ${REGISTRY}
+      repository: images/core
+      tag: ${KAMIWAZA_VERSION}
+
+  etcd:
+    image:                              # core etcd
+      registry: ${REGISTRY}
+      repository: images/etcd
+      tag: ${ETCD_TAG}
+
+  postgresql:
+    image:                              # core Postgres
+      registry: ${REGISTRY}
+      repository: images/postgres
+      tag: ${POSTGRES_TAG}
+
+  utilityImages:                        # images used by core jobs / helpers
+    curl:
+      registry: ${REGISTRY}
+      repository: images/curl
+      tag: ${CURL_TAG}
+    kubectl:
+      registry: ${REGISTRY}
+      repository: images/kubectl
+      tag: ${KUBECTL_TAG}
+
+
+### ----------------------------------------------------------------------------
+### Embedding — default model server (llama.cpp)
+### ----------------------------------------------------------------------------
+### OFFLINE: the model is the GGUF shipped in the bundle, NOT a HuggingFace download.
+### The offline overlay points download-model at file:///app/models/_bundled/… on a
+### node hostPath; the `kamiwaza-model-stager` DaemonSet (manifests/) puts the bundled
+### GGUF there (the EKS stand-in for the VM host-prep). We only override the image
+### registries here — storage.type=hostPath + the file:// URL come from the overlay.
+embedding:
+
+  image:                                # llama.cpp embedding server
+    registry: ${REGISTRY}
+    repository: images/llamacpp
+    tag: ${LLAMACPP_TAG}
+
+  initImage:                            # download-model init — copies the bundled GGUF (file://)
+    registry: ${REGISTRY}
+    repository: images/curl
+    tag: ${CURL_TAG}
+
+  verifyImage:                          # verify-model init (checksums the model)
+    registry: ${REGISTRY}
+    repository: images/chainguard-base
+    tag: ${KAMIWAZA_VERSION}
+
+
+### ----------------------------------------------------------------------------
+### Frontend — web UI
+### ----------------------------------------------------------------------------
+frontend:
+  image:
+    registry: ${REGISTRY}
+    repository: images/frontend
+    tag: ${KAMIWAZA_VERSION}
+
+
+### ----------------------------------------------------------------------------
+### Docs
+### ----------------------------------------------------------------------------
+docs:
+  image:
+    registry: ${REGISTRY}
+    repository: images/docs
+    tag: v${KAMIWAZA_VERSION_SHORT}   # docs uses the bare version (v0.13.3), derived from KAMIWAZA_VERSION
+
+
+### ----------------------------------------------------------------------------
+### Network — Traefik ingress
+### ----------------------------------------------------------------------------
+network:
+  traefik:
+    image:
+      registry: ${REGISTRY}
+      repository: images/traefik
+      tag: ${TRAEFIK_TAG}
+
+
+### ----------------------------------------------------------------------------
+### DataHub — metadata catalog (upstream subchart)
+### ----------------------------------------------------------------------------
+### NOTE: DataHub nests images differently from the rest of the platform. Most
+### components set only `repository` and inherit the registry from
+### `datahub.global.imageRegistry` below.
+datahub:
+
+  global:
+    imageRegistry: ${REGISTRY}          # registry for all DataHub component images
+
+  # -- Kamiwaza-side DataHub helpers -------------------------------------------
+  keycloakClient:
+    image:
+      registry: ${REGISTRY}
+      repository: images/keycloak
+      tag: ${KEYCLOAK_TAG}
+
+  postgresql:
+    image:
+      registry: ${REGISTRY}
+      repository: images/postgres
+      tag: ${POSTGRES_TAG}
+
+  opensearch:
+    image:                              # search backend (registry baked into repository)
+      repository: ${REGISTRY}/images/opensearch
+      tag: ${OPENSEARCH_TAG}
+
+  prereq:
+    kafka:
+      image:                            # event bus
+        registry: ${REGISTRY}
+        repository: images/kafka-iamguarded
+        tag: ${KAFKA_TAG}
+    neo4j:
+      image:                            # graph store (single combined `customImage` ref)
+        customImage: ${REGISTRY}/images/neo4j:${NEO4J_TAG}
+
+  utilityImages:
+    chainguardBase:
+      registry: ${REGISTRY}
+      repository: images/chainguard-base
+      tag: ${KAMIWAZA_VERSION}
+    curl:
+      registry: ${REGISTRY}
+      repository: images/curl
+      tag: ${CURL_TAG}
+    kubectl:
+      registry: ${REGISTRY}
+      repository: images/kubectl
+      tag: ${KUBECTL_TAG}
+
+  # -- Upstream DataHub components (registry from datahub.global.imageRegistry) -
+  datahub:
+
+    datahub-gms:
+      image:
+        repository: images/datahub-gms
+        tag: ${KAMIWAZA_VERSION}
+
+    datahub-frontend:
+      image:
+        repository: images/datahub-frontend
+        tag: ${KAMIWAZA_VERSION}
+      # This image lives INSIDE a list, and Helm replaces whole lists (not items),
+      # so it carries the full ${REGISTRY}/... reference inline rather than a
+      # registry/repository pair. Keep the whole block when bumping the tag.
+      extraInitContainers:
+      - name: wait-for-oidc-secret
+        image: ${REGISTRY}/images/chainguard-base:${KAMIWAZA_VERSION}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for OIDC secret to be populated with real value..."
+          SECRET_FILE="/oidc-secret/client-secret"
+          MAX_RETRIES=120
+          RETRY_INTERVAL=5
+          RETRIES=0
+          while [ $RETRIES -lt $MAX_RETRIES ]; do
+            RETRIES=$((RETRIES + 1))
+            echo "  Attempt ${RETRIES}/${MAX_RETRIES}: Checking secret file..."
+            if [ -f "$SECRET_FILE" ]; then
+              SECRET_VALUE=$(cat "$SECRET_FILE")
+              if [ -n "$SECRET_VALUE" ] && [ "$SECRET_VALUE" != "placeholder" ]; then
+                echo "OIDC secret is ready with real value!"
+                exit 0
+              fi
+            fi
+            echo "    Secret not ready (empty or placeholder), waiting ${RETRY_INTERVAL}s..."
+            sleep ${RETRY_INTERVAL}
+          done
+          echo "ERROR: OIDC secret was not populated after ${MAX_RETRIES} attempts"
+          exit 1
+        volumeMounts:
+        - name: oidc-secret
+          mountPath: /oidc-secret
+          readOnly: true
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+
+    datahubSystemUpdate:
+      image:
+        repository: images/datahub-upgrade
+        tag: ${KAMIWAZA_VERSION}
+
+    datahubUpgrade:
+      image:
+        repository: images/datahub-upgrade
+        tag: ${KAMIWAZA_VERSION}
+
+    postgresqlSetupJob:
+      image:
+        repository: images/datahub-postgres-setup
+        tag: ${KAMIWAZA_VERSION}

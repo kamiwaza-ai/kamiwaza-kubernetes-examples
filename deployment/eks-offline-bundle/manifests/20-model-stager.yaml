@@ -1,0 +1,41 @@
+# Stages the BUNDLED embedding model (the GGUF shipped in the offline bundle) onto
+# every node's hostPath (/host/kamiwaza/models/_bundled). The offline overlay points
+# the embedding `download-model` init at file:///app/models/_bundled/<model> on that
+# hostPath; on a VM the bundle's host-prep fills it, on EKS this DaemonSet does.
+# The image is built FROM the relocated chainguard-base (in ECR) — nothing online.
+# ${REGISTRY} is substituted from config.env by `make deploy` (envsubst).
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kamiwaza-model-stager
+  namespace: kamiwaza
+spec:
+  selector:
+    matchLabels:
+      app: kamiwaza-model-stager
+  template:
+    metadata:
+      labels:
+        app: kamiwaza-model-stager
+    spec:
+      containers:
+        - name: stager
+          image: ${REGISTRY}/model-stager:latest
+          # run as root so it can write the (root-owned) hostPath, then make the
+          # model world-readable/writable so the embedding pod's non-root init can use it.
+          securityContext:
+            runAsUser: 0
+          command:
+            - sh
+            - -c
+            - mkdir -p /hostmodels/_bundled && cp -n /staged/_bundled/* /hostmodels/_bundled/ && chmod -R a+rwX /hostmodels && echo STAGED && sleep infinity
+          volumeMounts:
+            - name: hostmodels
+              mountPath: /hostmodels
+      volumes:
+        - name: hostmodels
+          hostPath:
+            path: /host/kamiwaza/models
+            type: DirectoryOrCreate
+      tolerations:
+        - operator: Exists
