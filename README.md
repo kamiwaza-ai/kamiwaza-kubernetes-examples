@@ -66,6 +66,7 @@ Category indexes:
 | ReBAC (relationship-based access control)           | [security/rebac](security/rebac)                                                 | #security #rebac #auth #helm-values          |
 | LDAP + Keycloak federation                          | [security/ldap](security/ldap)                                                   | #security #ldap #keycloak                    |
 | Diagnostic commands                                 | [troubleshooting/diagnostic-commands](troubleshooting/diagnostic-commands)       | #troubleshooting #diagnostics #health-check   |
+| Debug container (offline + Claude Code)             | [troubleshooting/debug-container](troubleshooting/debug-container)                | #troubleshooting #debug-container #claude #bedrock #offline |
 
 ---
 
