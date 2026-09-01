@@ -7,8 +7,8 @@ Use this folder **after** the parent [`../`](../) packet is green for core / Ray
 > extension workload trusts the corporate CA automatically — declared service pods of any
 > extension (apps, tools, MCP servers) **and** the spawned sandbox pods that
 > sandbox-spawning extensions (e.g. Kaizen) create — across redeploys, with **no
-> per-extension patching**. The other files here are Kaizen-specific *remediation* and
-> *verification* that the generic webhook does not do.
+> per-extension patching**. The other files here are Kaizen-specific _remediation_ and
+> _verification_ that the generic webhook does not do.
 
 This stays within the same `0.13.0` constraint: additive trust bundle, verification left
 ON, no new images.
@@ -42,13 +42,13 @@ Those live in [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.p
 
 ## Files
 
-| File | Purpose |
-| --- | --- |
-| [`extension-trust-webhook/`](extension-trust-webhook/) | **The mechanism (recommended).** Mutating admission webhook that injects the `kamiwaza-trust-bundle` mount + CA env into **every** declared extension pod **and** spawned sandbox pod, automatically and across redeploys — no per-extension patching, no controller overlay, no new image. Validated live. |
-| [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.py) | **Kaizen-specific remediation the webhook does not do:** re-asserts the secure verify-on flags, fixes the internal-`KAMIWAZA_API_URL` mismatch, and opens egress / injects a proxy on the declared backend CR. The mount + CA env is the webhook's job now, so run this **only** for that remediation. |
-| [`verify-kaizen.sh`](verify-kaizen.sh) | Kaizen verifier: checks declared-backend trust wiring **and** whether the spawned sandbox inherited it (including the live TLS probe — the only real proof of corporate-CA trust). |
-| [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/) | Offline / local-catalog livepatch for future Kaizen launches: 30-day lifetime / retention plus selected `0.13.1` startup and memory fixes. Unrelated to CA trust. |
-| [`kaizen-offline-frontend-font-hotfix/`](kaizen-offline-frontend-font-hotfix/) | Offline image-tar hotfix for `0.13.0` Kaizen frontend startup rebuilds that fail on `next/font/google` / Google Fonts access. |
+| File                                                                           | Purpose                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`extension-trust-webhook/`](extension-trust-webhook/)                         | **The mechanism (recommended).** Mutating admission webhook that injects the `kamiwaza-trust-bundle` mount + CA env into **every** declared extension pod **and** spawned sandbox pod, automatically and across redeploys — no per-extension patching, no controller overlay, no new image. Validated live. |
+| [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.py)           | **Kaizen-specific remediation the webhook does not do:** re-asserts the secure verify-on flags, fixes the internal-`KAMIWAZA_API_URL` mismatch, and opens egress / injects a proxy on the declared backend CR. The mount + CA env is the webhook's job now, so run this **only** for that remediation.      |
+| [`verify-kaizen.sh`](verify-kaizen.sh)                                         | Kaizen verifier: checks declared-backend trust wiring **and** whether the spawned sandbox inherited it (including the live TLS probe — the only real proof of corporate-CA trust).                                                                                                                          |
+| [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/)     | Offline / local-catalog livepatch for future Kaizen launches: 30-day lifetime / retention plus selected `0.13.1` startup and memory fixes. Unrelated to CA trust.                                                                                                                                           |
+| [`kaizen-offline-frontend-font-hotfix/`](kaizen-offline-frontend-font-hotfix/) | Offline image-tar hotfix for `0.13.0` Kaizen frontend startup rebuilds that fail on `next/font/google` / Google Fonts access.                                                                                                                                                                               |
 
 ## Apply order
 
@@ -83,7 +83,7 @@ Those live in [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.p
    security/tls-trust/extensions/apply-kaizen-extension-trust.py <extension-name>
    ```
 
-   Optional proxy path for customer/private egress:
+   Optional proxy path for private/proxied egress:
 
    ```bash
    security/tls-trust/extensions/apply-kaizen-extension-trust.py \
@@ -99,10 +99,10 @@ Those live in [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.p
 5. For Kaizen, open or **resume** a conversation so the sandbox-controller spawns a fresh
    agent pod in `kamiwaza-sandboxes`. The webhook mutates pods at **CREATE**, so this must
    come after the webhook is deployed.
-6. If this customer is on offline / local catalog `0.13.0` and future Kaizen launches also
+6. If the install is offline / on local catalog `0.13.0` and future Kaizen launches also
    need the selected `0.13.1` template fixes, run
    [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/).
-7. If this customer is on a fully disconnected `0.13.0` install and the Kaizen
+7. If it is a fully disconnected `0.13.0` install and the Kaizen
    frontend fails its startup rebuild while trying to fetch Google Fonts, patch
    the bundled frontend image tar with
    [`kaizen-offline-frontend-font-hotfix/`](kaizen-offline-frontend-font-hotfix/).
@@ -149,13 +149,12 @@ this patcher only for the Kaizen-specific remediation below.
 
 > **Timing: the patch lands after the operator reconciles.** The patcher applies the CR;
 > the operator then reconciles it into the Deployment and rolls the pod. A `kubectl rollout
-> status` run *immediately* after can return "successfully rolled out" against the
+status` run _immediately_ after can return "successfully rolled out" against the
 > **pre-reconcile** Deployment. Re-check (or rerun `verify-kaizen.sh`) a few seconds later.
 
 > **Proxy and CA env do NOT propagate to spawned sandboxes.** The Kaizen backend builds
 > `forward_env` for spawned agents (`conversation_manager.py`), but in the verification-ON
-> path it forwards only `MCP_VERIFY_SSL` and `KAMIWAZA_TRUST_TRAEFIK_CERT` — **not**
-> `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` / `AWS_CA_BUNDLE`, and **not** the proxy vars. The
+> path it forwards only `MCP_VERIFY_SSL` and `KAMIWAZA_TRUST_TRAEFIK_CERT` — **not** > `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` / `AWS_CA_BUNDLE`, and **not** the proxy vars. The
 > CA bundle reaches the sandbox directly on the spawned pod via the webhook — not via
 > `forward_env`.
 
@@ -187,8 +186,8 @@ some builds that value is an **internal HTTPS service hostname** such as
 Traefik serving cert (`*.kamiwaza.test` / `*.default.deployment.kamiwaza.ai`), so the moment
 verification turns **on**, the extension's calls to its own `KAMIWAZA_API_URL` fail with a
 **hostname mismatch** — even though the CA is now trusted. With verification off (the
-platform default) that mismatch was silently ignored, so it surfaces *only after applying
-this packet*. Symptom: "Unable to connect to Kamiwaza API" / model auto-discovery fails, or
+platform default) that mismatch was silently ignored, so it surfaces _only after applying
+this packet_. Symptom: "Unable to connect to Kamiwaza API" / model auto-discovery fails, or
 chat 502s, despite the CA being correctly trusted.
 
 **Check before patching** what the extension actually calls:
@@ -202,7 +201,7 @@ kubectl -n kamiwaza-extensions exec <kaizen-backend-pod> -- \
   verification does not apply to it — safe.
 - `KAMIWAZA_API_URL` is **HTTPS to an internal `.svc` hostname**: verification ON will break
   it. Point it at the public origin (`https://kamiwaza.test/api` — the same host Kaizen
-  already uses for *model* calls, which verifies cleanly), **or** have the platform serve a
+  already uses for _model_ calls, which verifies cleanly), **or** have the platform serve a
   Traefik cert whose SANs include the internal hostname. `apply-kaizen-extension-trust.py`
   auto-corrects this to the public origin when a `publicApiUrl`/`origin` is available, and
   `verify-kaizen.sh` probes the backend's real `KAMIWAZA_API_URL` under verification-on (step

@@ -1,6 +1,6 @@
 # Kamiwaza Kubernetes examples
 
-Scenario workflows for running **[Kamiwaza](https://kamiwaza.ai)** on Kubernetes next to the **[Kamiwaza Deploy](https://github.com/kamiwaza/deploy)** Helm charts. This repository uses a scenario-first structure: curated directories per use case, explicit prerequisites, ordered steps, and verification.
+Scenario workflows for running **[Kamiwaza](https://kamiwaza.ai)** on Kubernetes next to the **Kamiwaza Deploy** Helm charts. This repository uses a scenario-first structure: curated directories per use case, explicit prerequisites, ordered steps, and verification.
 
 **These manifests are references for learning and lab environments.** Harden secrets, DNs, hostnames, and TLS before production.
 
@@ -8,7 +8,7 @@ Scenario workflows for running **[Kamiwaza](https://kamiwaza.ai)** on Kubernetes
 
 ## Official documentation
 
-- Platform deployment and architecture: **Kamiwaza Deploy** repo (`cluster/helmfile.yaml.gotmpl`, `docs/`).
+- Platform deployment and architecture: the **[Kamiwaza docs](https://docs.kamiwaza.ai)**, and the **Kamiwaza Deploy** distribution you installed from (`cluster/helmfile.yaml.gotmpl`, `docs/`) — provided to Kamiwaza customers, not a public repo.
 - This repo does **not** replace those docs; it adds copy-paste scenarios you can run after (or beside) a normal install.
 
 ---
@@ -52,22 +52,22 @@ Category indexes:
 - **Security:** [security/README.md](security/README.md)
 - **Troubleshooting:** [troubleshooting/README.md](troubleshooting/README.md)
 
-| Scenario                                            | Path                                                                             | Tags                                         |
-| --------------------------------------------------- | -------------------------------------------------------------------------------- | -------------------------------------------- |
-| Environment profile matrix (lite/full/dev/dev-full) | [deployment/env-profile-matrix](deployment/env-profile-matrix)                   | #deployment #topology #helmfile              |
-| Offline bundle download (Keygen)                    | [deployment/offline-bundle-download](deployment/offline-bundle-download)         | #deployment #offline #bundle #keygen         |
-| Grafana + Prometheus monitoring                     | [monitoring/grafana-prometheus](monitoring/grafana-prometheus)                    | #monitoring #prometheus #grafana #loki        |
-| Service access patterns                             | [networking/external-access](networking/external-access)                         | #networking #port-forward #ingress            |
-| Backup and restore                                  | [operations/backup-restore](operations/backup-restore)                           | #operations #backup #postgres #etcd           |
-| Kaizen offline template livepatch                   | [security/tls-trust/extensions/kaizen-offline-template-livepatch](security/tls-trust/extensions/kaizen-offline-template-livepatch) | #security #tls #kaizen #offline #livepatch |
-| Kaizen offline frontend font hotfix                 | [security/tls-trust/extensions/kaizen-offline-frontend-font-hotfix](security/tls-trust/extensions/kaizen-offline-frontend-font-hotfix) | #kaizen #offline #frontend #nextjs |
-| Consent modal + classification banners              | [security/consent-banner](security/consent-banner)                               | #security #compliance #helm-values           |
-| CAC / PIV login (mTLS forwarding)                   | [security/cac](security/cac)                                                     | #security #cac #mtls #helm-values            |
-| Custom TLS trust + BYO ingress cert                 | [security/tls-trust](security/tls-trust)                                         | #security #tls #pki #ca-trust #bedrock       |
-| ReBAC (relationship-based access control)           | [security/rebac](security/rebac)                                                 | #security #rebac #auth #helm-values          |
-| LDAP + Keycloak federation                          | [security/ldap](security/ldap)                                                   | #security #ldap #keycloak                    |
-| Diagnostic commands                                 | [troubleshooting/diagnostic-commands](troubleshooting/diagnostic-commands)       | #troubleshooting #diagnostics #health-check   |
-| Debug container (offline + Claude Code)             | [troubleshooting/debug-container](troubleshooting/debug-container)                | #troubleshooting #debug-container #claude #bedrock #offline |
+| Scenario                                            | Path                                                                                                                                   | Tags                                                        |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Environment profile matrix (lite/full/dev/dev-full) | [deployment/env-profile-matrix](deployment/env-profile-matrix)                                                                         | #deployment #topology #helmfile                             |
+| Offline bundle download (Keygen)                    | [deployment/offline-bundle-download](deployment/offline-bundle-download)                                                               | #deployment #offline #bundle #keygen                        |
+| Grafana + Prometheus monitoring                     | [monitoring/grafana-prometheus](monitoring/grafana-prometheus)                                                                         | #monitoring #prometheus #grafana #loki                      |
+| Service access patterns                             | [networking/external-access](networking/external-access)                                                                               | #networking #port-forward #ingress                          |
+| Backup and restore                                  | [operations/backup-restore](operations/backup-restore)                                                                                 | #operations #backup #postgres #etcd                         |
+| Kaizen offline template livepatch                   | [security/tls-trust/extensions/kaizen-offline-template-livepatch](security/tls-trust/extensions/kaizen-offline-template-livepatch)     | #security #tls #kaizen #offline #livepatch                  |
+| Kaizen offline frontend font hotfix                 | [security/tls-trust/extensions/kaizen-offline-frontend-font-hotfix](security/tls-trust/extensions/kaizen-offline-frontend-font-hotfix) | #kaizen #offline #frontend #nextjs                          |
+| Consent modal + classification banners              | [security/consent-banner](security/consent-banner)                                                                                     | #security #compliance #helm-values                          |
+| CAC / PIV login (mTLS forwarding)                   | [security/cac](security/cac)                                                                                                           | #security #cac #mtls #helm-values                           |
+| Custom TLS trust + BYO ingress cert                 | [security/tls-trust](security/tls-trust)                                                                                               | #security #tls #pki #ca-trust #bedrock                      |
+| ReBAC (relationship-based access control)           | [security/rebac](security/rebac)                                                                                                       | #security #rebac #auth #helm-values                         |
+| LDAP + Keycloak federation                          | [security/ldap](security/ldap)                                                                                                         | #security #ldap #keycloak                                   |
+| Diagnostic commands                                 | [troubleshooting/diagnostic-commands](troubleshooting/diagnostic-commands)                                                             | #troubleshooting #diagnostics #health-check                 |
+| Debug container (offline + Claude Code)             | [troubleshooting/debug-container](troubleshooting/debug-container)                                                                     | #troubleshooting #debug-container #claude #bedrock #offline |
 
 ---
 

@@ -334,5 +334,5 @@ make purge          # full teardown: platform + CRDs + StorageClass + ECR
 use the Terraform that created it (out of scope for this folder):
 
 ```bash
-cd ../../../airgap-aws-test-infra/test-eks && terraform destroy
+cd <your-eks-terraform-dir> && terraform destroy   # or: eksctl delete cluster --name <cluster>
 ```

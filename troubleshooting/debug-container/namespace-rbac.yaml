@@ -29,7 +29,7 @@ metadata:
   namespace: kamiwaza-debug
 # Pre-wired imagePullSecret reference so the jump-pod and node-debug
 # DaemonSet manifests pull cleanly when the GHCR package is private
-# (the default for org-owned packages on `kamiwaza-internal`).
+# (the default for org-owned packages).
 #
 # Operators create the `ghcr-pull` Secret per the Pre-flight section of
 # container/manifests/README.md. The kubelet behavior is:

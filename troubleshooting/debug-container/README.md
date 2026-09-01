@@ -2,7 +2,7 @@
 
 **Scenario:** get the Kamiwaza debug container — an SRE jump pod with the full
 k8s toolchain (`kubectl`, `k9s`, `helm`, `stern`, …) **and Claude Code wired to
-the customer's Bedrock** — onto an offline cluster from a `docker save` tar.
+your organization's Bedrock** — onto an offline cluster from a `docker save` tar.
 
 This runbook covers **delivery and bring-up only** (load the image, apply the
 manifests, exec in). Operating Claude Code / the toolchain once you're in the
@@ -10,20 +10,21 @@ pod is the operator's job — start with the in-pod `cheatsheet` and `motd`.
 
 **Tags:** #troubleshooting #debug-container #claude #bedrock #offline
 
-> `namespace-rbac.yaml` and `jump-pod.yaml` here are vendored from
-> [`kamiwaza-debug-container`](https://github.com/kamiwaza-internal/kamiwaza-debug-container)
-> (`container/manifests/`) — that repo is the source of truth and documents the
-> full deployment patterns (jump pod, break-glass DaemonSet, RBAC). Re-sync
-> these copies if they change there.
+> **The debug container image is not a public artifact.** It is distributed to
+> Kamiwaza customers — ask your Kamiwaza contact for the image tar and for the
+> `kamiwaza-debug-container` sources, which are the upstream of the
+> `namespace-rbac.yaml` / `jump-pod.yaml` vendored here (`container/manifests/`)
+> and document the full deployment patterns (jump pod, break-glass DaemonSet,
+> RBAC). Everything else in this folder is readable as a pattern without it.
 
 ## Prerequisites
 
 | Requirement | Notes |
 | --- | --- |
 | Cluster + `kubectl` | Configured for the target cluster context. |
-| The image tar | `kamiwaza-debug-<version>-amd64.tar` (or `.tar.gz`) from `packages.kamiwaza.ai`. <!-- TODO: replace with the real download path once published --> |
+| The image tar | `kamiwaza-debug-<version>-amd64.tar` (or `.tar.gz`) — request it from your Kamiwaza contact (not a public download). |
 | A container runtime on the box | To `docker load` / `ctr import` the tar and (optionally) sideload it to the nodes. |
-| Bedrock proxy details (optional) | Only for Claude Code: the proxy URL, region, a model id, an AWS bearer token (or IAM keys), and the proxy CA. Discover them with `bedrock_preflight.py` (kamiwaza platform repo, `scripts/`). |
+| Bedrock proxy details (optional) | Only for Claude Code: the proxy URL, region, a model id, an AWS bearer token (or IAM keys), and the proxy CA. Discover them with `bedrock_preflight.py` (Kamiwaza platform sources, `scripts/`). |
 
 ## 1. Get the tar onto the box and load it
 
@@ -31,7 +32,7 @@ pod is the operator's job — start with the in-pod `cheatsheet` and `motd`.
 `image:` in `jump-pod.yaml` (default `:1.2.0`).
 
 ```bash
-curl -fSLO https://packages.kamiwaza.ai/debug-container/kamiwaza-debug-1.2.0-amd64.tar.gz
+# copy the tar you were given onto the box, then:
 gunzip kamiwaza-debug-1.2.0-amd64.tar.gz
 
 # Docker:
@@ -77,7 +78,7 @@ kubectl apply -f jump-pod.yaml
 kubectl -n kamiwaza-debug exec -it kamiwaza-debug-jump -- bash
 ```
 
-You're now in the debug container. `claude` is pre-wired for the customer's
+You're now in the debug container. `claude` is pre-wired for your organization's
 Bedrock (no login). From here it's over to the operator — see the in-pod
 `cheatsheet` and `motd` for the toolchain.
 

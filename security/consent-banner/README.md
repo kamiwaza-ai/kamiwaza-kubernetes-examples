@@ -11,7 +11,7 @@
 
 ## Prerequisites
 
-- A Kamiwaza install (Helmfile from [Kamiwaza Deploy](https://github.com/kamiwaza/deploy)) with namespace **`kamiwaza`**.
+- A Kamiwaza install (Helmfile from **Kamiwaza Deploy**) with namespace **`kamiwaza`**.
 - `kubectl` + `kubectl apply -k`.
 
 ## Steps

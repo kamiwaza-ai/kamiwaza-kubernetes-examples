@@ -12,8 +12,6 @@ self-contained procedure with verification steps.
 | Procedure | When to use |
 | --- | --- |
 | [`apply-overrides-reinstall/`](apply-overrides-reinstall/) | Apply values/overrides changes, reinstall, or uninstall the platform. |
-| [`cluster-scaling-maxpods/`](cluster-scaling-maxpods/) | Raise the Kind pod ceiling to 1000 for large fan-out. |
-| [`credential-rotation/`](credential-rotation/) | Rotate GHCR / registry credentials without redeploying. |
 
 ---
 

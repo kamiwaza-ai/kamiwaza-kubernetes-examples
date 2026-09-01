@@ -1,7 +1,7 @@
 # Kaizen offline template livepatch (0.13.0 -> selected 0.13.1 fixes)
 
 Use this after the parent Kaizen extension follow-on in
-[`../README.md`](../README.md) when the customer is still on `release/0.13.0`,
+[`../README.md`](../README.md) when the install is still on `release/0.13.0`,
 cannot upgrade to `0.13.1`, and is using the offline / local catalog path.
 
 Patch the **Kaizen catalog template on the running instance** so **new Kaizen launches only**

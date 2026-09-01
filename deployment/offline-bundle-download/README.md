@@ -45,7 +45,7 @@ DEST="./artifacts/kamiwaza-bundle-v1.2.0" \
 
 `RELEASE` pins the bundle version. Set it to **whatever version you want** — the newest,
 or an older one your cluster / runbook was validated against (e.g. matching an existing
-install, or reproducing a customer's environment). Leave it unset only if "whatever is
+install, or reproducing an existing environment). Leave it unset only if "whatever is
 newest today" is genuinely what you want; a pinned version makes the download
 reproducible.
 

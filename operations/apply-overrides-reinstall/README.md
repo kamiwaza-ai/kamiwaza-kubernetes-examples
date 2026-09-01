@@ -147,7 +147,5 @@ kubectl -n kamiwaza rollout status deploy/core-scheduler
 
 ## Related
 
-- [`../cluster-scaling-maxpods/`](../cluster-scaling-maxpods/) — raise the Kind pod ceiling.
-- [`../credential-rotation/`](../credential-rotation/) — rotate registry credentials.
 - [`../../security/tls-trust/`](../../security/tls-trust/) — a real overrides-driven change (custom CA trust) end to end.
 - [`../../troubleshooting/healthcheck-probe/`](../../troubleshooting/healthcheck-probe/) — fix a probe that crashloops a healthy pod.

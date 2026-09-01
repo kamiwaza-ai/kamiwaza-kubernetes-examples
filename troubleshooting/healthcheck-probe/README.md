@@ -7,7 +7,8 @@ because a startup/liveness/readiness probe failed. The usual culprit is a probe 
 checks the wrong path, port, or scheme, or one tuned too aggressively for the app's
 cold-start time.
 
-This is the "probe kill" branch promised in [`../pod-crashloop/`](../pod-crashloop/).
+This is the "probe kill" branch of crashloop triage — start from
+[`../diagnostic-commands/`](../diagnostic-commands/) if you have not narrowed it down yet.
 
 **Tags:** #troubleshooting #probes #healthcheck #crashloop #extensions
 
@@ -25,8 +26,8 @@ You are in this playbook if you see **all** of:
 - Events: `Unhealthy: <Startup|Liveness|Readiness> probe failed` → `Killing: ... will be restarted`
 - The container's own logs show it came up fine (`kubectl logs <pod>` → server "ready/listening")
 
-If the exit code is non-zero, or logs show a stack trace, this is an app/config crash —
-go back to [`../pod-crashloop/`](../pod-crashloop/) instead.
+If the exit code is non-zero, or logs show a stack trace, this is an app/config crash, not a
+probe kill — triage it with [`../diagnostic-commands/`](../diagnostic-commands/) instead.
 
 ---
 
@@ -214,6 +215,6 @@ remediation; the durable fix is in the extension image.
 
 ## Related
 
-- [`../pod-crashloop/`](../pod-crashloop/) — the general crashloop triage that routes here.
-- [`../../operations/extension-overrides/`](../../operations/extension-overrides/) — apply config changes (overrides) and roll workloads safely.
+- [`../diagnostic-commands/`](../diagnostic-commands/) — the general triage this branches off.
+- [`../../operations/apply-overrides-reinstall/`](../../operations/apply-overrides-reinstall/) — apply config changes (overrides) and roll workloads safely.
 - [`../../security/tls-trust/extensions/`](../../security/tls-trust/extensions/) — extension trust/egress patterns.

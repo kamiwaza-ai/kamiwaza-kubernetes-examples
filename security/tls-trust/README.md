@@ -42,6 +42,7 @@ install and post-install re-patching are repeatable:
    `kamiwaza-prod-control-plane`, plus scoped Kamiwaza/Kind containers, images,
    networks, volumes, model storage, and kubeconfig. It keeps the Podman package by
    default.
+
 3. Before and after uninstall, confirm required offline inputs remain available:
    S3/offline bundle artifacts, `/opt/kamiwaza/prereqs`, and any install override
    files such as `/opt/kamiwaza/cluster/values/overrides.yaml`.
@@ -54,7 +55,7 @@ install and post-install re-patching are repeatable:
 
 5. Reinstall 0.13.0 offline with the required overrides.
 6. Apply the global DNS fail-fast patch at the end of this README, then apply the
-   TLS trust / Kaizen follow-on patches needed for the customer scenario.
+   TLS trust / Kaizen follow-on patches needed for this scenario.
 
 ---
 
@@ -89,30 +90,30 @@ Make the control-plane entry include:
 networking:
   podSubnet: "10.244.0.0/16"
 nodes:
-- role: control-plane
-  kubeadmConfigPatches:
-  - |
-    kind: InitConfiguration
-    nodeRegistration:
-      kubeletExtraArgs:
-        max-pods: "1000"
-  - |
-    kind: KubeletConfiguration
-    maxPods: 1000
-  # COMPANION PATCH — required, not optional. maxPods raises only the kubelet
-  # ceiling; each node still gets a /24 pod CIDR (~254 usable IPs) by default,
-  # so without this the node caps at ~254 pods regardless of maxPods=1000.
-  # Widen the per-node pod CIDR to /22 (1022 usable IPs) so 1000 pods can
-  # actually get an IP.
-  - |
-    kind: ClusterConfiguration
-    controllerManager:
-      extraArgs:
-        # The 0.13.0 release pins kindest/node:v1.31.6, which kind renders as a
-        # v1beta3 ClusterConfiguration — there extraArgs is a map[string]string.
-        # The v1beta4 list-of-{name,value} form fails to unmarshal against it
-        # ("cannot unmarshal array into ... map") and aborts control-plane init.
-        node-cidr-mask-size: "22"
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            max-pods: "1000"
+      - |
+        kind: KubeletConfiguration
+        maxPods: 1000
+      # COMPANION PATCH — required, not optional. maxPods raises only the kubelet
+      # ceiling; each node still gets a /24 pod CIDR (~254 usable IPs) by default,
+      # so without this the node caps at ~254 pods regardless of maxPods=1000.
+      # Widen the per-node pod CIDR to /22 (1022 usable IPs) so 1000 pods can
+      # actually get an IP.
+      - |
+        kind: ClusterConfiguration
+        controllerManager:
+          extraArgs:
+            # The 0.13.0 release pins kindest/node:v1.31.6, which kind renders as a
+            # v1beta3 ClusterConfiguration — there extraArgs is a map[string]string.
+            # The v1beta4 list-of-{name,value} form fails to unmarshal against it
+            # ("cannot unmarshal array into ... map") and aborts control-plane init.
+            node-cidr-mask-size: "22"
 ```
 
 > **Why both halves are mandatory.** `maxPods` is a kubelet limit; the per-node
@@ -198,23 +199,23 @@ renders — which fails to unmarshal — or the node was not recreated).
 
 ## Compatibility / version pin
 
-| Item | Status |
-| --- | --- |
-| Validated against | **Kamiwaza 0.13.0** |
-| Kaizen sandbox trust validated against | **Kaizen controller 1.8.13** (distinct from the platform version) — sandboxes get the bundle via the [extension trust webhook](extensions/extension-trust-webhook/) |
-| Outbound CA trust (this folder) | **Config-only on 0.13.0** — no trust-manager controller needed. Build the `kamiwaza-trust-bundle` ConfigMap with [`build-trust-bundle-configmap.sh`](build-trust-bundle-configmap.sh), then `core.trustManager.enabled` + `core.scheduler.extraEnv` mount it. |
-| BYO ingress cert | **Manifest path on 0.13.0** — there is no native values knob, but the network subchart already manages a `default` TLSStore + wildcard Certificate, so the BYO manifests collide with Helm-owned resources. Read the [Helm-ownership caveat](ingress/#helm-ownership-on-0130) in `ingress/` before applying. **Not needed on later releases**, which serve a BYO ingress cert through a native values knob. |
+| Item                                   | Status                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Validated against                      | **Kamiwaza 0.13.0**                                                                                                                                                                                                                                                                                                                                                                                         |
+| Kaizen sandbox trust validated against | **Kaizen controller 1.8.13** (distinct from the platform version) — sandboxes get the bundle via the [extension trust webhook](extensions/extension-trust-webhook/)                                                                                                                                                                                                                                         |
+| Outbound CA trust (this folder)        | **Config-only on 0.13.0** — no trust-manager controller needed. Build the `kamiwaza-trust-bundle` ConfigMap with [`build-trust-bundle-configmap.sh`](build-trust-bundle-configmap.sh), then `core.trustManager.enabled` + `core.scheduler.extraEnv` mount it.                                                                                                                                               |
+| BYO ingress cert                       | **Manifest path on 0.13.0** — there is no native values knob, but the network subchart already manages a `default` TLSStore + wildcard Certificate, so the BYO manifests collide with Helm-owned resources. Read the [Helm-ownership caveat](ingress/#helm-ownership-on-0130) in `ingress/` before applying. **Not needed on later releases**, which serve a BYO ingress cert through a native values knob. |
 
 > The trust bundle is **additive**: Mozilla public CAs **+** platform `root-ca` **+**
 > your corporate CA(s). There is intentionally no "replace / drop public CAs" mode.
 
 ### What picks up new trust via this path
 
-| Workload | Outbound trust | Notes |
-| --- | --- | --- |
-| `core-scheduler` | ✅ | bundle mounted at `/etc/ssl/certs/ca-certificates.crt` |
-| Ray head + workers | ✅ | same mount; this is where Bedrock/LiteLLM runs |
-| Declared extension pods | ✅ via the extension trust webhook | the [extension trust webhook](extensions/extension-trust-webhook/) injects the bundle mount + CA env into every declared extension pod automatically — see [`extensions/`](extensions/) |
+| Workload                 | Outbound trust                     | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------ | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core-scheduler`         | ✅                                 | bundle mounted at `/etc/ssl/certs/ca-certificates.crt`                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Ray head + workers       | ✅                                 | same mount; this is where Bedrock/LiteLLM runs                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Declared extension pods  | ✅ via the extension trust webhook | the [extension trust webhook](extensions/extension-trust-webhook/) injects the bundle mount + CA env into every declared extension pod automatically — see [`extensions/`](extensions/)                                                                                                                                                                                                                                                                                     |
 | Kaizen spawned sandboxes | ✅ via the extension trust webhook | Kaizen adds a second boundary — the sandbox's CA file is owned by the sandbox-controller, not Helm — but it is closed by the [extension trust webhook](extensions/extension-trust-webhook/), which injects the same bundle mount + CA env into every spawned sandbox at pod-create (validated live, Kaizen 1.8.13). A live TLS probe from the sandbox to a corporate-CA endpoint is still the only proof the corporate CA (not the agent image's default bundle) is trusted |
 
 > **Hostname caveat for Kaizen / custom endpoints:** this packet adds **CA
@@ -226,22 +227,22 @@ renders — which fails to unmarshal — or the node was not recreated).
 
 ### Client-library consumption (with this recipe's env set, bundle at `/etc/ssl/certs/ca-certificates.crt`)
 
-| Library | Honors | Covered by this recipe |
-| --- | --- | --- |
-| stdlib `ssl` / `aiohttp` | OS store + `SSL_CERT_FILE` | ✅ mount + `SSL_CERT_FILE` |
-| `requests` | `REQUESTS_CA_BUNDLE` / `SSL_CERT_FILE` | ✅ chart sets `REQUESTS_CA_BUNDLE` |
-| `httpx` ≥ 0.28 | **`SSL_CERT_FILE`** (else falls back to `certifi`) | ✅ `SSL_CERT_FILE` |
-| **LiteLLM 1.83** incl. **Bedrock** (httpx-based) | **`SSL_CERT_FILE`** | ✅ `SSL_CERT_FILE` |
-| `boto3` / `botocore` (direct, e.g. S3) | **`AWS_CA_BUNDLE`** only | ✅ `AWS_CA_BUNDLE` |
+| Library                                          | Honors                                             | Covered by this recipe             |
+| ------------------------------------------------ | -------------------------------------------------- | ---------------------------------- |
+| stdlib `ssl` / `aiohttp`                         | OS store + `SSL_CERT_FILE`                         | ✅ mount + `SSL_CERT_FILE`         |
+| `requests`                                       | `REQUESTS_CA_BUNDLE` / `SSL_CERT_FILE`             | ✅ chart sets `REQUESTS_CA_BUNDLE` |
+| `httpx` ≥ 0.28                                   | **`SSL_CERT_FILE`** (else falls back to `certifi`) | ✅ `SSL_CERT_FILE`                 |
+| **LiteLLM 1.83** incl. **Bedrock** (httpx-based) | **`SSL_CERT_FILE`**                                | ✅ `SSL_CERT_FILE`                 |
+| `boto3` / `botocore` (direct, e.g. S3)           | **`AWS_CA_BUNDLE`** only                           | ✅ `AWS_CA_BUNDLE`                 |
 
 > **`SSL_CERT_FILE` is the key lever for the Bedrock/LiteLLM path** — not `AWS_CA_BUNDLE`.
 > In litellm 1.83 the Bedrock call is **httpx-based, not boto3**: `get_ssl_verify()`
 > returns `$SSL_CERT_FILE` when verification is on, and httpx 0.28
 > (`create_ssl_context`) uses `$SSL_CERT_FILE` as the CA file when set, else `certifi`.
-> `AWS_CA_BUNDLE` is set too, but it only covers any *direct* boto3 use (S3, STS).
+> `AWS_CA_BUNDLE` is set too, but it only covers any _direct_ boto3 use (S3, STS).
 >
 > Because the bundle is **additive** (Mozilla + platform root + your CA), pointing
-> `SSL_CERT_FILE` at it keeps public TLS working *and* adds your CA — `SSL_CERT_FILE`
+> `SSL_CERT_FILE` at it keeps public TLS working _and_ adds your CA — `SSL_CERT_FILE`
 > replaces certifi rather than augmenting it, so a non-additive file would break public TLS.
 
 ---
@@ -259,13 +260,13 @@ renders — which fails to unmarshal — or the node was not recreated).
 ### Starting state: existing cluster vs fresh install
 
 This recipe works on a cluster that is **already running** and on a **fresh install**.
-Both paths must satisfy one ordering rule, then differ only in *when* you run the steps.
+Both paths must satisfy one ordering rule, then differ only in _when_ you run the steps.
 
 > **Ordering rule (both paths):** the `kamiwaza-trust-bundle` ConfigMap (built by
 > [`build-trust-bundle-configmap.sh`](build-trust-bundle-configmap.sh)) must exist in
 > the `kamiwaza` namespace **before** the `helmfile sync` that sets
 > `core.trustManager.enabled: true`. The bundle volume is `optional: true`, so a sync
-> run *before* the ConfigMap exists brings the scheduler/Ray pods up with **no CA file
+> run _before_ the ConfigMap exists brings the scheduler/Ray pods up with **no CA file
 > mounted** — silently. `verify.sh` (in-pod cert count) is the guard. If the mount is
 > already enabled and you build/update the ConfigMap afterward, roll the pods (see
 > [Recovery](#recovery--rollback-bad-ca)).
@@ -302,18 +303,18 @@ either be up first, or you must feed the baseline from a file. Two clean orderin
 
 ## What you get
 
-| File | Purpose |
-| --- | --- |
-| [`build-trust-bundle-configmap.sh`](build-trust-bundle-configmap.sh) | **Config-only ConfigMap builder — the replacement for the trust-manager controller.** Assembles the additive PEM (public/Mozilla baseline + platform `root-ca` + your corporate CA(s), deduped by SHA-256) and `kubectl apply`s ConfigMap `kamiwaza-trust-bundle` (key `ca-certificates.crt`) into each target namespace. Needs only `openssl` + `kubectl`. |
+| File                                                                   | Purpose                                                                                                                                                                                                                                                                                                                                                       |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`build-trust-bundle-configmap.sh`](build-trust-bundle-configmap.sh)   | **Config-only ConfigMap builder — the replacement for the trust-manager controller.** Assembles the additive PEM (public/Mozilla baseline + platform `root-ca` + your corporate CA(s), deduped by SHA-256) and `kubectl apply`s ConfigMap `kamiwaza-trust-bundle` (key `ca-certificates.crt`) into each target namespace. Needs only `openssl` + `kubectl`.   |
 | [`trust-bundle-values-snippet.yaml`](trust-bundle-values-snippet.yaml) | Helm values overlay: mounts the (script-built) `kamiwaza-trust-bundle` ConfigMap on scheduler + Ray and sets `SSL_CERT_FILE` (covers httpx/LiteLLM/Bedrock) + `AWS_CA_BUNDLE` (direct boto3), plus an optional certifi-overlay fallback. Disables the chart's inert Bundle CR (`ca.trustBundle.enabled: false`) since there is no controller to reconcile it. |
-| [`org-ca-secret.template.yaml`](org-ca-secret.template.yaml) | Direct-apply `kamiwaza-org-ca` Secret template. |
-| [`kustomization.yaml`](kustomization.yaml) | Local-secret-driven generator for the same Secret (keeps PEM out of hand-edited YAML). |
-| [`org-ca.pem.example`](org-ca.pem.example) | Placeholder PEM. |
-| [`demo-pki/`](demo-pki/) | **FAKE, throwaway** root+intermediate+leaf PKI and ready-to-apply Secret manifests, so the whole cycle (outbound trust **and** BYO ingress) runs with zero generation. Regenerable via `demo-pki/generate.sh`. Never use for anything real. |
-| [`verify.sh`](verify.sh) | End-to-end verification (ConfigMap contents, namespace sync, pod env/mount, optional live TLS probe). |
-| [`bedrock-custom-region/`](bedrock-custom-region/) | **Companion** — custom Bedrock **region** enablement. Declarative botocore hotfix so boto3 *accepts* a non-default region; pair with this recipe so no `SSL_VERIFY=False` is needed. |
-| [`ingress/`](ingress/) | BYO ingress cert — manifest path required on 0.13.0 (not needed on later releases). |
-| [`extensions/`](extensions/) | Extension / Kaizen follow-on. The [extension trust webhook](extensions/extension-trust-webhook/) injects the bundle mount + CA env into every declared extension pod **and** spawned sandbox pod automatically; plus Kaizen-specific remediation, the sandbox verification path, and the offline template livepatch. |
+| [`org-ca-secret.template.yaml`](org-ca-secret.template.yaml)           | Direct-apply `kamiwaza-org-ca` Secret template.                                                                                                                                                                                                                                                                                                               |
+| [`kustomization.yaml`](kustomization.yaml)                             | Local-secret-driven generator for the same Secret (keeps PEM out of hand-edited YAML).                                                                                                                                                                                                                                                                        |
+| [`org-ca.pem.example`](org-ca.pem.example)                             | Placeholder PEM.                                                                                                                                                                                                                                                                                                                                              |
+| [`demo-pki/`](demo-pki/)                                               | **FAKE, throwaway** root+intermediate+leaf PKI and ready-to-apply Secret manifests, so the whole cycle (outbound trust **and** BYO ingress) runs with zero generation. Regenerable via `demo-pki/generate.sh`. Never use for anything real.                                                                                                                   |
+| [`verify.sh`](verify.sh)                                               | End-to-end verification (ConfigMap contents, namespace sync, pod env/mount, optional live TLS probe).                                                                                                                                                                                                                                                         |
+| [`bedrock-custom-region/`](bedrock-custom-region/)                     | **Companion** — custom Bedrock **region** enablement. Declarative botocore hotfix so boto3 _accepts_ a non-default region; pair with this recipe so no `SSL_VERIFY=False` is needed.                                                                                                                                                                          |
+| [`ingress/`](ingress/)                                                 | BYO ingress cert — manifest path required on 0.13.0 (not needed on later releases).                                                                                                                                                                                                                                                                           |
+| [`extensions/`](extensions/)                                           | Extension / Kaizen follow-on. The [extension trust webhook](extensions/extension-trust-webhook/) injects the bundle mount + CA env into every declared extension pod **and** spawned sandbox pod automatically; plus Kaizen-specific remediation, the sandbox verification path, and the offline template livepatch.                                          |
 
 ---
 
@@ -328,10 +329,12 @@ carry root **and** intermediate(s).
 
 > **Just want to see it work?** A committed, **fake** demo PKI lives in
 > [`demo-pki/`](demo-pki/), so the whole cycle runs with **one command, no Secret**:
+>
 > ```bash
 > security/tls-trust/build-trust-bundle-configmap.sh \
 >   --ca-file security/tls-trust/demo-pki/ca-chain.pem
 > ```
+>
 > `demo-pki/ca-chain.pem` is the fake root+intermediate. It is throwaway material —
 > **never** use it for anything real. For a real deployment pass your own
 > `--ca-file`, or create the `kamiwaza-org-ca` Secret with one of the options below.
@@ -392,9 +395,9 @@ Secret `root-ca` (ns `kamiwaza`, key `ca.crt`) and is included by default.
 Copy [`trust-bundle-values-snippet.yaml`](trust-bundle-values-snippet.yaml) into your
 highest-priority values file. It sets:
 
-- `ca.trustBundle.enabled: false`  ← no inert Bundle CR (there is no controller to
+- `ca.trustBundle.enabled: false` ← no inert Bundle CR (there is no controller to
   reconcile it; the ConfigMap is produced by the build script)
-- `core.trustManager.enabled: true`  ← mounts the script-built `kamiwaza-trust-bundle`
+- `core.trustManager.enabled: true` ← mounts the script-built `kamiwaza-trust-bundle`
   ConfigMap on scheduler + Ray (a legacy misnomer — it only mounts a ConfigMap and
   needs **no** controller)
 - `core.scheduler.extraEnv` → **`SSL_CERT_FILE`** (covers stdlib `ssl`, httpx, and the
