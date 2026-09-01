@@ -13,7 +13,9 @@
 #
 # Required env:  KEYGEN_LICENSE   (your Kamiwaza license key)
 # Optional env:
-#   RELEASE      e.g. 1.0.0   (default: latest stable in the package)
+#   RELEASE      bundle version to fetch, e.g. 1.0.0 — any published release, not
+#                just the newest (default: latest stable in the package). An unknown
+#                value prints the available versions and exits.
 #   DEST         download dir (default: /opt/kamiwaza/prereqs)
 #   PACKAGE_ID   override the offline-bundles package id
 #   KEEP_PARTS=1 keep the split .part-NNN files after assembly

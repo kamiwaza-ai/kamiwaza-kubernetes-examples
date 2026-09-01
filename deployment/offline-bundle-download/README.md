@@ -36,10 +36,31 @@ DEST="./artifacts/kamiwaza-bundle-v1.2.0" \
 | Env | Default | Meaning |
 | --- | --- | --- |
 | `KEYGEN_LICENSE` | *(required)* | Your Kamiwaza license key (sent as `Authorization: License …`). |
-| `RELEASE` | latest stable | Bundle version, e.g. `1.2.0`. An unknown value prints the available versions. |
+| `RELEASE` | latest stable | **Which bundle version to fetch** — any published release, not just the newest (see below). Omit it to take the latest stable. |
 | `DEST` | `/opt/kamiwaza/prereqs` | Download directory; created with `sudo install -d` if it doesn't exist. |
 | `KEEP_PARTS` | `0` | `1` keeps the `.part-NNN` files + sidecars after assembly (to re-verify or redistribute the split files). |
 | `PACKAGE_ID` | offline-bundles pkg | Override the Keygen package id. |
+
+### Choosing a release
+
+`RELEASE` pins the bundle version. Set it to **whatever version you want** — the newest,
+or an older one your cluster / runbook was validated against (e.g. matching an existing
+install, or reproducing a customer's environment). Leave it unset only if "whatever is
+newest today" is genuinely what you want; a pinned version makes the download
+reproducible.
+
+To see what's published, ask for a version that doesn't exist — the script lists the
+available ones and exits before downloading anything:
+
+```bash
+KEYGEN_LICENSE="<key>" RELEASE=list DEST=. deployment/offline-bundle-download/download-bundle.sh
+# Release list not found. Available:
+#   1.0.0
+#   1.1.0
+#   1.2.0
+```
+
+Prereleases (`1.2.0-rc.1`) are filtered out of both the list and the "latest" pick.
 
 **Reruns are safe and cheap.** Present files are skipped, interrupted downloads resume
 (`curl --continue-at -`), and an already-assembled bundle short-circuits the re-fetch of
