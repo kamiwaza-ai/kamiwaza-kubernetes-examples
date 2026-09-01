@@ -77,7 +77,7 @@ The sections below explain each mechanic / how to do it by hand.
 | `aws` CLI | Admin (or ECR `Create/Push` + EKS describe) in the cluster's account/region. |
 | Node IAM role | Must allow ECR pull (`AmazonEC2ContainerRegistryReadOnly` — included by the EKS managed node role). |
 | `docker` | helm-dt reads `~/.docker/config.json` for the push. |
-| Bundle | Downloaded + extracted; the prod RPM extracted to a work dir (`$WORK=.../opt/kamiwaza`). |
+| Bundle | Downloaded + extracted ([offline-bundle-download](../offline-bundle-download) fetches + verifies it); the prod RPM extracted to a work dir (`$WORK=.../opt/kamiwaza`). |
 
 ```bash
 export REGION=us-east-1 ACCOUNT=<acct-id>
