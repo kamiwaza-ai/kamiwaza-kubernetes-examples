@@ -1,0 +1,31 @@
+# A bundle that is refused, on purpose.
+#
+# Run a plan against this file rather than believing a list of values. Both
+# entries below are rejected before anything is written, and the plan reports
+# one blocker each with no partial apply: a manifest is planned as a whole.
+#
+# `relation: Auditor` is not in the contract's relation vocabulary, and
+# `resourceType: Namespace` is not in its resource vocabulary. Both vocabularies
+# are closed enumerations in
+# `specs/002-identity-transport-runtime/contracts/grant-service.openapi.yaml`.
+# That is deliberate: an open vocabulary means a typo becomes a new relation
+# nobody grants and nobody audits, and a relation the enforcement side never
+# checks is a grant that reads as applied and enforces nothing.
+#
+# Read the vocabularies from the contract, not from this file and not from a
+# list in a README that happened to work when it was written. The plan is the
+# authority on what your release accepts.
+bundleID: example-refused-bundle
+revision: rev-0001
+platformID: example-platform
+entries:
+  - entryID: unknown-relation
+    principalID: 00000000-0000-4000-8000-000000000003
+    resourceType: Dataset
+    resourceID: example-quarterly-metrics
+    relation: Auditor
+  - entryID: unknown-resource-type
+    principalID: 00000000-0000-4000-8000-000000000003
+    resourceType: Namespace
+    resourceID: example-namespace
+    relation: Viewer

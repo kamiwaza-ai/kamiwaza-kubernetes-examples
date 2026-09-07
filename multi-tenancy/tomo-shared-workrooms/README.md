@@ -25,7 +25,7 @@ The current catalog identifier is `kaizen`; the displayed product name may be To
    - Tenant B user
 5. The identity provider issues matching `tenant_id` and `tenant` claims. The two Tenant A users receive the same value; the Tenant B user receives a different value.
 
-Use the existing [ReBAC tenant workflow](../../security/rebac/#custom-rebac-tenants) to register both tenant IDs, bootstrap their tuples, configure claim mapping, and verify registry enforcement. Do not encode tenant membership in Kubernetes namespace names for this scenario.
+Register both tenant IDs and configure claim mapping with the [ReBAC tenant registry fragments](../../security/rebac/#tenants), then verify registry enforcement. Relationship edges are no longer bootstrapped by CLI: grant them with the [plan, diff, apply workflow](../../security/rebac/) in that same directory, which previews every change and reports which producers own each edge before anything is written. Do not encode tenant membership in Kubernetes namespace names for this scenario.
 
 ## 1. Verify the main platform and shared model
 
