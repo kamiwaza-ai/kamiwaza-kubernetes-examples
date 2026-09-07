@@ -92,6 +92,28 @@ case "$bind_dn" in
 esac
 
 echo ""
+echo "== Synchronization is bounded"
+# A directory read with no page size, no batch size, and no timeouts is
+# unbounded: a large or hostile directory can hold the connection open and
+# return an arbitrary number of entries. Asserting the bounds here is the point
+# of a validator — configuring them and never checking is how they get dropped
+# by a later edit without anyone noticing.
+for bound in pagination:true batchSizeForSync: connectionTimeout: readTimeout:; do
+  key="${bound%%:*}"
+  want="${bound#*:}"
+  got="$(echo "$LDAP_JSON" | jq -r "(.config.${key} // [])[0] // empty")"
+  if [[ -z $got ]]; then
+    echo "FAIL: ${key} is unset (synchronization would be unbounded)" >&2
+    fail=1
+  elif [[ -n $want && $got != "$want" ]]; then
+    echo "FAIL: ${key}='${got}' (expected ${want})" >&2
+    fail=1
+  else
+    echo "OK: ${key}=${got}"
+  fi
+done
+
+echo ""
 echo "== Group -> realm role mappings"
 if verify_declared_group_role_mappings "$TOKEN"; then
   echo "OK: all declared group->realm role mappings present"

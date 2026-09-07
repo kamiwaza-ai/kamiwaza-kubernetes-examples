@@ -1,12 +1,19 @@
-# Administrator-owned profile for read-only directory federation, plus the
-# approved egress destination the method reaches the directory through.
+# Administrator-owned profile for read-only directory federation.
 #
-# Merge each list into the matching list of the AdminCapabilityPolicy document
-# the operator chart mounts (`policy.yaml`): `authProfiles` and
-# `transport.egress.destinations`. A method whose `destinationClass` is not a
-# declared `Directory` destination is refused, because a directory reached
-# through a class approved for something else is verified against the wrong
-# authorities and bounded by the wrong hosts.
+# This file is a loadable auth-profile fragment: its root key is `profiles`,
+# which is what the published schema declares and what the operator's own
+# loader accepts, so it can be checked before it is merged. Inside the whole
+# AdminCapabilityPolicy document (`policy.yaml`) the same list is `authProfiles`
+# — one document holds several kinds of profile and an unqualified `profiles`
+# would not say which. Rename the key when you merge; do not paste this root
+# into the document.
+#
+# The egress destination this method reaches the directory through is a
+# separate loadable fragment, transport-policy-fragment.yaml, because it merges
+# into a different section of the same document. A method whose
+# `destinationClass` is not a declared `Directory` destination is refused: a
+# directory reached through a class approved for something else is verified
+# against the wrong authorities and bounded by the wrong hosts.
 #
 # The directory is externally owned. This example ships a plaintext lab
 # directory for teaching, and that lab does not satisfy the transport this
@@ -19,7 +26,7 @@
 # non-resolvable name (RFC 6761), `dc=example,dc=invalid` is not a real
 # directory tree, and 636 is the registered LDAPS port rather than anyone's
 # port. Replace all three.
-authProfiles:
+profiles:
   - name: directory-federation
     methods:
       - name: enterprise-directory
@@ -82,21 +89,3 @@ authProfiles:
       reauthentication: AtTimeout
       tokenAudience: kamiwaza-platform
     failureMode: FailClosed
-
-# Merge under `transport.egress.destinations` in the same policy document.
-transportEgressDestinations:
-  - name: enterprise-directory
-    kind: Directory
-    hosts:
-      - directory.example.invalid
-    ports:
-      - 636
-    transport: TLS
-    # The directory is dialled by a platform-controlled client, which
-    # validates name, port, resolved addresses, and re-resolution before
-    # connecting. Server verification comes from the platform trust
-    # distribution; the bind credential is application-level, so the client
-    # presents no certificate.
-    authentication:
-      type: None
-    enforcementMode: PolicyAwareDialer

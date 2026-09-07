@@ -104,7 +104,7 @@ The revocation document the origin reads is a JSON object with a `generated_at` 
 
 | File                                                                             | Purpose                                                                   |
 | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| [auth-profile-fragment.yaml](auth-profile-fragment.yaml)                         | the `authProfiles` entry to merge into the operator's policy document     |
+| [auth-profile-fragment.yaml](auth-profile-fragment.yaml)                         | a loadable `profiles` fragment; merge it as `authProfiles` in the policy document |
 | [platform-profile-selection.yaml](platform-profile-selection.yaml)               | merge patch selecting the approved profile by name                        |
 | [gateway-frontend-validation.yaml](gateway-frontend-validation.yaml)             | reference shape for the administrator-owned Gateway                       |
 | [edge-conformance-evidence.example.yaml](edge-conformance-evidence.example.yaml) | shape of the five conformance records (not for applying)                  |
@@ -128,7 +128,7 @@ kubectl diff -k security/cac
 kubectl apply -k security/cac
 ```
 
-3. **Publish the profile.** Merge the `authProfiles` entry from `auth-profile-fragment.yaml` into the AdminCapabilityPolicy document the operator chart mounts, and bump `adminPolicy.revision`. The policy ConfigMap is immutable, so a changed document needs a new revision; evidence recorded against the old revision is downgraded to attestation, and a regulated profile refuses it, so re-record the conformance evidence after the bump.
+3. **Publish the profile.** `auth-profile-fragment.yaml` has the root key `profiles`, which is what the published schema declares and what the operator's own loader accepts, so it can be validated before it is merged. Merge its list as `authProfiles` into the AdminCapabilityPolicy document the operator chart mounts, and bump `adminPolicy.revision`. The policy ConfigMap is immutable, so a changed document needs a new revision; evidence recorded against the old revision is downgraded to attestation, and a regulated profile refuses it, so re-record the conformance evidence after the bump.
 
 4. **Point the Gateway at the authorities.** Add `spec.tls.frontend.default.validation` to the administrator-owned Gateway as shown in `gateway-frontend-validation.yaml`. On Gateway API 1.4 and below these fields are silently pruned, which leaves no client-certificate requirement at all.
 

@@ -1,0 +1,40 @@
+# The approved egress destination the directory-federation method reaches the
+# directory through.
+#
+# This file is a loadable transport-policy fragment: its root key is
+# `transport`, which is what the published schema declares and what the
+# operator's own loader accepts, so it can be checked before it is merged into
+# the `transport` section of the AdminCapabilityPolicy document (`policy.yaml`).
+#
+# It is separate from auth-profile-fragment.yaml because the two merge into
+# different sections of that document. Keeping them separate is what lets each
+# be validated on its own; a single file carrying both would match no loader
+# and could only be checked by eye.
+#
+# `issuance.mode` is present because a transport policy is validated as a
+# whole, not one section at a time. Set it to the mode your installation
+# actually uses rather than copying this value.
+#
+# Every value here is a placeholder. `directory.example.invalid` is a reserved
+# non-resolvable name (RFC 6761) and 636 is the registered LDAPS port rather
+# than anyone's port.
+transport:
+  issuance:
+    mode: PlatformIssued
+  egress:
+    destinations:
+      - name: enterprise-directory
+        kind: Directory
+        hosts:
+          - directory.example.invalid
+        ports:
+          - 636
+        transport: TLS
+        # The directory is dialled by a platform-controlled client, which
+        # validates name, port, resolved addresses, and re-resolution before
+        # connecting. Server verification comes from the platform trust
+        # distribution; the bind credential is application-level, so the client
+        # presents no certificate.
+        authentication:
+          type: None
+        enforcementMode: PolicyAwareDialer

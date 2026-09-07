@@ -1,9 +1,15 @@
 # Administrator-owned authentication profile for CAC/PIV certificate login.
 #
-# Merge this list into the `authProfiles:` list of the AdminCapabilityPolicy
-# document the operator chart mounts (`policy.yaml`). Profiles are immutable
-# administrator policy: a platform selects one by name and can never define,
-# weaken, or extend one.
+# This file is a loadable auth-profile fragment: its root key is `profiles`,
+# which is what the published schema declares and what the operator's own
+# loader accepts, so it can be checked before it is merged. Inside the whole
+# AdminCapabilityPolicy document the operator chart mounts (`policy.yaml`) the
+# same list is `authProfiles` — one document holds several kinds of profile and
+# an unqualified `profiles` would not say which. Rename the key when you merge;
+# do not paste this root into the document.
+#
+# Profiles are immutable administrator policy: a platform selects one by name
+# and can never define, weaken, or extend one.
 #
 # Every value here is a non-production placeholder. No certificate, issuer
 # distinguished name, subject, EDIPI, FASC-N, serial, or credential belongs in
@@ -12,9 +18,8 @@
 #
 # The published schema for this list is
 # `specs/002-identity-transport-runtime/contracts/auth-profile.schema.yaml` in
-# the platform operator repository, where the same list is named `profiles`
-# because it is validated there as a standalone fragment.
-authProfiles:
+# the platform operator repository.
+profiles:
   - name: cac-piv
     methods:
       - name: cac

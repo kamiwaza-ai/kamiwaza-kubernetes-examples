@@ -52,7 +52,8 @@ Hex rather than base64: these values are written into LDIF, where a value beginn
 | --------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------ |
 | **Manifests**         | `kustomization.yaml`, `namespace.yaml`, `openldap/`, `jobs/` | Runnable resources (`kubectl apply -k .`)                                      |
 | **Federation bundle** | `keycloak-federation/`                                       | Declarative Keycloak LDAP provider, mappers, and apply/validate/revert scripts |
-| **Auth profile**      | `auth-profile-fragment.yaml`                                 | The administrator policy entry for operator-managed directory federation       |
+| **Auth profile**      | `auth-profile-fragment.yaml`                                 | Loadable `profiles` fragment; merge as `authProfiles` in the policy document    |
+| **Egress destination** | `transport-policy-fragment.yaml`                            | Loadable `transport` fragment; merge under `transport.egress.destinations`       |
 | **Sample data**       | `ldap-samples/`                                              | Optional LDIF for labs, with no passwords in it                                |
 | **Runbook**           | `docs/OPERATOR_GUIDE.md`                                     | Step-by-step operations and troubleshooting                                    |
 | **Values snippet**    | `values-snippet.yaml`                                        | Re-enables Keycloak when an environment has auth disabled                      |
