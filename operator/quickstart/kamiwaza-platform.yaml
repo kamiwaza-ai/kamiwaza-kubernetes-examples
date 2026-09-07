@@ -1,0 +1,55 @@
+apiVersion: platform.kamiwaza.io/v1alpha1
+kind: KamiwazaPlatform
+metadata:
+  name: kamiwaza
+  namespace: kamiwaza-examples
+spec:
+  version: 1.3.0
+  profile: Full
+  domain: kamiwaza-examples.example.com
+  topology:
+    mode: SingleNamespace
+  storage:
+    # Keep this value in sync with operator-values.yaml.
+    statefulClassName: example-rwo
+    shared:
+      enabled: false
+  dependencies:
+    certManager:
+      required: true
+    trustManager:
+      required: true
+    istio:
+      required: true
+    gatewayAPI:
+      required: true
+  auth:
+    enabled: true
+    rebac:
+      enabled: true
+      allowCommunityFallback: false
+  images:
+    requireDigests: true
+    pullSecrets:
+      - name: registry-pull
+  models:
+    - name: tinyllama
+      repository: TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF
+      version: 52e7645ba7c309695bec7ac98f4f005b139cf465
+      hub: huggingface
+      files:
+        - tinyllama-1.1b-chat-v1.0.Q2_K.gguf
+      contextWindow: 2048
+      deploymentTarget: Kubernetes
+      serving:
+        engine: llamacpp
+        minCopies: 1
+        startingCopies: 1
+        maxCopies: 1
+        forceCPU: true
+        activeRequestsPerReplica: 20
+  observability:
+    mode: Disabled
+  adoption:
+    mode: Disabled
+  deletionPolicy: RetainData

@@ -1,0 +1,102 @@
+# Administrator-owned profile for read-only directory federation, plus the
+# approved egress destination the method reaches the directory through.
+#
+# Merge each list into the matching list of the AdminCapabilityPolicy document
+# the operator chart mounts (`policy.yaml`): `authProfiles` and
+# `transport.egress.destinations`. A method whose `destinationClass` is not a
+# declared `Directory` destination is refused, because a directory reached
+# through a class approved for something else is verified against the wrong
+# authorities and bounded by the wrong hosts.
+#
+# The directory is externally owned. This example ships a plaintext lab
+# directory for teaching, and that lab does not satisfy the transport this
+# profile requires: `ldap://` is admissible only with `startTlsRequired: true`,
+# because a plaintext bind sends the credential before any upgrade. Point the
+# profile at a directory that serves `ldaps://` or StartTLS — yours, not the
+# lab's.
+#
+# Every value here is a placeholder. `directory.example.invalid` is a reserved
+# non-resolvable name (RFC 6761), `dc=example,dc=invalid` is not a real
+# directory tree, and 636 is the registered LDAPS port rather than anyone's
+# port. Replace all three.
+authProfiles:
+  - name: directory-federation
+    methods:
+      - name: enterprise-directory
+        type: LDAPThroughKeycloak
+        providerID: enterprise-directory
+        enabled: true
+        connectionUrl: ldaps://directory.example.invalid:636
+        destinationClass: enterprise-directory
+        # A read-only service account, never the directory manager. Its
+        # credential arrives by reference; the profile carries no credential.
+        bindDN: cn=federation-reader,ou=services,dc=example,dc=invalid
+        bindSecretRef:
+          name: enterprise-directory-bind
+          key: password
+        usersDN: ou=people,dc=example,dc=invalid
+        # The stable directory identifier is the identity. The username is a
+        # mutable login name and is never the principal.
+        uniqueIDAttribute: entryUUID
+        usernameAttribute: uid
+        # The one admissible value: the platform never writes to a customer
+        # directory.
+        editMode: READ_ONLY
+        # Bounded synchronization: changed entries only, on the schedule the
+        # platform owns, rather than an unbounded periodic full sync.
+        syncPolicy: Changed
+        # Closed mapper vocabulary. Each mapper projects one directory
+        # attribute onto one reviewed claim; none manufactures a group, a
+        # role, or a tenant the directory does not state.
+        mappers:
+          - name: username
+            type: UserAttribute
+            source: uid
+            target: preferred_username
+          - name: email
+            type: UserAttribute
+            source: mail
+            target: email
+          - name: given-name
+            type: UserAttribute
+            source: givenName
+            target: given_name
+          - name: family-name
+            type: UserAttribute
+            source: sn
+            target: family_name
+          - name: groups
+            type: GroupRole
+            source: memberOf
+            target: groups
+    jitAdmission: Allowed
+    requiredClaims:
+      - sub
+    authorizationProjection: ReBACOnly
+    tenantContext: RequiredClaimThenReBAC
+    assurance:
+      fipsRequired: false
+    session:
+      overallTimeout: 12h
+      inactivityTimeout: 30m
+      reauthentication: AtTimeout
+      tokenAudience: kamiwaza-platform
+    failureMode: FailClosed
+
+# Merge under `transport.egress.destinations` in the same policy document.
+transportEgressDestinations:
+  - name: enterprise-directory
+    kind: Directory
+    hosts:
+      - directory.example.invalid
+    ports:
+      - 636
+    transport: TLS
+    # The directory is dialled by a platform-controlled client, which
+    # validates name, port, resolved addresses, and re-resolution before
+    # connecting. Server verification comes from the platform trust
+    # distribution; the bind credential is application-level, so the client
+    # presents no certificate.
+    authentication:
+      type: None
+    enforcementMode: PolicyAwareDialer

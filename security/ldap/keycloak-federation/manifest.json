@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Declarative LDAP user federation for Keycloak (kamiwaza realm) against in-cluster OpenLDAP. See ../docs/OPERATOR_GUIDE.md. apply-keycloak-ldap.sh creates/updates the LDAP provider, mappers in mappers[], and group->realm role mappings in group_role_mappings.",
+  "description": "Declarative read-only LDAP user federation for Keycloak (kamiwaza realm) against the lab directory. See ../docs/OPERATOR_GUIDE.md. apply-keycloak-ldap.sh creates or updates the LDAP provider, the mappers in mappers[], and the group to realm role mappings in group_role_mappings. Mappers project directory attributes and directory group membership only; no mapper manufactures a group or a role the directory does not state.",
   "realm": "kamiwaza",
   "ldap_provider": {
     "name": "Enterprise LDAP",
@@ -12,10 +12,6 @@
     {
       "name": "ldap-groups",
       "file": "mappers/group-ldap-mapper.json"
-    },
-    {
-      "name": "ldap-default-user-group",
-      "file": "mappers/hardcoded-default-user-group.json"
     },
     {
       "name": "ldap-attribute-mail",

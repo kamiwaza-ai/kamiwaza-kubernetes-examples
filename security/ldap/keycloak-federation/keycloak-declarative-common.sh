@@ -43,7 +43,8 @@ kc_curl() {
 }
 
 # Defaults for local Kamiwaza Kind stack. Override by exporting before running the script.
-# mode: "apply" also fills LDAP_BIND_PASSWORD from kubectl when unset.
+# mode: "apply" also fills LDAP_BIND_PASSWORD from kubectl when unset. It reads the
+# read-only federation bind credential, never the directory manager password.
 kc_decl_load_env() {
   local mode="${1:-apply}"
   export KEYCLOAK_URL="${KEYCLOAK_URL:-https://kamiwaza.test}"
@@ -58,7 +59,7 @@ kc_decl_load_env() {
   fi
   if [[ $mode == "apply" ]] && [[ -z ${LDAP_BIND_PASSWORD:-} ]] && command -v kubectl >/dev/null 2>&1; then
     local lb
-    lb="$(kubectl get secret -n ldap openldap-secret -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d || true)"
+    lb="$(kubectl get secret -n ldap openldap-secret -o jsonpath='{.data.federation-bind-password}' 2>/dev/null | base64 -d || true)"
     [[ -n $lb ]] && export LDAP_BIND_PASSWORD="$lb"
   fi
 }
@@ -149,7 +150,7 @@ find_mapper_component_id() {
 ldap_bind_password() {
   local p="${LDAP_BIND_PASSWORD:-}"
   [[ -n $p ]] || {
-    echo "error: LDAP_BIND_PASSWORD is not set (OpenLDAP admin bind password)" >&2
+    echo "error: LDAP_BIND_PASSWORD is not set (read-only federation bind credential)" >&2
     exit 1
   }
   echo "$p"
@@ -265,7 +266,7 @@ find_group_id_by_path() {
   echo "$resp" | jq -r '.id // empty' 2>/dev/null || true
 }
 
-# hardcoded-ldap-group-mapper and group-by-path role mappings require these groups to exist.
+# The group role mappings resolve groups by path, so those groups must exist.
 ensure_top_level_group() {
   local token="$1" gname="$2"
   local gpath

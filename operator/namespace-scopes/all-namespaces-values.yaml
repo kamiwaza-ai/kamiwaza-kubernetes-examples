@@ -1,0 +1,15 @@
+manager:
+  watchNamespaces: []
+  watchAnyNamespace: true
+
+adminPolicy:
+  revision: examples-all-namespace-r1
+  # The cache is cluster-wide, but mutation remains limited to these targets.
+  allowedTargetNamespaces:
+    - kamiwaza-examples
+    - kamiwaza-examples-tenant
+  extensions:
+    enabled: true
+    allowedNamespaces:
+      - kamiwaza-examples
+      - kamiwaza-examples-tenant

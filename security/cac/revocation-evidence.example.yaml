@@ -1,0 +1,33 @@
+# The shape of the revocation evidence the profile's `revocation.evidenceSource`
+# names. This file documents the record; it is not something to apply.
+#
+# One record, not a list. Missing, empty, unreadable, negative, and stale
+# evidence are the same outcome: login stays closed. Staleness is not a lesser
+# state than absence, because a certificate revoked this morning is still
+# revoked however confidently last week's evidence reads.
+#
+# `observedAt` is what the freshness bound is measured against. A record with
+# no readable observation time is refused rather than treated as recent, so
+# omitting the field is not a way around `maxEvidenceAge`.
+#
+# There is no field here for a certificate serial, subject, or issuer. This
+# record states that the revocation check ran and passed; the serials
+# themselves stay in the revocation source the auth origin reads.
+#
+# Every value below is a placeholder.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cac-revocation-evidence
+  namespace: kamiwaza-security
+data:
+  evidence.json: |
+    {
+      "type": "RevocationEvidenceFresh",
+      "status": "Pass",
+      "reason": "",
+      "policyRevision": "example-policy-revision",
+      "evidenceClass": "ExternallyObserved",
+      "evidenceDigest": "example-revocation-run-0001",
+      "observedAt": "2026-01-01T00:00:00Z"
+    }

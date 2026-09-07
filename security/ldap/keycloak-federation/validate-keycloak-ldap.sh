@@ -37,7 +37,7 @@ fi
 echo "OK: LDAP provider present — ${LDAP_NAME} (id ${LDAP_CID})"
 
 echo ""
-echo "== Realm groups (required for hardcoded-ldap-group-mapper + role mappings)"
+echo "== Realm groups (required for the group role mappings)"
 if manifest_has_group_role_mappings; then
   while IFS= read -r gname; do
     [[ -z $gname ]] && continue
@@ -68,21 +68,28 @@ else
 fi
 
 echo ""
-echo "== hardcoded default group mapper config"
-HDM_ID="$(find_mapper_component_id "$TOKEN" "$LDAP_CID" "ldap-default-user-group")"
-if [[ -z $HDM_ID ]]; then
-  echo "FAIL: mapper ldap-default-user-group not found" >&2
-  fail=1
+echo "== Provider is read-only federation"
+LDAP_JSON="$(kc_curl -sS -f "$(kc_admin_api)/realms/$(realm_name)/components/${LDAP_CID}" \
+  -H "Authorization: Bearer ${TOKEN}")"
+edit_mode="$(echo "$LDAP_JSON" | jq -r '(.config.editMode // [])[0] // empty')"
+sync_registrations="$(echo "$LDAP_JSON" | jq -r '(.config.syncRegistrations // [])[0] // empty')"
+bind_dn="$(echo "$LDAP_JSON" | jq -r '(.config.bindDn // [])[0] // empty')"
+if [[ $edit_mode == "READ_ONLY" ]]; then
+  echo "OK: editMode=READ_ONLY (the platform never writes to the directory)"
 else
-  HDM_JSON="$(kc_curl -sS -f "$(kc_admin_api)/realms/$(realm_name)/components/${HDM_ID}" \
-    -H "Authorization: Bearer ${TOKEN}")"
-  grp="$(echo "$HDM_JSON" | jq -r '(.config.group // [])[0] // empty')"
-  if [[ $grp == "/user" ]]; then
-    echo "OK: ldap-default-user-group targets ${grp}"
-  else
-    echo "WARN: ldap-default-user-group group value is '${grp}' (expected /user for this lab)" >&2
-  fi
+  echo "FAIL: editMode='${edit_mode}' (expected READ_ONLY)" >&2
+  fail=1
 fi
+if [[ $sync_registrations == "false" ]]; then
+  echo "OK: syncRegistrations=false (no account is created in the directory)"
+else
+  echo "FAIL: syncRegistrations='${sync_registrations}' (expected false)" >&2
+  fail=1
+fi
+case "$bind_dn" in
+  cn=federation-reader,*) echo "OK: bindDn is the read-only federation account" ;;
+  *) echo "WARN: bindDn='${bind_dn}' is not the read-only federation account" >&2 ;;
+esac
 
 echo ""
 echo "== Group -> realm role mappings"
@@ -108,18 +115,20 @@ if [[ $cnt -ge 1 ]]; then
     echo "WARN: alice has no federationLink (may be local user or different Keycloak version shape)" >&2
   fi
 else
-  echo "WARN: user 'alice' not found — ensure LDAP bootstrap Job finished (or apply ldap-samples/bootstrap.ldif), then Keycloak user sync" >&2
+  echo "WARN: user 'alice' not found — ensure the ldap-bootstrap-import Job finished, then run a Keycloak user sync" >&2
 fi
 
 echo ""
 if command -v kubectl >/dev/null 2>&1; then
-  if kubectl get job -n kamiwaza keycloak-ldap-federation-apply >/dev/null 2>&1; then
-    echo "== Kubernetes Job keycloak-ldap-federation-apply"
-    succeeded="$(kubectl get job -n kamiwaza keycloak-ldap-federation-apply -o jsonpath='{.status.succeeded}' 2>/dev/null || true)"
+  if kubectl get job -n ldap ldap-bootstrap-import >/dev/null 2>&1; then
+    echo "== Kubernetes Job ldap-bootstrap-import"
+    succeeded="$(kubectl get job -n ldap ldap-bootstrap-import -o jsonpath='{.status.succeeded}' 2>/dev/null || true)"
     if [[ ${succeeded:-0} == "1" ]]; then
-      echo "OK: job succeeded (completionTime=$(kubectl get job -n kamiwaza keycloak-ldap-federation-apply -o jsonpath='{.status.completionTime}'))"
+      # The Job proves the federation bind account is read-only before it
+      # succeeds, so a completed Job is that proof.
+      echo "OK: job succeeded (completionTime=$(kubectl get job -n ldap ldap-bootstrap-import -o jsonpath='{.status.completionTime}'))"
     else
-      echo "WARN: job .status.succeeded=${succeeded:-unset} (expected 1 when last run finished cleanly)" >&2
+      echo "WARN: job .status.succeeded=${succeeded:-unset} (expected 1 when the last run finished cleanly)" >&2
     fi
   fi
 fi

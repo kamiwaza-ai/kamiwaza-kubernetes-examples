@@ -18,7 +18,7 @@
     "connectionUrl": ["ldap://openldap.ldap.svc.cluster.local.:389"],
     "usersDn": ["ou=people,dc=kamiwaza,dc=local"],
     "authType": ["simple"],
-    "bindDn": ["cn=admin,dc=kamiwaza,dc=local"],
+    "bindDn": ["cn=federation-reader,ou=services,dc=kamiwaza,dc=local"],
     "connectionPooling": ["true"]
   }
 }

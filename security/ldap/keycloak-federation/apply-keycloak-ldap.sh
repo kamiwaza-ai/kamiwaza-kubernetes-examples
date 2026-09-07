@@ -6,7 +6,8 @@
 # Defaults (export before running to override):
 #   KEYCLOAK_URL              https://kamiwaza.test
 #   KEYCLOAK_ADMIN_PASSWORD   from kubectl secret kamiwaza/keycloak-admin when unset and kubectl works
-#   LDAP_BIND_PASSWORD        from kubectl secret ldap/openldap-secret when unset and kubectl works
+#   LDAP_BIND_PASSWORD        read-only federation bind credential; from kubectl secret
+#                             ldap/openldap-secret key federation-bind-password when unset
 #
 # Optional:
 #   KEYCLOAK_ADMIN            default admin
@@ -50,13 +51,13 @@ EOF
   if command -v kubectl >/dev/null 2>&1 && [[ -n ${LDAP_BIND_PASSWORD:-} ]]; then
     echo '    kubectl exec -n ldap deploy/openldap -- ldapsearch -x \' >&2
     echo '      -H ldap://127.0.0.1:389 \' >&2
-    echo '      -D "cn=admin,dc=kamiwaza,dc=local" -w "<from openldap-secret>" \' >&2
+    echo '      -D "cn=federation-reader,ou=services,dc=kamiwaza,dc=local" -w "<from openldap-secret>" \' >&2
     echo '      -b "ou=people,dc=kamiwaza,dc=local" "(objectClass=inetOrgPerson)" dn' >&2
     echo >&2
     echo "  diagnostic (live):" >&2
     if kubectl exec -n ldap deploy/openldap -- ldapsearch -x \
       -H ldap://127.0.0.1:389 \
-      -D "cn=admin,dc=kamiwaza,dc=local" \
+      -D "cn=federation-reader,ou=services,dc=kamiwaza,dc=local" \
       -w "$LDAP_BIND_PASSWORD" \
       -b "ou=people,dc=kamiwaza,dc=local" \
       "(objectClass=inetOrgPerson)" dn 2>/dev/null | head -40 >&2; then

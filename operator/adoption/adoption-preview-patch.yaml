@@ -1,0 +1,12 @@
+spec:
+  adoption:
+    mode: Preview
+    # Replace this example with the complete reviewed identity allowlist.
+    allowResources:
+      - apiVersion: v1
+        kind: ConfigMap
+        namespace: kamiwaza-examples
+        name: core
+    # Preview reports managers; Explicit transfer authorizes only this set.
+    allowFieldManagers:
+      - helm

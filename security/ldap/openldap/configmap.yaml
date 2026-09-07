@@ -1,4 +1,13 @@
-# Minimal tree + demo users for ldap-bootstrap-import. Richer lab data: ldap-samples/bootstrap.ldif (docs/OPERATOR_GUIDE.md §4).
+# Lab directory content: the tree, the service branch the read-only bind
+# account lives in, three users, and two groups.
+#
+# No password appears here. The bootstrap Job sets the lab user passwords and
+# the federation bind credential from Secret `openldap-secret`, so a
+# credential is never carried in a tracked file.
+#
+# Every value is a synthetic lab value: `dc=kamiwaza,dc=local` is the stock
+# example base DN and `users.example.invalid` is a reserved non-resolvable
+# domain (RFC 6761). Replace both, along with the users, for anything real.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -14,6 +23,10 @@ data:
     objectClass: organizationalUnit
     ou: groups
 
+    dn: ou=services,dc=kamiwaza,dc=local
+    objectClass: organizationalUnit
+    ou: services
+
     dn: uid=alice,ou=people,dc=kamiwaza,dc=local
     objectClass: inetOrgPerson
     objectClass: posixAccount
@@ -26,8 +39,6 @@ data:
     uidNumber: 1001
     gidNumber: 1001
     homeDirectory: /home/alice
-    # Lab only — use SSHA or ldaps in production.
-    userPassword: kamiwaza
 
     dn: uid=bob,ou=people,dc=kamiwaza,dc=local
     objectClass: inetOrgPerson
@@ -41,7 +52,6 @@ data:
     uidNumber: 1002
     gidNumber: 1002
     homeDirectory: /home/bob
-    userPassword: kamiwaza
 
     dn: uid=carol,ou=people,dc=kamiwaza,dc=local
     objectClass: inetOrgPerson
@@ -55,7 +65,6 @@ data:
     uidNumber: 1003
     gidNumber: 1003
     homeDirectory: /home/carol
-    userPassword: kamiwaza
 
     dn: cn=admin,ou=groups,dc=kamiwaza,dc=local
     objectClass: groupOfNames

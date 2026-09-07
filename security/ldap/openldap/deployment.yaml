@@ -1,3 +1,13 @@
+# Lab stand-in for a directory the customer owns. Plaintext LDAP on the
+# cluster network, one replica, one writable volume: a teaching directory, not
+# a production one.
+#
+# The image is pinned by digest. The tag is kept beside it for readability;
+# the digest is what is resolved.
+#
+# There is no bootstrap init container. The directory content is loaded once
+# by the ldap-bootstrap-import Job, so there is one writer of the tree instead
+# of two racing at start-up.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,21 +28,9 @@ spec:
       labels:
         app: openldap
     spec:
-      initContainers:
-        - name: copy-bootstrap-ldif
-          image: busybox:1.36
-          command:
-            - sh
-            - -c
-            - cp /bootstrap-config/bootstrap.ldif /bootstrap-work/bootstrap.ldif
-          volumeMounts:
-            - name: bootstrap-config
-              mountPath: /bootstrap-config
-            - name: bootstrap-work
-              mountPath: /bootstrap-work
       containers:
         - name: openldap
-          image: osixia/openldap:1.5.0
+          image: docker.io/osixia/openldap:1.5.0@sha256:18742e9c449c9c1afe129d3f2f3ee15fb34cc43e5f940a20f3399728f41d7c28
           ports:
             - containerPort: 389
               name: ldap
@@ -51,6 +49,9 @@ spec:
                 secretKeyRef:
                   name: openldap-secret
                   key: config-password
+            # Lab only. A directory this example federates for real is
+            # reached over ldaps:// or StartTLS, which this lab does not
+            # serve; see README.md.
             - name: LDAP_TLS
               value: "false"
             - name: LDAP_REMOVE_CONFIG_AFTER_SETUP
@@ -60,8 +61,6 @@ spec:
               mountPath: /var/lib/ldap
             - name: ldap-config
               mountPath: /etc/ldap/slapd.d
-            - name: bootstrap-work
-              mountPath: /container/service/slapd/assets/config/bootstrap/ldif/custom
           readinessProbe:
             tcpSocket:
               port: 389
@@ -86,8 +85,3 @@ spec:
         - name: ldap-config
           persistentVolumeClaim:
             claimName: openldap-config
-        - name: bootstrap-config
-          configMap:
-            name: openldap-bootstrap
-        - name: bootstrap-work
-          emptyDir: {}

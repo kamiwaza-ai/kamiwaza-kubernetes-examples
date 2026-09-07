@@ -8,7 +8,7 @@ This folder follows a scenario-first layout: one subdirectory per runnable secur
 | ------------------- | -------------------------------------------------------------------- |
 | Identity source     | Keycloak local users, LDAP federation, CAC/PIV cert flow             |
 | Authorization model | RBAC baseline, optional ReBAC tenant-aware checks                    |
-| TLS / mTLS          | Standard TLS, Traefik mTLS for CAC endpoint                          |
+| TLS / mTLS          | Standard TLS, client-certificate validation at an administrator-owned edge |
 | Secret handling     | Kubernetes Secrets (templates + kustomize generation for local labs) |
 | Values integration  | Merge snippets into Deploy `cluster/values/overrides.yaml`           |
 
@@ -17,9 +17,9 @@ This folder follows a scenario-first layout: one subdirectory per runnable secur
 | Scenario                         | Identity source              | Authorization                | TLS / mTLS             | Key toggles / knobs                                                            | Main artifacts                                                                             |
 | -------------------------------- | ---------------------------- | ---------------------------- | ---------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
 | [consent-banner](consent-banner) | Pre-login consent UX         | N/A                          | TLS                    | `core.security.consent.enabled`, `core.security.banner.enabled`                | Kustomize ConfigMap + values snippet                                                       |
-| [cac](cac)                       | CAC/PIV certificate login    | RBAC/ReBAC compatible        | mTLS + cert-forwarding | `AUTH_GATEWAY_CAC_*`, `AUTH_GATEWAY_MTLS_REQUIRED`, Traefik `tlsOptions.mtls`  | Values snippet + secret templates + kustomize secret generator                             |
+| [cac](cac)                       | CAC/PIV certificate login    | ReBAC pre-admission          | client certificates at an external edge | auth profile `X509CAC` method, `AUTH_GATEWAY_CAC_EDGE_PROFILE=rfc9440`         | Auth profile fragment + platform patch + Gateway reference + evidence shapes + values snippet |
 | [rebac](rebac)                   | Keycloak JWT claims          | ReBAC (tenant-scoped tuples) | TLS                    | `core.rebac.*`, `core.scheduler.rebac.*`, optional tenant registry enforcement | Values snippets + tenant manifest examples                                                 |
-| [ldap](ldap)                     | LDAP via Keycloak federation | RBAC/ReBAC compatible        | TLS                    | `auth.enabled: true` + declarative Keycloak federation bundle                  | Kustomize stack (OpenLDAP, UI, Jobs) + declarative Keycloak bundle + optional LDIF samples |
+| [ldap](ldap)                     | LDAP via Keycloak federation | RBAC/ReBAC compatible        | TLS                    | `auth.enabled: true` + declarative read-only Keycloak federation bundle        | Digest-pinned kustomize stack (directory + bootstrap Job) + declarative bundle + auth profile fragment |
 | [tls-trust](tls-trust)           | N/A (transport trust)        | N/A                          | Custom CA + BYO TLS     | `core.trustManager.enabled`, `AWS_CA_BUNDLE`/`SSL_CERT_FILE`, `build-trust-bundle-configmap.sh` | Values snippet + CA Secret (kustomize/template) + build-trust-bundle-configmap.sh + BYO ingress manifests + verify.sh |
 
 ## Structure expectations for new scenarios
