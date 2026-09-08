@@ -1,0 +1,95 @@
+# Administrator-owned authentication profile for CAC/PIV certificate login.
+#
+# This file is a loadable auth-profile fragment: its root key is `profiles`,
+# which is what the published schema declares and what the operator's own
+# loader accepts, so it can be checked before it is merged. Inside the whole
+# AdminCapabilityPolicy document the operator chart mounts (`policy.yaml`) the
+# same list is `authProfiles` — one document holds several kinds of profile and
+# an unqualified `profiles` would not say which. Rename the key when you merge;
+# do not paste this root into the document.
+#
+# Profiles are immutable administrator policy: a platform selects one by name
+# and can never define, weaken, or extend one.
+#
+# Every value here is a non-production placeholder. No certificate, issuer
+# distinguished name, subject, EDIPI, FASC-N, serial, or credential belongs in
+# this file or in the policy document it is merged into. The profile names the
+# objects that hold that material; it never carries the material.
+#
+# The published schema for this list is
+# `specs/002-identity-transport-runtime/contracts/auth-profile.schema.yaml` in
+# the platform operator repository.
+profiles:
+  - name: cac-piv
+    methods:
+      - name: cac
+        type: X509CAC
+        providerID: cac
+        enabled: true
+        # The approved client certificate authorities. The platform publishes
+        # this ConfigMap for the administrator's Gateway to reference for
+        # frontend client-certificate validation; the administrator supplies
+        # its contents.
+        clientCARef:
+          name: cac-client-authorities
+          key: ca.crt
+        certificatePolicy:
+          requiredExtendedKeyUsages:
+            - ClientAuth
+            - PIVAuthentication
+          # A named extraction strategy, not an expression: this states which
+          # certificate field the principal is derived from. No certificate
+          # value is configured anywhere, here or in the platform.
+          sourceIdentity: PIVFASCN
+          minimumKeyPolicy: FipsApproved
+        revocation:
+          # Both: the external edge publishes revocation evidence and the auth
+          # origin keeps its own. Login stays closed while either is missing,
+          # empty, stale, or negative.
+          mode: Both
+          required: true
+          maxEvidenceAge: 24h
+          failureMode: FailClosed
+          evidenceSource:
+            name: cac-revocation-evidence
+            key: evidence.json
+        edge:
+          capability: ClientCertificateAuthentication
+          # The proxy-origin hop is authenticated and confidential. A shared
+          # header value alone is not an edge identity.
+          backendAuthentication: MutualTLS
+          backendClientIdentityRef: cac-edge-client
+          externalEvidenceRef:
+            name: cac-edge-conformance
+            key: result.json
+          protectedPath: /api/auth/cac/login
+          directAccessPolicy: Deny
+          sanitizeHeaders: AllCertificateVerificationEdgeAuthAndUserIdentityHeaders
+          # All five are required. Each covers one way the edge can be
+          # bypassed, so four proven outcomes leave the fifth unchecked.
+          requiredEvidence:
+            - ClientCertificateEnforced
+            - HeadersSanitized
+            - BackendAuthenticated
+            - PathRestricted
+            - DirectOriginDenied
+        certificateHeader: Client-Cert
+        certificateChainHeader: Client-Cert-Chain
+        maxHeaderBytes: 24576
+    # A certificate proves an authentication event. It grants nothing: an
+    # explicit ReBAC relationship is checked before a session is created.
+    jitAdmission: PreAdmissionRequired
+    requiredClaims:
+      - sub
+    authorizationProjection: ReBACOnly
+    tenantContext: RequiredClaimThenReBAC
+    assurance:
+      minimumAAL: AAL3
+      minimumFAL: FAL2
+      fipsRequired: true
+    session:
+      overallTimeout: 8h
+      inactivityTimeout: 15m
+      reauthentication: StepUpForSensitiveAction
+      tokenAudience: kamiwaza-platform
+    failureMode: FailClosed

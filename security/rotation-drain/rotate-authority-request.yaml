@@ -1,0 +1,39 @@
+# Request one manual authority rotation, as a merge patch on the platform.
+#
+#   kubectl -n kamiwaza-examples patch kamiwazaplatform kamiwaza \
+#     --type merge --patch-file security/rotation-drain/rotate-authority-request.yaml
+#
+# `rotate-authority` selects the role: `Server` or `Client`. They are separate
+# because a leaked client-authority key must not be able to mint a server
+# identity, and revoking client trust must not invalidate every server
+# certificate.
+#
+# `rotate-operation` selects the protocol:
+#
+#   RenewCertificate   reissue the authority certificate over the existing
+#                      key. Existing leaves still verify, so it is one
+#                      rollout of the Rollout-class consumers.
+#   ReplaceKey         a new authority key, so every leaf must be reissued and
+#                      the old anchor must stay trusted until that is done.
+#                      Three ordered phases, and the order is not optional.
+#
+# The request is carried out once. The ledger beside the authorities records
+# which request was honoured, so an annotation left in place does not rotate
+# again on the next reconcile. Requesting the same operation a second time
+# means removing the annotation and setting it once more, which is the
+# acknowledgement that the first one finished.
+#
+# Both respect `maintenanceWindows`. A request made outside the window is
+# deferred to the next one and reported as deferred, never skipped.
+#
+# Rotation is not revocation. An identity issued under the retiring authority
+# stays valid until that anchor is dropped in phase 3, and phase 3 waits for
+# proof that every consumer is on the new generation.
+apiVersion: platform.kamiwaza.io/v1alpha1
+kind: KamiwazaPlatform
+metadata:
+  name: kamiwaza
+  namespace: kamiwaza-examples
+  annotations:
+    transport.kamiwaza.io/rotate-authority: Server
+    transport.kamiwaza.io/rotate-operation: RenewCertificate

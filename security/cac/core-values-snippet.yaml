@@ -1,107 +1,85 @@
-# Merge this block into Deploy `cluster/values/overrides.yaml` (or another higher-priority values file).
+# Auth-origin half of the CAC/PIV edge contract, for the Helmfile lifecycle.
 #
-# Required secrets in namespace `kamiwaza` before sync:
-#   - auth-gateway-edge (key: secret)
-#   - traefik-client-ca (contains client CA cert(s), e.g. ca.crt)
+# Merge into Deploy `cluster/values/overrides.yaml` (or another later values
+# layer). This configures only the origin: what it accepts, from whom, on
+# which path, and how large a forwarded field may be. It configures no edge,
+# because the edge is not the platform's to configure.
 #
-# IMPORTANT: `X-Edge-Auth` in `cac-edge-auth` middleware MUST exactly match
-# Secret `auth-gateway-edge` key `secret` (cleartext).
-
+# `AUTH_GATEWAY_CAC_EDGE_PROFILE` is the whole migration switch. Unset, or any
+# unrecognised value, leaves the legacy forwarded-header flow exactly as it is
+# today, so rolling a new image never changes how an installation's CAC login
+# behaves. `rfc9440` selects strict `Client-Cert` parsing, and only then does
+# the rest of this contract apply.
+#
+# Every credential here arrives by reference. Nothing in this example holds a
+# secret, a certificate, or an issuer name: create the Secret from local files
+# with `kubectl apply -k security/cac` first (see README.md), and keep the
+# local files out of Git.
 core:
   scheduler:
     extraEnv:
       - name: AUTH_GATEWAY_CAC_ENABLED
         value: "true"
+      # Required whenever CAC is enabled: the origin refuses to serve
+      # certificate login over a channel that did not require one.
       - name: AUTH_GATEWAY_MTLS_REQUIRED
         value: "true"
-      - name: AUTH_GATEWAY_CAC_ALLOWED_ISSUERS
-        value: '["REPLACE_WITH_RFC2253_ISSUER_DN"]'
-      - name: AUTH_GATEWAY_CAC_CLIENT_CERT_HEADER
-        value: "X-Forwarded-Tls-Client-Cert"
-      - name: AUTH_GATEWAY_CAC_CLIENT_CERT_VERIFIED_HEADER
-        value: "X-Forwarded-Tls-Client-Cert-Verified"
+      # Strict RFC 9440 profile. Remove this entry to stay on the legacy flow.
+      - name: AUTH_GATEWAY_CAC_EDGE_PROFILE
+        value: "rfc9440"
+      # The only path certificate forwarding is admitted for. The origin
+      # refuses a forwarded certificate that arrived for anything else.
+      - name: AUTH_GATEWAY_CAC_LOGIN_PATH
+        value: "/api/auth/cac/login"
+      # Ceilings on the forwarded field. An oversized field or an excessive
+      # chain is rejected before any identity processing happens. Keep these in
+      # step with `maxHeaderBytes` in the auth profile.
+      - name: AUTH_GATEWAY_CAC_MAX_HEADER_LENGTH
+        value: "24576"
+      - name: AUTH_GATEWAY_CAC_MAX_CHAIN_LENGTH
+        value: "8"
+      # The field the edge authenticates itself with. The origin accepts
+      # certificate fields only from the approved edge identity.
       - name: AUTH_GATEWAY_CAC_EDGE_HEADER
         value: "X-Edge-Auth"
       - name: AUTH_GATEWAY_EDGE_SHARED_SECRET
         valueFrom:
           secretKeyRef:
-            name: auth-gateway-edge
-            key: secret
-
-network:
-  traefik:
-    tlsOptions:
-      mtls:
-        minVersion: VersionTLS12
-        clientAuth:
-          secretNames:
-            - traefik-client-ca
-          clientAuthType: RequireAndVerifyClientCert
-
-    extraObjects:
-      - apiVersion: traefik.io/v1alpha1
-        kind: Middleware
-        metadata:
-          name: cac-strip-auth-headers
-          namespace: kamiwaza
-        spec:
-          headers:
-            customRequestHeaders:
-              X-Forwarded-Tls-Client-Cert: ""
-              X-Forwarded-Tls-Client-Cert-Verified: ""
-              X-Edge-Auth: ""
-              X-User-Id: ""
-              X-User-Email: ""
-              X-User-Name: ""
-              X-User-Roles: ""
-              X-User-Signature: ""
-              X-User-Signature-Ts: ""
-
-      - apiVersion: traefik.io/v1alpha1
-        kind: Middleware
-        metadata:
-          name: cac-pass-client-cert
-          namespace: kamiwaza
-        spec:
-          passTLSClientCert:
-            pem: true
-
-      - apiVersion: traefik.io/v1alpha1
-        kind: Middleware
-        metadata:
-          name: cac-edge-auth
-          namespace: kamiwaza
-        spec:
-          headers:
-            customRequestHeaders:
-              X-Forwarded-Tls-Client-Cert-Verified: "SUCCESS"
-              X-Edge-Auth: "REPLACE_WITH_EDGE_SHARED_SECRET"
-
-      - apiVersion: traefik.io/v1alpha1
-        kind: IngressRoute
-        metadata:
-          name: core-auth-cac-login
-          namespace: kamiwaza
-        spec:
-          entryPoints:
-            - websecure
-          routes:
-            - match: Host(`kamiwaza.test`) && (Path(`/api/auth/cac/login`) || Path(`/api/auth/cac/login/`)) && Method(`POST`)
-              kind: Rule
-              priority: 1205
-              middlewares:
-                - name: core-headers
-                  namespace: kamiwaza
-                - name: cac-strip-auth-headers
-                  namespace: kamiwaza
-                - name: cac-pass-client-cert
-                  namespace: kamiwaza
-                - name: cac-edge-auth
-                  namespace: kamiwaza
-              services:
-                - name: core-raycluster-head-svc
-                  port: 7777
-          tls:
-            options:
-              name: mtls
-              namespace: kamiwaza
+            name: cac-edge-origin
+            key: edge-shared-secret
+      # Keys the opaque principal derivation. It must outlive every
+      # certificate it maps: rotating it renames every CAC principal and
+      # orphans the identity each one owns.
+      - name: AUTH_GATEWAY_CAC_PRINCIPAL_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: cac-edge-origin
+            key: principal-secret
+      # The issuers this installation accepts, as the JSON array your own PKI
+      # publishes. It arrives by reference because an issuer name identifies
+      # your organisation's certificate authorities and does not belong in a
+      # values file, an example, or Git.
+      - name: AUTH_GATEWAY_CAC_ALLOWED_ISSUERS
+        valueFrom:
+          secretKeyRef:
+            name: cac-edge-origin
+            key: allowed-issuers
+      # Origin-side revocation evidence. The strict profile has no fail-open:
+      # missing, empty, and stale evidence all keep login closed, so this file
+      # has to be refreshed inside its TTL by whatever publishes your
+      # revocation data.
+      - name: AUTH_GATEWAY_CAC_CRL_CACHE_PATH
+        value: "/etc/kamiwaza/cac/cac_revocations.json"
+      - name: AUTH_GATEWAY_CAC_CRL_CACHE_TTL_SECONDS
+        value: "3600"
+    extraVolumeMounts:
+      - name: cac-revocation-source
+        mountPath: /etc/kamiwaza/cac
+        readOnly: true
+    extraVolumes:
+      # Referenced, never created here. The Secret holds the revocation
+      # document your PKI publishes; this example ships no copy of it and no
+      # field for the certificate serials it lists.
+      - name: cac-revocation-source
+        secret:
+          secretName: cac-revocation-source

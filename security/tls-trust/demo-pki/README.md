@@ -1,6 +1,7 @@
 # Demo PKI — FAKE, throwaway certificates for the tls-trust example
 
 > ## ⚠️ DO NOT TRUST OR REUSE THIS MATERIAL
+>
 > Every key and certificate in this directory is **fake, public, and throwaway**.
 > The private keys are committed to a public repo **on purpose** so the example
 > manifests apply with zero local generation. **Never** add any of this to a real
@@ -19,24 +20,24 @@ Kamiwaza Demo Root CA (FAKE)              root-ca.crt / root-ca.key
         └── *.kamiwaza.test  (leaf)      ingress.crt / ingress.key
 ```
 
-| File | What it is | Used as |
-| --- | --- | --- |
-| `root-ca.crt` / `root-ca.key` | self-signed root | top of trust |
-| `intermediate-ca.crt` / `intermediate-ca.key` | issuing CA (pathlen:0) | signs the leaf; also the CA-issuer keypair for ingress Approach 2 |
-| `ingress.crt` / `ingress.key` | leaf for `*.kamiwaza.test` (+ apex SAN) | the BYO serving cert for ingress Approach 1 |
-| `ca-chain.pem` | root **+** intermediate | **outbound** trust anchor — the `org-ca.pem` for the `kamiwaza-org-ca` Secret |
-| `ingress-fullchain.pem` | leaf **+** intermediate | **inbound** served chain (what Traefik presents) |
+| File                                          | What it is                              | Used as                                                                       |
+| --------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------- |
+| `root-ca.crt` / `root-ca.key`                 | self-signed root                        | top of trust                                                                  |
+| `intermediate-ca.crt` / `intermediate-ca.key` | issuing CA (pathlen:0)                  | signs the leaf; also the CA-issuer keypair for ingress Approach 2             |
+| `ingress.crt` / `ingress.key`                 | leaf for `*.kamiwaza.test` (+ apex SAN) | the BYO serving cert for ingress Approach 1                                   |
+| `ca-chain.pem`                                | root **+** intermediate                 | **outbound** trust anchor — the `org-ca.pem` for the `kamiwaza-org-ca` Secret |
+| `ingress-fullchain.pem`                       | leaf **+** intermediate                 | **inbound** served chain (what Traefik presents)                              |
 
 ## Ready-to-apply Secret manifests
 
 So the cert material and the YAML never drift, `generate.sh` also emits the three
 Secrets the example consumes (each pinned to `namespace: kamiwaza`):
 
-| Manifest | Secret | For |
-| --- | --- | --- |
-| `secret-kamiwaza-org-ca.yaml` | `kamiwaza-org-ca` (`Opaque`, `org-ca.pem`) | outbound CA trust — parent README Step 1 |
-| `secret-org-ingress-tls.yaml` | `org-ingress-tls` (`kubernetes.io/tls`) | ingress Approach 1 (BYO leaf) |
-| `secret-org-ca-keypair.yaml` | `org-ca-keypair` (`kubernetes.io/tls`) | ingress Approach 2 (cert-manager CA issuer) |
+| Manifest                      | Secret                                     | For                                         |
+| ----------------------------- | ------------------------------------------ | ------------------------------------------- |
+| `secret-kamiwaza-org-ca.yaml` | `kamiwaza-org-ca` (`Opaque`, `org-ca.pem`) | outbound CA trust — parent README Step 1    |
+| `secret-org-ingress-tls.yaml` | `org-ingress-tls` (`kubernetes.io/tls`)    | ingress Approach 1 (BYO leaf)               |
+| `secret-org-ca-keypair.yaml`  | `org-ca-keypair` (`kubernetes.io/tls`)     | ingress Approach 2 (cert-manager CA issuer) |
 
 ```bash
 # Outbound trust (then merge the values snippet + sync — see parent README):

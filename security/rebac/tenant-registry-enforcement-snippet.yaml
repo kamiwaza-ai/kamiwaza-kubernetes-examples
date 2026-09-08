@@ -1,10 +1,17 @@
-# Optional: merge into Kamiwaza Deploy `cluster/values/overrides.yaml` to enforce the tenant
-# registry at runtime (reject unknown `tenant_id` claims). Requires the registry file inside
-# the core image at `configs/rebac/tenant_registry.yaml`, or mount a custom file and set
-# AUTH_TENANT_REGISTRY_PATH to that path.
+# Reject a token whose `tenant_id` claim is not a registered tenant.
 #
-# See `security/rebac/README.md` § Custom ReBAC tenants.
-
+# Merge into Kamiwaza Deploy `cluster/values/overrides.yaml` and re-sync. See
+# README.md § Tenants.
+#
+# `core.scheduler.extraEnv` is a list and Helm replaces lists wholesale on a
+# values merge: if a later values layer already sets it, add this entry to that
+# list rather than introducing a second one.
+#
+# Enforcement reads whatever registry file is on disk in the running image.
+# Until the updated `configs/rebac/tenant_registry.yaml` is inside that image,
+# or `AUTH_TENANT_REGISTRY_PATH` points at a mounted copy, this switch enforces
+# the old list — which is a closed list rejecting your new tenant, not an open
+# one.
 core:
   scheduler:
     extraEnv:

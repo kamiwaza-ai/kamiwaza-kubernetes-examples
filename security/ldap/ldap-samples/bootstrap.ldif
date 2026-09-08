@@ -21,7 +21,6 @@ homeDirectory: /home/alice
 title: Platform Administrator
 departmentNumber: Engineering
 employeeType: active
-userPassword: kamiwaza
 
 dn: uid=bob,ou=people,dc=kamiwaza,dc=local
 objectClass: inetOrgPerson
@@ -39,7 +38,6 @@ title: Engineer
 departmentNumber: Engineering
 employeeType: active
 manager: uid=alice,ou=people,dc=kamiwaza,dc=local
-userPassword: kamiwaza
 
 dn: uid=carol,ou=people,dc=kamiwaza,dc=local
 objectClass: inetOrgPerson
@@ -57,7 +55,6 @@ title: Platform Engineer
 departmentNumber: Engineering
 employeeType: active
 manager: uid=alice,ou=people,dc=kamiwaza,dc=local
-userPassword: kamiwaza
 
 dn: cn=admin,ou=groups,dc=kamiwaza,dc=local
 objectClass: groupOfNames

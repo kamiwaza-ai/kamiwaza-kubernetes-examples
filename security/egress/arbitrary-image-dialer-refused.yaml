@@ -1,0 +1,53 @@
+# Refused on purpose.
+#
+# A package repository is dialled by the customer's own image, and this
+# document gives that class the policy-aware dialer. The loader accepts the
+# shape and the policy is refused at cross-reference time:
+#
+#   enforcement matches the consumer class:
+#   transport.egress.destinations[0].enforcementMode: destination kind
+#   PackageRepository is dialled by an arbitrary image, which requires
+#   EnforcingProxy rather than PolicyAwareDialer
+#
+# The reason is EgressEnforcementUnavailable.
+#
+# The policy-aware dialer is code the platform builds into its own clients. It
+# cannot be given to an image the platform did not build, so declaring it for
+# one publishes an enforcement nobody performs -- which is worse than no
+# enforcement, because status would report the destination as bounded. The
+# arbitrary-image classes are `ExtensionExternalAPI` and `PackageRepository`;
+# both require `EnforcingProxy` and a `proxyRef`.
+transport:
+  issuance:
+    mode: PlatformIssued
+
+  trust:
+    bundleConfigMapName: kamiwaza-trust-bundle
+    publicRoots: Include
+
+  floor:
+    minimumTLSVersion: TLS1.2
+    hostnameVerification: Required
+
+  internal:
+    defaultTransport: PlatformTLS
+    workloadIngressFloor: true
+
+  egress:
+    deniedNetworks:
+      - Loopback
+      - LinkLocal
+      - CloudMetadata
+      - PrivateRanges
+    destinations:
+      # The defect: an arbitrary-image class with a platform-client dialer.
+      - name: os-packages
+        kind: PackageRepository
+        hosts:
+          - packages.example.invalid
+        ports:
+          - 443
+        transport: TLS
+        authentication:
+          type: None
+        enforcementMode: PolicyAwareDialer

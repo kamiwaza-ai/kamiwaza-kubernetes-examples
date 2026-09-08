@@ -1,24 +1,55 @@
-# Merge the `core:` block below into Kamiwaza Deploy `cluster/values/overrides.yaml`
-# (or another values file layered after `kamiwaza-base.yaml` / `kamiwaza-dev.yaml`).
+# Relationship decisions and producer-owned grants, for the Helmfile lifecycle.
 #
-# ReBAC (relationship-based access control) requires:
-#   - auth.enabled: true (full stack with Keycloak — not lite mode)
-#   - See also: cluster/values/kamiwaza-rebac.yaml in Deploy (Helmfile when
-#     KAMIWAZA_REBAC_ENABLED=true or ./scripts/install-dev.sh --rebac)
+# Merge into Deploy `cluster/values/overrides.yaml` (or another later values
+# layer). Nothing here is a Kubernetes object and nothing here holds a
+# credential: the administrator bearer token the workflow uses is supplied by
+# the caller at request time and never by a values file.
 #
-# Lab defaults below use allowCommunityFallback: true for easier local testing.
-# Tighten for production (e.g. allowCommunityFallback: false).
-
+# `core.scheduler.extraEnv` is a list, and Helm replaces lists wholesale on a
+# values merge. If a later values layer already sets `core.scheduler.extraEnv`,
+# add these entries to that list instead of introducing a second one, or they
+# are silently dropped.
 core:
-  # Drives core-config ConfigMap AUTH_REBAC_* (scheduler + services reading envFrom).
+  # Relationship decisions in the `core-config` ConfigMap, read by everything
+  # that loads it with `envFrom`. ReBAC requires `auth.enabled: true`; a lite
+  # install has no Keycloak and the core chart fails template rather than
+  # rendering a half-enabled state.
   rebac:
     enabled: true
     backend: postgres
-    allowCommunityFallback: true
+    # A fallback that decides access when the relationship store cannot answer
+    # is a second authorization path. Keep it off wherever the answer matters.
+    allowCommunityFallback: false
 
-  # Scheduler and Ray worker pods: explicit AUTH_REBAC_* env (overrides ConfigMap).
   scheduler:
     rebac:
       enabled: true
+      # The tenant every bootstrap job and reference id uses. Per-user tenants
+      # come from the token claim, not from this value.
       defaultTenantId: "__default__"
-      allowCommunityFallback: true
+      allowCommunityFallback: false
+
+    extraEnv:
+      # The whole migration switch for producer ownership. Unset, blank,
+      # `legacy`, or any unrecognised value is exactly today's grant
+      # behaviour — an unrecognised value logs one warning and stays legacy —
+      # so rolling a new image never changes how an installation's existing
+      # grant paths behave. `producer_owned` is what makes an edge carry its
+      # owners, and only then does a remove release one producer's claim
+      # instead of deleting the edge.
+      - name: AUTH_GATEWAY_GRANT_PRODUCER_PROFILE
+        value: "producer_owned"
+      # Producer ownership is only as strong as the authority check in front of
+      # it. Under the legacy profile the coarse Kamiwaza `admin` role satisfies
+      # authorization administration and short-circuits the ownership lookup,
+      # so any admin can change any grant. `least_privilege` separates identity
+      # administration from authorization administration and requires the
+      # dedicated `kamiwaza:authorization_administration` role for a grant
+      # change. A Kubernetes namespace `admin` satisfies neither, whatever it
+      # is named.
+      #
+      # Select this only after the humans who need it hold that role and the
+      # resource access they had exists as explicit relationships. Selecting it
+      # first removes their ambient access at the next request.
+      - name: AUTH_GATEWAY_ROLE_SEPARATION_PROFILE
+        value: "least_privilege"

@@ -2,6 +2,10 @@
 # Apply with ldapmodify — see ../docs/OPERATOR_GUIDE.md §8.
 #
 # The optional "demo-engineering" block only works if cn=demo-engineering exists.
+#
+# There is no userPassword line here on purpose: a credential written into an
+# LDIF file is a credential in your shell history and your editor's backup.
+# Set it afterwards with ldappasswd, which prompts for it.
 
 dn: uid=<uid>,ou=people,dc=kamiwaza,dc=local
 changetype: add
@@ -20,8 +24,6 @@ title: <title>
 departmentNumber: <department>
 employeeType: active
 manager: uid=<manager_uid>,ou=people,dc=kamiwaza,dc=local
-# Lab default; replace with an SSHA hash for production.
-userPassword: kamiwaza
 
 dn: cn=user,ou=groups,dc=kamiwaza,dc=local
 changetype: modify

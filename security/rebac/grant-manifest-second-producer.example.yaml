@@ -1,0 +1,23 @@
+# A second administrator-automation grant bundle that declares one of the same
+# edges as grant-manifest.example.yaml.
+#
+# This is the case the example exists for. The edge below is the same edge as
+# `analytics-editor-on-shared-workroom` in the other bundle: same principal,
+# same resource, same relation. Its `entryID` differs because an entry ID names
+# an intent inside one bundle, not the edge itself.
+#
+# Two bundles are two producers. Each owns its own claim on the edge, the store
+# holds one edge with two owners, and a removal by either producer releases
+# only that producer's claim. Access survives until the last owner releases it.
+#
+# Same closed `GrantManifest` schema, same placeholder rules: the principal is
+# a synthetic UUID and the resource names nothing real.
+bundleID: example-reporting-automation
+revision: rev-0001
+platformID: example-platform
+entries:
+  - entryID: reporting-editor-on-shared-workroom
+    principalID: 00000000-0000-4000-8000-000000000002
+    resourceType: Workroom
+    resourceID: example-lab-shared
+    relation: Editor

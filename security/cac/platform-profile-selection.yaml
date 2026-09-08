@@ -1,0 +1,23 @@
+# Select the approved CAC/PIV profile on an existing platform.
+#
+# Apply as a merge patch so the rest of the platform intent is untouched:
+#
+#   kubectl -n kamiwaza patch kamiwazaplatform kamiwaza \
+#     --type merge --patch-file security/cac/platform-profile-selection.yaml
+#
+# The reference is a name only. The profile itself lives in immutable
+# administrator policy in the manager's namespace, so a platform owner selects
+# an approved profile and cannot state an issuer, a claim mapping, or an edge
+# requirement here.
+#
+# An unset reference keeps the behaviour an installation already has.
+apiVersion: platform.kamiwaza.io/v1alpha1
+kind: KamiwazaPlatform
+metadata:
+  name: kamiwaza
+  namespace: kamiwaza
+spec:
+  components:
+    identityAndAccess:
+      profileRef:
+        name: cac-piv

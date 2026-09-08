@@ -1,0 +1,116 @@
+# Stage 3 of the migration: the same installation with nothing left that a
+# regulated profile refuses.
+#
+# The diff from stage 2 is short and is the whole exercise:
+#
+#   * the plaintext object-storage hop is gone -- the pinned version was moved
+#     to one that terminates TLS, and the hop is `PlatformTLS`;
+#   * the mesh-delegated compute hop is gone -- the platform protects it
+#     itself, so its evidence is observed rather than attested;
+#   * the minimum TLS version is stated rather than defaulted, because a
+#     regulated profile requires a stated floor;
+#   * the workload ingress floor and the complete denied network set are both
+#     required rather than optional.
+#
+# This document loads in a Full profile and in a regulated one. Getting here
+# is not a configuration change: each removed exception was removed because
+# the thing it excused was fixed. Editing the exceptions out without fixing
+# them produces a policy that loads and an installation that does not work.
+transport:
+  issuance:
+    mode: PlatformIssued
+    platformIssued:
+      authorityValidity: 8760h
+      authorityRenewBefore: 720h
+      leafValidity: 2160h
+      leafRenewBefore: 360h
+      expirationPolicy: ReplaceKey
+      privateKeyPolicy:
+        algorithm: ECDSA
+        size: 384
+        rotationPolicy: Always
+      workloadIdentity:
+        # The default source. It projects the identity the platform already
+        # attests into a short-lived certificate, and needs no node component,
+        # no admission webhook, and no permission beyond what every
+        # ServiceAccount holds.
+        source: PlatformIssued
+        trustDomain: kamiwaza-examples.example.com
+        attestation: OfflineTokenReview
+        identityLifetime: 24h
+        identityRenewBefore: 8h
+    maintenanceWindows:
+      - "0 2 * * 6"
+
+  trust:
+    bundleConfigMapName: kamiwaza-trust-bundle
+    publicRoots: Include
+    maximumBundleBytes: 900000
+    targetNamespaces:
+      - kamiwaza-examples
+      - kamiwaza-examples-extensions
+
+  floor:
+    # Required to be stated in a regulated profile, not merely defaulted.
+    minimumTLSVersion: TLS1.2
+    hostnameVerification: Required
+    fipsApprovedOnly: false
+
+  internal:
+    defaultTransport: PlatformTLS
+    workloadIngressFloor: true
+    hops:
+      - name: CoreToApplicationDatabase
+        transport: PlatformTLS
+        authentication:
+          type: MutualTLS
+          maxConnectionAge: 30m
+          mutualTLS:
+            clientIdentityRef: core-client
+      - name: CoreToIdentityProvider
+        transport: PlatformTLS
+        authentication:
+          type: None
+      # Was Plaintext in stage 2. The version moved; the exception went with
+      # it.
+      - name: CoreToObjectStorage
+        transport: PlatformTLS
+        authentication:
+          type: None
+      # Was MeshDelegated in stage 2. Verification is per identity: an
+      # accepted-identity list is required and an empty one is invalid rather
+      # than permissive, because trust-domain membership is not authorization.
+      - name: DistributedComputeInternal
+        transport: PlatformTLS
+        authentication:
+          type: WorkloadIdentityX509
+          maxConnectionAge: 30m
+          workloadIdentityX509:
+            trustDomain: kamiwaza-examples.example.com
+            acceptedIdentities:
+              - "spiffe://kamiwaza-examples.example.com/ns/kamiwaza-examples/sa/kamiwaza-compute"
+      - name: CoreToExtension
+        transport: ProxyTerminated
+        authentication:
+          type: WorkloadIdentityJWT
+          maxConnectionAge: 30m
+          workloadIdentityJWT:
+            audience: kamiwaza-workload-sts
+            attestationProfiles:
+              - kubernetes-offline-v1
+            ttlSeconds: 3600
+
+  clientIdentities:
+    - name: core-client
+      secretRef:
+        name: kamiwaza-core-client
+      commonName: core-client
+      validity: 2160h
+      renewBefore: 360h
+
+  egress:
+    deniedNetworks:
+      - Loopback
+      - LinkLocal
+      - CloudMetadata
+      - PrivateRanges

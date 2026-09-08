@@ -1,0 +1,66 @@
+# The issuance mode with the largest failure surface, published so the
+# failures are visible before they happen.
+#
+# Under `AdministratorSupplied` an external public-key infrastructure issues
+# everything out of band. The operator creates no certificate intent, renews
+# nothing, validates the supplied chain before use, and publishes the exact
+# Secret names and keys it consumes. "Renews nothing" is the part that
+# surprises people: expiry is your calendar's problem, and the platform's job
+# is to warn you inside `expiryWarningBefore` rather than to fix it.
+#
+# The four outcomes to expect from this mode:
+#
+#   SuppliedMaterialInvalid    chain unordered, unvalidatable, or a required
+#                              key missing -- terminal until the material
+#                              changes, never a warning
+#   SuppliedMaterialExpiring   inside the warning window -- advisory before
+#                              expiry, blocking after it
+#   EgressTrustForbidden       the exact-name read was denied by RBAC --
+#                              terminal until installation policy changes
+#   EgressTrustReadFailed      the read timed out or was throttled --
+#                              transient, retried with backoff and jitter
+#
+# No certificate body and no key appears here. Both Secrets are references to
+# objects the administrator creates outside this repository.
+transport:
+  issuance:
+    mode: AdministratorSupplied
+    administratorSupplied:
+      # Two authority roles, never one. A leaked client-authority key must not
+      # be able to mint a server identity, and revoking client trust must not
+      # invalidate every server certificate.
+      serverAuthorityRef:
+        name: enterprise-transport-authorities
+        key: server-ca.pem
+      clientAuthorityRef:
+        name: enterprise-transport-authorities
+        key: client-ca.pem
+      # The operator publishes the exact per-identity Secret names it expects
+      # under this prefix, so the required contract is readable from status
+      # rather than guessed.
+      identitySecretPrefix: enterprise-identity
+      # How far ahead of expiry unrenewable material is reported. Silence is
+      # not an acceptable substitute for a warning that only appears in a
+      # metric.
+      expiryWarningBefore: 720h
+
+  trust:
+    bundleConfigMapName: kamiwaza-trust-bundle
+    publicRoots: Include
+    targetNamespaces:
+      - kamiwaza-examples
+
+  floor:
+    minimumTLSVersion: TLS1.2
+    hostnameVerification: Required
+
+  internal:
+    defaultTransport: PlatformTLS
+    workloadIngressFloor: true
+
+  egress:
+    deniedNetworks:
+      - Loopback
+      - LinkLocal
+      - CloudMetadata
+      - PrivateRanges

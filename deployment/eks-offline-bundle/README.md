@@ -40,6 +40,7 @@ make status      # health    •    make destroy     # tear down
 ```
 
 **What's config vs. mechanism:**
+
 - **`overrides.yaml`** (a Helm `--values` file) carries the entire **platform** config —
   `global.domain` and every umbrella image's `registry` (`${REGISTRY}`, filled from
   `config.env`) + `tag`. It's commented per component; you edit the domain and, per
@@ -71,13 +72,13 @@ The sections below explain each mechanic / how to do it by hand.
 
 ## Prerequisites
 
-| Requirement | Notes |
-| --- | --- |
-| EKS cluster | Existing; managed nodes with the **EBS CSI driver** installed (the 0.13.3 PVCs are unqualified, so they need a default StorageClass — **`make deploy` creates a `gp3` default for you**, `manifests/10-storageclass.yaml`). |
-| `aws` CLI | Admin (or ECR `Create/Push` + EKS describe) in the cluster's account/region. |
-| Node IAM role | Must allow ECR pull (`AmazonEC2ContainerRegistryReadOnly` — included by the EKS managed node role). |
-| `docker` | helm-dt reads `~/.docker/config.json` for the push. |
-| Bundle | Downloaded + extracted ([offline-bundle-download](../offline-bundle-download) fetches + verifies it); the prod RPM extracted to a work dir (`$WORK=.../opt/kamiwaza`). |
+| Requirement   | Notes                                                                                                                                                                                                                       |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EKS cluster   | Existing; managed nodes with the **EBS CSI driver** installed (the 0.13.3 PVCs are unqualified, so they need a default StorageClass — **`make deploy` creates a `gp3` default for you**, `manifests/10-storageclass.yaml`). |
+| `aws` CLI     | Admin (or ECR `Create/Push` + EKS describe) in the cluster's account/region.                                                                                                                                                |
+| Node IAM role | Must allow ECR pull (`AmazonEC2ContainerRegistryReadOnly` — included by the EKS managed node role).                                                                                                                         |
+| `docker`      | helm-dt reads `~/.docker/config.json` for the push.                                                                                                                                                                         |
+| Bundle        | Downloaded + extracted ([offline-bundle-download](../offline-bundle-download) fetches + verifies it); the prod RPM extracted to a work dir (`$WORK=.../opt/kamiwaza`).                                                      |
 
 ```bash
 export REGION=us-east-1 ACCOUNT=<acct-id>
@@ -191,6 +192,7 @@ kubectl create secret generic kamiwaza-user-admin -n kamiwaza --from-file="passw
 ```
 
 Sanity-check the rendered tags before the long sync:
+
 ```bash
 set -a; source config.env; set +a; export KAMIWAZA_VERSION_SHORT="${KAMIWAZA_VERSION#release-}"
 envsubst < overrides.yaml | grep -E '^\s+(registry|repository|tag):'   # all $REGISTRY/... + your pins
@@ -267,7 +269,7 @@ curl -k --resolve kamiwaza.test:443:$(dig +short "$ELB" | head -1) https://kamiw
 
 ## Gotchas (learned the hard way)
 
-- **Embedding model is the *bundled* GGUF, staged via node hostPath (offline).** The
+- **Embedding model is the _bundled_ GGUF, staged via node hostPath (offline).** The
   offline overlay points `core-embedding`'s `download-model` init at `file://` on a
   hostPath the VM host-prep fills but EKS leaves empty → crash-loop + `core-scheduler`
   "Embedding service not ready". The `model-stager` DaemonSet (Step 6) fills it; its
@@ -295,11 +297,11 @@ curl -k --resolve kamiwaza.test:443:$(dig +short "$ELB" | head -1) https://kamiw
 Three levels, smallest blast radius first. All are `make` targets (they reuse
 `config.env`, so run them from this folder):
 
-| Target | Removes | Keeps |
-| --- | --- | --- |
-| `make destroy` | helm releases + the 6 namespaces → workloads, **PVCs (→ EBS volumes)**, the **Traefik ELB**, the admin secret, the model-stager DaemonSet | cluster, CRDs, gp3 StorageClass, ECR images |
-| `make destroy-ecr` | the ~46 relocated **ECR repos** (images + charts + model-stager) | everything else |
-| `make purge` | `destroy` + `destroy-ecr` + the operators' **CRDs** + the **gp3 StorageClass** we added | only the empty EKS cluster |
+| Target             | Removes                                                                                                                                   | Keeps                                       |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `make destroy`     | helm releases + the 6 namespaces → workloads, **PVCs (→ EBS volumes)**, the **Traefik ELB**, the admin secret, the model-stager DaemonSet | cluster, CRDs, gp3 StorageClass, ECR images |
+| `make destroy-ecr` | the ~46 relocated **ECR repos** (images + charts + model-stager)                                                                          | everything else                             |
+| `make purge`       | `destroy` + `destroy-ecr` + the operators' **CRDs** + the **gp3 StorageClass** we added                                                   | only the empty EKS cluster                  |
 
 ```bash
 make destroy        # uninstall the platform (most common)
@@ -312,12 +314,13 @@ make purge          # full teardown: platform + CRDs + StorageClass + ECR
   kuberay, metrics-server, extension-operator, kamiwaza) then deletes namespaces
   `kamiwaza`, `kamiwaza-extensions`, `kamiwaza-system`, `kuberay`, `metrics-server`,
   `cert-manager`. Deleting the namespaces also:
+
   - removes the platform **PVCs** — with `reclaimPolicy: Delete` the backing **EBS
     volumes are deleted** too (your platform data is gone — back up first if needed);
   - deletes the `traefik` Service, which **tears down the AWS ELB**;
   - removes the `kamiwaza-user-admin` secret and the `kamiwaza-model-stager` DaemonSet.
-  > If a namespace hangs in `Terminating`, a CRD finalizer is usually waiting — run
-  > `make purge` (it deletes the CRDs) or remove the stuck finalizer manually.
+    > If a namespace hangs in `Terminating`, a CRD finalizer is usually waiting — run
+    > `make purge` (it deletes the CRDs) or remove the stuck finalizer manually.
 
 - **`make destroy-ecr`** enumerates the repos from the bundle's wraps (same list
   `make relocate` created) and `aws ecr delete-repository --force`s each, so you stop

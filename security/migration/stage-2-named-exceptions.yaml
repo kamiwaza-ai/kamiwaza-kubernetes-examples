@@ -1,0 +1,113 @@
+# Stage 2 of the migration: every hop accounted for, including the ones this
+# installation cannot protect yet.
+#
+# This is the stage a real migration sits in for a while, and it is the reason
+# `Plaintext` and `MeshDelegated` exist at all. A policy that could only
+# express protected hops would push the unprotected ones out of the policy and
+# out of status, where nobody would be counting them. Here they are named, one
+# per hop, each with either a justification or an evidence source.
+#
+# The same document has two different outcomes depending on the profile, and
+# that is the point:
+#
+#   Full        loads. The plaintext hop is reported as an active exception
+#               with its justification, and the delegated hop is reported as
+#               administrator-attested rather than observed.
+#   Regulated   refused at policy load. A regulated profile refuses plaintext
+#               transport, and refuses a hop whose only evidence is an
+#               administrator's word.
+#
+# Nothing here is a credential. `Plaintext` on the object-storage hop is a
+# statement about a pinned version that does not terminate TLS yet, not a
+# preference, and it carries an expiry so it cannot quietly become permanent.
+transport:
+  issuance:
+    mode: PlatformIssued
+    platformIssued:
+      expirationPolicy: RenewCertificate
+      privateKeyPolicy:
+        algorithm: ECDSA
+        size: 384
+        rotationPolicy: Always
+    # Automatic renewal and the rollouts it causes are confined to this
+    # window. A window shorter than the reconcile interval slips renewal to
+    # the next window rather than skipping it.
+    maintenanceWindows:
+      - "0 2 * * 6"
+
+  trust:
+    bundleConfigMapName: kamiwaza-trust-bundle
+    publicRoots: Include
+    targetNamespaces:
+      - kamiwaza-examples
+      - kamiwaza-examples-extensions
+
+  floor:
+    minimumTLSVersion: TLS1.2
+    hostnameVerification: Required
+    fipsApprovedOnly: false
+
+  internal:
+    defaultTransport: PlatformTLS
+    workloadIngressFloor: true
+    hops:
+      - name: CoreToApplicationDatabase
+        transport: PlatformTLS
+        authentication:
+          type: MutualTLS
+          maxConnectionAge: 30m
+          mutualTLS:
+            clientIdentityRef: core-client
+      - name: CoreToIdentityProvider
+        transport: PlatformTLS
+        authentication:
+          type: None
+      # An arbitrary third-party image that cannot terminate TLS itself. The
+      # platform renders the pinned proxy in front of it, and the proxy
+      # presents the platform-issued identity. Still observed, not attested.
+      - name: CoreToExtension
+        transport: ProxyTerminated
+        authentication:
+          type: WorkloadIdentityJWT
+          maxConnectionAge: 30m
+          workloadIdentityJWT:
+            audience: kamiwaza-workload-sts
+            attestationProfiles:
+              - kubernetes-offline-v1
+            ttlSeconds: 3600
+      # An administrator-owned mesh is asserted to protect this hop. No
+      # standard object can attest that, so the platform records the assertion
+      # and its source and never reports it as observed. A regulated profile
+      # refuses exactly this.
+      - name: DistributedComputeInternal
+        transport: MeshDelegated
+        evidenceSource: AdminAttested
+        authentication:
+          type: None
+      # The honest exemption: this pinned version does not terminate TLS.
+      # Justification and expiry are both required, and the exception appears
+      # in status for as long as it is active.
+      - name: CoreToObjectStorage
+        transport: Plaintext
+        exemption:
+          justification: >-
+            The pinned object-storage version does not terminate TLS; tracked
+            for removal at the next version bump.
+          expires: "2027-01-01"
+        authentication:
+          type: None
+
+  clientIdentities:
+    - name: core-client
+      secretRef:
+        name: kamiwaza-core-client
+      commonName: core-client
+      validity: 2160h
+      renewBefore: 360h
+
+  egress:
+    deniedNetworks:
+      - Loopback
+      - LinkLocal
+      - CloudMetadata
+      - PrivateRanges

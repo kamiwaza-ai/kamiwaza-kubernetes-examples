@@ -37,9 +37,9 @@ NAME="extension-trust-webhook"
 # that blocks the API server from calling the webhook, and with failurePolicy=Ignore that
 # fails silently (no injection). kamiwaza-system is permissive (no NetworkPolicies).
 WEBHOOK_NS="${WEBHOOK_NS:-kamiwaza-system}"
-EXT_NS="${EXT_NS:-kamiwaza-extensions}"        # declared extension service pods
-SANDBOX_NS="${SANDBOX_NS:-kamiwaza-sandboxes}"  # spawned sandbox pods
-EXT_LABEL_KEY="extensions.kamiwaza.io/deployment-id"   # present on declared extension pods
+EXT_NS="${EXT_NS:-kamiwaza-extensions}"              # declared extension service pods
+SANDBOX_NS="${SANDBOX_NS:-kamiwaza-sandboxes}"       # spawned sandbox pods
+EXT_LABEL_KEY="extensions.kamiwaza.io/deployment-id" # present on declared extension pods
 SANDBOX_LABEL_KEY="kamiwaza.io/sandbox"
 SANDBOX_LABEL_VAL="true"
 BUNDLE_CONFIGMAP="${BUNDLE_CONFIGMAP:-kamiwaza-trust-bundle}"
@@ -52,23 +52,50 @@ CERT_DAYS=3650
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DELETE=0
 
-err(){ printf '\033[31merror:\033[0m %s\n' "$1" >&2; }
-info(){ printf '\033[1m%s\033[0m\n' "$1" >&2; }
+err() { printf '\033[31merror:\033[0m %s\n' "$1" >&2; }
+info() { printf '\033[1m%s\033[0m\n' "$1" >&2; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --image) IMAGE="${2:?}"; shift 2 ;;
-    --webhook-ns) WEBHOOK_NS="${2:?}"; shift 2 ;;
-    --ext-ns) EXT_NS="${2:?}"; shift 2 ;;
-    --sandbox-ns) SANDBOX_NS="${2:?}"; shift 2 ;;
-    --delete) DELETE=1; shift ;;
-    -h|--help) sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) err "unknown arg: $1"; exit 2 ;;
+  --image)
+    IMAGE="${2:?}"
+    shift 2
+    ;;
+  --webhook-ns)
+    WEBHOOK_NS="${2:?}"
+    shift 2
+    ;;
+  --ext-ns)
+    EXT_NS="${2:?}"
+    shift 2
+    ;;
+  --sandbox-ns)
+    SANDBOX_NS="${2:?}"
+    shift 2
+    ;;
+  --delete)
+    DELETE=1
+    shift
+    ;;
+  -h | --help)
+    sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'
+    exit 0
+    ;;
+  *)
+    err "unknown arg: $1"
+    exit 2
+    ;;
   esac
 done
 
-command -v kubectl >/dev/null || { err "kubectl not found"; exit 1; }
-command -v openssl >/dev/null || { err "openssl not found"; exit 1; }
+command -v kubectl >/dev/null || {
+  err "kubectl not found"
+  exit 1
+}
+command -v openssl >/dev/null || {
+  err "openssl not found"
+  exit 1
+}
 
 if [ "$DELETE" -eq 1 ]; then
   info "Tearing down $NAME"
@@ -81,12 +108,16 @@ fi
 if [ -z "$IMAGE" ]; then
   IMAGE="$(kubectl -n kamiwaza get deploy core-scheduler -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
 fi
-[ -n "$IMAGE" ] || { err "could not auto-detect a runner image; pass --image <ref>"; exit 1; }
+[ -n "$IMAGE" ] || {
+  err "could not auto-detect a runner image; pass --image <ref>"
+  exit 1
+}
 info "Runner image: $IMAGE"
 CODE_SHA="$(openssl dgst -sha256 "${SCRIPT_DIR}/extension-trust-webhook.py" | awk '{print $NF}')"
 
 SVC_DNS="${NAME}.${WEBHOOK_NS}.svc"
-WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
 
 # Idempotent cert: reuse the existing serving cert + caBundle if both are present, so re-runs
 # keep a STABLE caBundle (regenerating it without rolling the pod would break TLS to the API
@@ -105,17 +136,17 @@ else
   openssl x509 -req -in "$WORK/tls.csr" -CA "$WORK/ca.crt" -CAkey "$WORK/ca.key" -CAcreateserial \
     -days "$CERT_DAYS" -out "$WORK/tls.crt" \
     -extfile <(printf 'subjectAltName=DNS:%s,DNS:%s.cluster.local\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth' "$SVC_DNS" "$SVC_DNS") >/dev/null 2>&1
-  CABUNDLE="$(base64 < "$WORK/ca.crt" | tr -d '\n')"
+  CABUNDLE="$(base64 <"$WORK/ca.crt" | tr -d '\n')"
   kubectl -n "$WEBHOOK_NS" create secret tls "${NAME}-tls" \
-    --cert="$WORK/tls.crt" --key="$WORK/tls.key" --dry-run=client -o yaml \
-    | kubectl label --local -f - app="$NAME" -o yaml --dry-run=client | kubectl apply -f - >/dev/null
+    --cert="$WORK/tls.crt" --key="$WORK/tls.key" --dry-run=client -o yaml |
+    kubectl label --local -f - app="$NAME" -o yaml --dry-run=client | kubectl apply -f - >/dev/null
 fi
 CERT_SHA="$(printf '%s' "$CABUNDLE" | openssl dgst -sha256 | awk '{print $NF}')"
 
 info "Applying ConfigMap"
 kubectl -n "$WEBHOOK_NS" create configmap "${NAME}-code" \
-  --from-file="extension-trust-webhook.py=${SCRIPT_DIR}/extension-trust-webhook.py" --dry-run=client -o yaml \
-  | kubectl label --local -f - app="$NAME" -o yaml --dry-run=client | kubectl apply -f - >/dev/null
+  --from-file="extension-trust-webhook.py=${SCRIPT_DIR}/extension-trust-webhook.py" --dry-run=client -o yaml |
+  kubectl label --local -f - app="$NAME" -o yaml --dry-run=client | kubectl apply -f - >/dev/null
 
 info "Applying Deployment + Service"
 cat <<YAML | kubectl apply -f - >/dev/null

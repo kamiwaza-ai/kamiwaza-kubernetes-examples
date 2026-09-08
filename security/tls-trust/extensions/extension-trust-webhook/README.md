@@ -54,11 +54,11 @@ a ConfigMap and a long-lived self-signed serving cert that is **reused across re
 
 ## What it covers
 
-| Pod | Namespace | Matched by | Injected |
-| --- | --- | --- | --- |
-| Declared extension pods (apps, tools, MCP servers) | `kamiwaza-extensions` | label `extensions.kamiwaza.io/deployment-id` (`Exists`) | mount + CA env (only-if-absent) |
-| Spawned sandbox pods (Kaizen and any sandbox-spawning extension) | `kamiwaza-sandboxes` | label `kamiwaza.io/sandbox=true` | mount + CA env (only-if-absent) |
-| Everything else (operator, core, Ray, infra, unlabeled pods) | any | — | **not touched** — safe for platform pods |
+| Pod                                                              | Namespace             | Matched by                                              | Injected                                 |
+| ---------------------------------------------------------------- | --------------------- | ------------------------------------------------------- | ---------------------------------------- |
+| Declared extension pods (apps, tools, MCP servers)               | `kamiwaza-extensions` | label `extensions.kamiwaza.io/deployment-id` (`Exists`) | mount + CA env (only-if-absent)          |
+| Spawned sandbox pods (Kaizen and any sandbox-spawning extension) | `kamiwaza-sandboxes`  | label `kamiwaza.io/sandbox=true`                        | mount + CA env (only-if-absent)          |
+| Everything else (operator, core, Ray, infra, unlabeled pods)     | any                   | —                                                       | **not touched** — safe for platform pods |
 
 ## Prerequisite
 
@@ -95,17 +95,16 @@ security/tls-trust/build-trust-bundle-configmap.sh \
 truth for flags and behavior. Re-running it is **idempotent** — the serving cert and
 `caBundle` are reused, and the webhook pod only rolls when the code or cert sha changes.
 
-| Flag / env | Default | Purpose |
-| --- | --- | --- |
-| `--image <ref>` | auto-detect from `core-scheduler` | pin the in-cluster python runner image |
-| `--webhook-ns` | `kamiwaza-system` | namespace the webhook runs in (see gotcha below) |
-| `--ext-ns` | `kamiwaza-extensions` | namespace of declared extension service pods |
-| `--sandbox-ns` | `kamiwaza-sandboxes` | namespace of spawned sandbox pods |
-| `--delete` | — | tear down the webhook + its `MutatingWebhookConfiguration` |
+| Flag / env          | Default                                                              | Purpose                                                                                    |
+| ------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `--image <ref>`     | auto-detect from `core-scheduler`                                    | pin the in-cluster python runner image                                                     |
+| `--webhook-ns`      | `kamiwaza-system`                                                    | namespace the webhook runs in (see gotcha below)                                           |
+| `--ext-ns`          | `kamiwaza-extensions`                                                | namespace of declared extension service pods                                               |
+| `--sandbox-ns`      | `kamiwaza-sandboxes`                                                 | namespace of spawned sandbox pods                                                          |
+| `--delete`          | —                                                                    | tear down the webhook + its `MutatingWebhookConfiguration`                                 |
 | `CA_ENV_VARS` (env) | `SSL_CERT_FILE,REQUESTS_CA_BUNDLE,AWS_CA_BUNDLE,NODE_EXTRA_CA_CERTS` | comma-separated env names to set (only-if-absent); set `CA_ENV_VARS=""` for **mount-only** |
 
-> **Run the webhook in `kamiwaza-system`, NOT in an extension namespace.**
-> `kamiwaza-extensions` has a default-deny-style Ingress NetworkPolicy (empty
+> **Run the webhook in `kamiwaza-system`, NOT in an extension namespace.** > `kamiwaza-extensions` has a default-deny-style Ingress NetworkPolicy (empty
 > `podSelector`) that blocks the API server from reaching a webhook deployed there. With
 > `failurePolicy: Ignore`, that failure is **silent** — pods are admitted with **no
 > injection** and you get no error. `kamiwaza-system` is permissive (no NetworkPolicies),
@@ -165,7 +164,7 @@ safe); re-running the deploy script was idempotent.
 
 > **Mount-over `/etc/ssl/certs/ca-certificates.crt` (read-only).** An agent's runtime
 > `update-ca-certificates` Traefik-leaf re-merge is shadowed by the read-only mount.
-> Corporate-CA trust still works — the corporate CA is *in* the bundle, the platform
+> Corporate-CA trust still works — the corporate CA is _in_ the bundle, the platform
 > `root-ca` in the bundle covers Traefik via chain, and in-cluster MCP is HTTP — so this
 > is acceptable. For mount-only behavior (no env), deploy with `CA_ENV_VARS=""`.
 
@@ -185,16 +184,17 @@ safe); re-running the deploy script was idempotent.
 
 Removes the `MutatingWebhookConfiguration` and the webhook Deployment / Service /
 ConfigMap / Secret. Pods admitted while the webhook was active keep their injected mount
-+ env until they respawn; the bundle volume is `optional`, so even after teardown those
-pods are fine.
+
+- env until they respawn; the bundle volume is `optional`, so even after teardown those
+  pods are fine.
 
 ## Files
 
-| File | Purpose |
-| --- | --- |
+| File                                                                     | Purpose                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`deploy-extension-trust-webhook.sh`](deploy-extension-trust-webhook.sh) | Generates the self-signed serving cert and deploys everything (Secret, ConfigMap, Deployment, Service, `MutatingWebhookConfiguration` with both rules). Idempotent; `--delete` tears down. **Source of truth for flags and behavior.** |
-| [`extension-trust-webhook.py`](extension-trust-webhook.py) | The webhook server: a Python stdlib `AdmissionReview` handler that builds the idempotent JSONPatch (mount + only-if-absent CA env). Pure function `build_patch` is unit-testable without a cluster. |
-| [`README.md`](README.md) | This guide. |
+| [`extension-trust-webhook.py`](extension-trust-webhook.py)               | The webhook server: a Python stdlib `AdmissionReview` handler that builds the idempotent JSONPatch (mount + only-if-absent CA env). Pure function `build_patch` is unit-testable without a cluster.                                    |
+| [`README.md`](README.md)                                                 | This guide.                                                                                                                                                                                                                            |
 
 ## Durable platform fix
 

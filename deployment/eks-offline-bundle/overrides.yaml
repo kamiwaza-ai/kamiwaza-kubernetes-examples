@@ -23,71 +23,65 @@
 ### The structure below maps those values onto the umbrella chart's image paths.
 ### ============================================================================
 
-
 ### ----------------------------------------------------------------------------
 ### Global
 ### ----------------------------------------------------------------------------
 global:
-
   # Hostname the UI / API are served on. Traefik routes on it and the platform
   # CA mints certs for it. Point DNS (or a hosts entry) at the Traefik LoadBalancer.
   domain: ${DOMAIN}
-
 
 ### ----------------------------------------------------------------------------
 ### Auth — Keycloak (identity / OIDC)
 ### ----------------------------------------------------------------------------
 auth:
   keycloak:
-
-    image:                              # Keycloak server
+    image: # Keycloak server
       registry: ${REGISTRY}
       repository: images/keycloak
       tag: ${KEYCLOAK_TAG}
 
     postgresql:
-      image:                            # Keycloak's backing Postgres
+      image: # Keycloak's backing Postgres
         registry: ${REGISTRY}
         repository: images/postgres
         tag: ${POSTGRES_TAG}
 
     initUsers:
-      image:                            # one-shot job that creates the admin user
+      image: # one-shot job that creates the admin user
         registry: ${REGISTRY}
         repository: images/init-keycloak-users
         tag: ${KAMIWAZA_VERSION}
 
     cliClient:
-      image:                            # kcadm CLI helper
+      image: # kcadm CLI helper
         registry: ${REGISTRY}
         repository: images/curl
         tag: ${CURL_TAG}
-
 
 ### ----------------------------------------------------------------------------
 ### Core — scheduler / Ray / control plane
 ### ----------------------------------------------------------------------------
 core:
-
   scheduler:
-    image:                              # Kamiwaza core (scheduler + Ray head)
+    image: # Kamiwaza core (scheduler + Ray head)
       registry: ${REGISTRY}
       repository: images/core
       tag: ${KAMIWAZA_VERSION}
 
   etcd:
-    image:                              # core etcd
+    image: # core etcd
       registry: ${REGISTRY}
       repository: images/etcd
       tag: ${ETCD_TAG}
 
   postgresql:
-    image:                              # core Postgres
+    image: # core Postgres
       registry: ${REGISTRY}
       repository: images/postgres
       tag: ${POSTGRES_TAG}
 
-  utilityImages:                        # images used by core jobs / helpers
+  utilityImages: # images used by core jobs / helpers
     curl:
       registry: ${REGISTRY}
       repository: images/curl
@@ -96,7 +90,6 @@ core:
       registry: ${REGISTRY}
       repository: images/kubectl
       tag: ${KUBECTL_TAG}
-
 
 ### ----------------------------------------------------------------------------
 ### Embedding — default model server (llama.cpp)
@@ -107,22 +100,20 @@ core:
 ### GGUF there (the EKS stand-in for the VM host-prep). We only override the image
 ### registries here — storage.type=hostPath + the file:// URL come from the overlay.
 embedding:
-
-  image:                                # llama.cpp embedding server
+  image: # llama.cpp embedding server
     registry: ${REGISTRY}
     repository: images/llamacpp
     tag: ${LLAMACPP_TAG}
 
-  initImage:                            # download-model init — copies the bundled GGUF (file://)
+  initImage: # download-model init — copies the bundled GGUF (file://)
     registry: ${REGISTRY}
     repository: images/curl
     tag: ${CURL_TAG}
 
-  verifyImage:                          # verify-model init (checksums the model)
+  verifyImage: # verify-model init (checksums the model)
     registry: ${REGISTRY}
     repository: images/chainguard-base
     tag: ${KAMIWAZA_VERSION}
-
 
 ### ----------------------------------------------------------------------------
 ### Frontend — web UI
@@ -133,7 +124,6 @@ frontend:
     repository: images/frontend
     tag: ${KAMIWAZA_VERSION}
 
-
 ### ----------------------------------------------------------------------------
 ### Docs
 ### ----------------------------------------------------------------------------
@@ -141,8 +131,7 @@ docs:
   image:
     registry: ${REGISTRY}
     repository: images/docs
-    tag: v${KAMIWAZA_VERSION_SHORT}   # docs uses the bare version (v0.13.3), derived from KAMIWAZA_VERSION
-
+    tag: v${KAMIWAZA_VERSION_SHORT} # docs uses the bare version (v0.13.3), derived from KAMIWAZA_VERSION
 
 ### ----------------------------------------------------------------------------
 ### Network — Traefik ingress
@@ -154,7 +143,6 @@ network:
       repository: images/traefik
       tag: ${TRAEFIK_TAG}
 
-
 ### ----------------------------------------------------------------------------
 ### DataHub — metadata catalog (upstream subchart)
 ### ----------------------------------------------------------------------------
@@ -162,9 +150,8 @@ network:
 ### components set only `repository` and inherit the registry from
 ### `datahub.global.imageRegistry` below.
 datahub:
-
   global:
-    imageRegistry: ${REGISTRY}          # registry for all DataHub component images
+    imageRegistry: ${REGISTRY} # registry for all DataHub component images
 
   # -- Kamiwaza-side DataHub helpers -------------------------------------------
   keycloakClient:
@@ -180,18 +167,18 @@ datahub:
       tag: ${POSTGRES_TAG}
 
   opensearch:
-    image:                              # search backend (registry baked into repository)
+    image: # search backend (registry baked into repository)
       repository: ${REGISTRY}/images/opensearch
       tag: ${OPENSEARCH_TAG}
 
   prereq:
     kafka:
-      image:                            # event bus
+      image: # event bus
         registry: ${REGISTRY}
         repository: images/kafka-iamguarded
         tag: ${KAFKA_TAG}
     neo4j:
-      image:                            # graph store (single combined `customImage` ref)
+      image: # graph store (single combined `customImage` ref)
         customImage: ${REGISTRY}/images/neo4j:${NEO4J_TAG}
 
   utilityImages:
@@ -210,7 +197,6 @@ datahub:
 
   # -- Upstream DataHub components (registry from datahub.global.imageRegistry) -
   datahub:
-
     datahub-gms:
       image:
         repository: images/datahub-gms
@@ -224,43 +210,43 @@ datahub:
       # so it carries the full ${REGISTRY}/... reference inline rather than a
       # registry/repository pair. Keep the whole block when bumping the tag.
       extraInitContainers:
-      - name: wait-for-oidc-secret
-        image: ${REGISTRY}/images/chainguard-base:${KAMIWAZA_VERSION}
-        command:
-        - /bin/sh
-        - -c
-        - |
-          echo "Waiting for OIDC secret to be populated with real value..."
-          SECRET_FILE="/oidc-secret/client-secret"
-          MAX_RETRIES=120
-          RETRY_INTERVAL=5
-          RETRIES=0
-          while [ $RETRIES -lt $MAX_RETRIES ]; do
-            RETRIES=$((RETRIES + 1))
-            echo "  Attempt ${RETRIES}/${MAX_RETRIES}: Checking secret file..."
-            if [ -f "$SECRET_FILE" ]; then
-              SECRET_VALUE=$(cat "$SECRET_FILE")
-              if [ -n "$SECRET_VALUE" ] && [ "$SECRET_VALUE" != "placeholder" ]; then
-                echo "OIDC secret is ready with real value!"
-                exit 0
-              fi
-            fi
-            echo "    Secret not ready (empty or placeholder), waiting ${RETRY_INTERVAL}s..."
-            sleep ${RETRY_INTERVAL}
-          done
-          echo "ERROR: OIDC secret was not populated after ${MAX_RETRIES} attempts"
-          exit 1
-        volumeMounts:
-        - name: oidc-secret
-          mountPath: /oidc-secret
-          readOnly: true
-        resources:
-          requests:
-            cpu: 10m
-            memory: 32Mi
-          limits:
-            cpu: 100m
-            memory: 64Mi
+        - name: wait-for-oidc-secret
+          image: ${REGISTRY}/images/chainguard-base:${KAMIWAZA_VERSION}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for OIDC secret to be populated with real value..."
+              SECRET_FILE="/oidc-secret/client-secret"
+              MAX_RETRIES=120
+              RETRY_INTERVAL=5
+              RETRIES=0
+              while [ $RETRIES -lt $MAX_RETRIES ]; do
+                RETRIES=$((RETRIES + 1))
+                echo "  Attempt ${RETRIES}/${MAX_RETRIES}: Checking secret file..."
+                if [ -f "$SECRET_FILE" ]; then
+                  SECRET_VALUE=$(cat "$SECRET_FILE")
+                  if [ -n "$SECRET_VALUE" ] && [ "$SECRET_VALUE" != "placeholder" ]; then
+                    echo "OIDC secret is ready with real value!"
+                    exit 0
+                  fi
+                fi
+                echo "    Secret not ready (empty or placeholder), waiting ${RETRY_INTERVAL}s..."
+                sleep ${RETRY_INTERVAL}
+              done
+              echo "ERROR: OIDC secret was not populated after ${MAX_RETRIES} attempts"
+              exit 1
+          volumeMounts:
+            - name: oidc-secret
+              mountPath: /oidc-secret
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
 
     datahubSystemUpdate:
       image:

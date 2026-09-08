@@ -1,0 +1,84 @@
+# Refused on purpose.
+#
+# Two destination classes present the same client certificate identity. The
+# document is schema-valid and the loader accepts its shape; the whole policy
+# is then refused at cross-reference time:
+#
+#   one client identity per destination class:
+#   transport.egress.destinations[1].authentication: client identity
+#   "shared-egress" is already bound to destination class "enterprise-directory"
+#
+# The reason is ClientIdentityInvalid.
+#
+# This is the refusal that looks like tidiness and is not. One identity for two
+# destinations means the compromise of either far side yields a credential for
+# both, and it means rotating the identity for one destination rotates it for
+# the other whether that destination was ready or not. The bound is per class
+# so the blast radius of one credential is one class.
+transport:
+  issuance:
+    mode: PlatformIssued
+
+  trust:
+    bundleConfigMapName: kamiwaza-trust-bundle
+    publicRoots: Include
+    additionalAuthorities:
+      - name: enterprise-root-2027
+        configMapRef:
+          name: enterprise-trust
+          key: root-2027.pem
+
+  floor:
+    minimumTLSVersion: TLS1.2
+    hostnameVerification: Required
+
+  internal:
+    defaultTransport: PlatformTLS
+    workloadIngressFloor: true
+
+  clientIdentities:
+    - name: shared-egress
+      secretRef:
+        name: kamiwaza-egress-shared
+      commonName: kamiwaza-shared-egress
+      validity: 2160h
+      renewBefore: 360h
+
+  egress:
+    deniedNetworks:
+      - Loopback
+      - LinkLocal
+      - CloudMetadata
+      - PrivateRanges
+    destinations:
+      - name: enterprise-directory
+        kind: Directory
+        hosts:
+          - ldap.example.invalid
+        ports:
+          - 636
+        transport: MutualTLS
+        authentication:
+          type: MutualTLS
+          maxConnectionAge: 30m
+          mutualTLS:
+            clientIdentityRef: shared-egress
+        enforcementMode: PolicyAwareDialer
+        requiredAuthorities:
+          - enterprise-root-2027
+      # The defect: the same identity, a second time.
+      - name: enterprise-revocation
+        kind: Revocation
+        hosts:
+          - crl.example.invalid
+        ports:
+          - 443
+        transport: MutualTLS
+        authentication:
+          type: MutualTLS
+          maxConnectionAge: 30m
+          mutualTLS:
+            clientIdentityRef: shared-egress
+        enforcementMode: PolicyAwareDialer
+        requiredAuthorities:
+          - enterprise-root-2027

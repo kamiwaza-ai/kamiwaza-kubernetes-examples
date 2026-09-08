@@ -1,0 +1,62 @@
+apiVersion: extensions.kamiwaza.io/v1alpha1
+kind: KamiwazaExtension
+metadata:
+  name: example-web
+  namespace: kamiwaza-examples
+spec:
+  type: app
+  extensionRef:
+    name: example-web
+    version: 1.0.0
+  security:
+    riskTier: 1
+    sourceType: kamiwaza
+    verified: true
+  services:
+    - name: web
+      primary: true
+      image:
+        registry: ghcr.io
+        repository: kamiwaza-internal/kamiwaza/images/frontend
+        tag: develop
+        digest: sha256:2190bd74ab275cf08398fdd7cf4450d89e2c65561d0bd69761b39e64c95dd293
+        pullPolicy: IfNotPresent
+      ports:
+        - name: http
+          containerPort: 3000
+          protocol: TCP
+          appProtocol: http
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+        limits:
+          cpu: 500m
+          memory: 2Gi
+      healthCheck:
+        httpGet:
+          path: /health
+          port: 3000
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        timeoutSeconds: 5
+        failureThreshold: 12
+        startPeriod: 120
+  kamiwaza:
+    namespace: kamiwaza-examples
+    apiUrl: http://core-api.kamiwaza-examples.svc.cluster.local:7777/api
+    publicApiUrl: https://kamiwaza-examples.example.com/api
+    origin: https://kamiwaza-examples.example.com
+    tlsRejectUnauthorized: "1"
+    useAuth: "false"
+  networking:
+    ingress:
+      enabled: true
+      pathPrefix: /extensions/example-web
+      routeBackend: virtualservice
+      stripPrefix: false
+    networkPolicy:
+      enabled: true
+      allowNamespaces:
+        - kamiwaza-examples
+      allowExternalAccess: false

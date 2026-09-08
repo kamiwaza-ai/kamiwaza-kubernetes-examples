@@ -1,0 +1,68 @@
+# Refused on purpose, and refused by something other than the policy loader --
+# which is the point of publishing it.
+#
+# This document is schema-valid, the operator's loader accepts it, and every
+# cross-reference rule passes. It is the configuration channel that refuses
+# it, when the plane is enabled:
+#
+#   Blocked, reason ConfigChannelUnauthenticated:
+#   administrator policy sets no bounded lifetime for the
+#   control-plane-to-data-plane configuration hop, so an admitted
+#   configuration could keep serving after the credential that authorized it
+#   expired
+#
+# The defect is that `ControlPlaneToProtocolDataPlane` authenticates with
+# `type: None`, so there is no connection age to bound the last-known-good
+# configuration with and no client identity whose validity could bound it one
+# step further out. No channel is constructed, and no route is programmed --
+# the refusal lands before programming rather than after, because a stale
+# writer whose rejection arrives after programming has already rerouted
+# traffic.
+#
+# An absent bound is refused rather than defaulted. A default invented at this
+# layer would be an expiry policy the platform chose for an administrator who
+# never stated one.
+#
+# On an installation with the plane disabled this document is inert: no
+# channel is constructed, nothing is published about one, and no reason is
+# reported.
+transport:
+  issuance:
+    mode: PlatformIssued
+
+  trust:
+    bundleConfigMapName: kamiwaza-trust-bundle
+    publicRoots: Include
+    targetNamespaces:
+      - kamiwaza-examples
+
+  floor:
+    minimumTLSVersion: TLS1.2
+    hostnameVerification: Required
+
+  internal:
+    defaultTransport: PlatformTLS
+    workloadIngressFloor: true
+    hops:
+      # The defect: the transport is protected, but nothing authenticates the
+      # writer and nothing bounds how long an admitted configuration lives.
+      - name: ControlPlaneToProtocolDataPlane
+        transport: PlatformTLS
+        authentication:
+          type: None
+      - name: ProtocolDataPlaneToDecisionService
+        transport: PlatformTLS
+        authentication:
+          type: WorkloadIdentityX509
+          maxConnectionAge: 15m
+          workloadIdentityX509:
+            trustDomain: kamiwaza-examples.example.com
+            acceptedIdentities:
+              - "spiffe://kamiwaza-examples.example.com/ns/kamiwaza-examples/sa/kamiwaza-dataplane"
+
+  egress:
+    deniedNetworks:
+      - Loopback
+      - LinkLocal
+      - CloudMetadata
+      - PrivateRanges

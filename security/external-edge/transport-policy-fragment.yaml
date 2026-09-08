@@ -1,0 +1,94 @@
+# The edge half of one transport policy, as a loadable fragment.
+#
+# Merge the `transport` section into the AdminCapabilityPolicy document the
+# operator chart mounts at /etc/kamiwaza-policy/policy.yaml and bump
+# `adminPolicy.revision`. The fragment has `transport` at the root because that
+# is what the published schema declares and what the operator's own loader
+# accepts, so it can be validated on its own before it is merged.
+#
+# The platform never creates the Gateway. It owns the listener certificate,
+# HTTPRoute, BackendTLSPolicy, and the edge client-authority ConfigMap, and it
+# proves the outcome from the Gateway's own status. Everything below is intent
+# the administrator's Gateway must satisfy, not configuration of a Gateway.
+#
+# Every name here is a placeholder. No credential, certificate body, private
+# host, or proxy URL appears in this file: the only host is the reserved
+# documentation domain, and the material the platform issues is referenced by
+# object name.
+transport:
+  issuance:
+    # The zero-configuration mode. It reaches no certificate controller, so
+    # this fragment works on a cluster that has none installed.
+    mode: PlatformIssued
+
+  trust:
+    bundleConfigMapName: kamiwaza-trust-bundle
+    publicRoots: Include
+    # Publication is per namespace because a BackendTLSPolicy authority
+    # reference is namespace-local and cannot point at a central namespace.
+    targetNamespaces:
+      - kamiwaza-examples
+
+  floor:
+    minimumTLSVersion: TLS1.2
+    hostnameVerification: Required
+    fipsApprovedOnly: false
+
+  edge:
+    listenerCertificate: PlatformIssued
+    # The Secret the administrator's listener references through
+    # `certificateRefs`. The platform writes it; the Gateway reads it.
+    listenerCertificateSecretName: kamiwaza-gateway-tls
+    # Scheme redirect and BackendTLSPolicy are Extended Gateway API features.
+    # RequireWhenSupported emits them where the GatewayClass advertises the
+    # feature and reports EdgeFeatureUnsupported where it does not, rather than
+    # emitting an object the implementation will reject.
+    httpsRedirect: RequireWhenSupported
+    backendTLS: RequireWhenSupported
+    clientCertificate:
+      # RequireValid is the only expressible mode. The insecure fallback mode
+      # admits an absent and an invalid certificate alike, so it is not a
+      # "verify if presented" option and the platform never selects it.
+      mode: RequireValid
+      # A ConfigMap distinct from the trust bundle above. The two answer
+      # different questions -- which clients may authenticate, and which
+      # servers the platform trusts -- and one name for both means whichever
+      # is written last silently replaces the other.
+      authorityConfigMapName: kamiwaza-edge-client-ca
+      # Gateway API standardizes no client-certificate header and cannot
+      # interpolate connection state, so forwarding is fulfilled outside the
+      # operator by the administrator's edge and credited only against
+      # recorded conformance evidence.
+      forwardingMode: ExternalEdgeHeader
+      externalEvidenceRef:
+        name: edge-conformance
+        key: result.json
+
+  internal:
+    defaultTransport: PlatformTLS
+    workloadIngressFloor: true
+    hops:
+      # The gateway terminates public TLS and re-originates to each published
+      # backend. Without these hops the request travels in clear inside the
+      # cluster after the edge has already terminated it.
+      - name: GatewayToCore
+        transport: PlatformTLS
+        authentication:
+          type: None
+      - name: GatewayToFrontend
+        transport: PlatformTLS
+        authentication:
+          type: None
+      - name: GatewayToIdentityProvider
+        transport: PlatformTLS
+        authentication:
+          type: None
+
+  egress:
+    # The complete denied set. A regulated profile requires all four, and no
+    # profile permits fewer.
+    deniedNetworks:
+      - Loopback
+      - LinkLocal
+      - CloudMetadata
+      - PrivateRanges

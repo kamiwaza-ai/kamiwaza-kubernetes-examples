@@ -1,0 +1,153 @@
+# Optional lab convenience. This administrator-owned registry is not reconciled by KamiwazaPlatform and is not a production default.
+# Prerequisites:
+# - create Secret `registry-htpasswd` in the `kamiwaza-examples` namespace with key
+#   `htpasswd`;
+# - project the same approved username/password into Secret
+#   `kamiwaza-registry-credentials` in that namespace.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: registry
+  namespace: kamiwaza-examples
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: registry-data
+  namespace: kamiwaza-examples
+spec:
+  # Replace with the administrator-approved dynamic RWO StorageClass.
+  storageClassName: example-rwo
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: registry-config
+  namespace: kamiwaza-examples
+data:
+  config.yml: |
+    version: 0.1
+    log:
+      level: info
+      formatter: json
+    storage:
+      filesystem:
+        rootdirectory: /var/lib/registry
+      delete:
+        enabled: false
+    http:
+      addr: :5000
+      headers:
+        X-Content-Type-Options: [nosniff]
+    auth:
+      htpasswd:
+        realm: Kamiwaza Registry
+        path: /auth/htpasswd
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry
+  namespace: kamiwaza-examples
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: registry
+  ports:
+    - name: registry
+      port: 5000
+      targetPort: registry
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registry
+  namespace: kamiwaza-examples
+  labels:
+    app.kubernetes.io/name: registry
+    app.kubernetes.io/part-of: kamiwaza-registry-example
+    app.kubernetes.io/managed-by: cluster-administrator
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: registry
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: registry
+    spec:
+      serviceAccountName: registry
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: registry
+          image: ghcr.io/kamiwaza-internal/containers/images/registry@sha256:966bcd92d8b2c8b44ef8faee20c6aeb21bc9865707f468960644ceed52c6220f
+          imagePullPolicy: IfNotPresent
+          args:
+            - serve
+            - /etc/distribution/config.yml
+          ports:
+            - name: registry
+              containerPort: 5000
+          readinessProbe:
+            tcpSocket:
+              port: registry
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: registry
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 4Gi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/distribution
+              readOnly: true
+            - name: auth
+              mountPath: /auth
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/registry
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: registry-config
+        - name: auth
+          secret:
+            secretName: registry-htpasswd
+        - name: data
+          persistentVolumeClaim:
+            claimName: registry-data
+        - name: tmp
+          emptyDir: {}

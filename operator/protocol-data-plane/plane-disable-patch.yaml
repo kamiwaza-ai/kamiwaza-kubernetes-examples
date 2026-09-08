@@ -1,0 +1,30 @@
+# Run without the governed endpoint.
+#
+#   kubectl -n kamiwaza-examples patch kamiwazaplatform kamiwaza \
+#     --type merge \
+#     --patch-file operator/protocol-data-plane/plane-disable-patch.yaml
+#
+# This is the whole of the opt-out. With the plane disabled the operator
+# renders no plane workload, constructs no configuration channel, publishes no
+# `status.protocolDataPlane`, and reports no plane reason -- not an empty
+# object a reader has to interpret, and not a blocked component for a
+# capability nobody selected.
+#
+# It is also the honest answer to "what does the fencing guard do on an
+# installation that has not adopted the plane": nothing, because there is
+# nothing to fence. A commit presented to a channel that was never
+# constructed is an error rather than a rejection, since the caller reached a
+# code path a disabled capability should never reach at all.
+#
+# Disabling the plane does not remove a served model's own in-cluster address.
+# The plane is an additional front door, not a replacement, so the direct path
+# keeps working and keeps being reported on its own observation.
+apiVersion: platform.kamiwaza.io/v1alpha1
+kind: KamiwazaPlatform
+metadata:
+  name: kamiwaza
+  namespace: kamiwaza-examples
+spec:
+  components:
+    protocolDataPlane:
+      enabled: false
