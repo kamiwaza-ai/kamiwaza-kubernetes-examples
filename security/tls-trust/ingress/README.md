@@ -6,10 +6,10 @@ cert-manager PKI intact.
 
 Two approaches:
 
-| Approach | What you provide | Who issues the leaf |
-| --- | --- | --- |
-| **BYO leaf cert** | a ready `kubernetes.io/tls` Secret (leaf cert + key) | your external PKI, offline |
-| **CA-issuer** | a CA cert **+ CA private key** Secret | cert-manager, in-cluster, from your CA |
+| Approach          | What you provide                                     | Who issues the leaf                    |
+| ----------------- | ---------------------------------------------------- | -------------------------------------- |
+| **BYO leaf cert** | a ready `kubernetes.io/tls` Secret (leaf cert + key) | your external PKI, offline             |
+| **CA-issuer**     | a CA cert **+ CA private key** Secret                | cert-manager, in-cluster, from your CA |
 
 ---
 
@@ -26,9 +26,9 @@ The earlier version of this doc said the network chart "does not create a `defau
 TLSStore" on 0.13.0. That is **incorrect**. On 0.13.0 the network subchart already
 manages two Helm-owned resources in the `kamiwaza` namespace:
 
-| Resource | Template | Default secretName |
-| --- | --- | --- |
-| `TLSStore/default` | `charts/network/templates/traefik/default-tlsstore.yaml` | `traefik-wildcard-public-tls` |
+| Resource                              | Template                                                     | Default secretName                                |
+| ------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------- |
+| `TLSStore/default`                    | `charts/network/templates/traefik/default-tlsstore.yaml`     | `traefik-wildcard-public-tls`                     |
 | `Certificate/traefik-wildcard-public` | `charts/network/templates/traefik/wildcard-certificate.yaml` | `traefik-wildcard-public-tls`, issued by `app-ca` |
 
 That means a plain `kubectl apply` of the `TLSStore/default` repoint below will:
@@ -36,8 +36,8 @@ That means a plain `kubectl apply` of the `TLSStore/default` repoint below will:
 1. Succeed once, with a `last-applied-configuration` warning (Helm did not create
    the resource with the kubectl annotation). **Verified on 0.13.0.**
 2. **Survive an ordinary `helmfile sync`** — it is **not** auto-reverted. Helm 3's
-   three-way merge only reasserts a field when the chart's *rendered value for it
-   changes between releases*; when the chart output for `TLSStore/default` is
+   three-way merge only reasserts a field when the chart's _rendered value for it
+   changes between releases_; when the chart output for `TLSStore/default` is
    unchanged, the original→modified diff is empty and your live drift is preserved.
    (Verified: after a full re-sync, `helm get manifest kamiwaza` still shows
    `secretName: traefik-wildcard-public-tls` while the live store keeps
@@ -55,7 +55,7 @@ Realistic options on 0.13.0:
 - **(Recommended for Argo/CI-driven clusters)** Use the renamed manifests in
   Approach 2 (`Certificate/traefik-wildcard-byo` with its own secret name). This
   leaves the chart-managed Certificate alone; only the `TLSStore/default`
-  repoint stays Helm-conflicted, and because Argo self-heal *will* revert it, reassert
+  repoint stays Helm-conflicted, and because Argo self-heal _will_ revert it, reassert
   it via a post-sync hook (a one-line patch).
 - **(Cleanest, requires a chart change)** Open a values knob in the network
   subchart (e.g. `network.traefik.defaultTlsStore.secretName`) and disable
@@ -67,10 +67,12 @@ Realistic options on 0.13.0:
 
 > **Zero-generation demo.** The committed fake [`../demo-pki/`](../demo-pki/) ships a
 > ready leaf Secret for `*.kamiwaza.test`, so steps 1–2 collapse to:
+>
 > ```bash
 > kubectl apply -f security/tls-trust/demo-pki/secret-org-ingress-tls.yaml
 > kubectl apply -f security/tls-trust/ingress/tlsstore-default-byo.yaml
 > ```
+>
 > Then jump to step 3. **Demo material only — never serve it for real.**
 
 ```bash
@@ -105,12 +107,14 @@ leaf and rotates it.
 > **Zero-generation demo.** [`../demo-pki/`](../demo-pki/) ships the demo intermediate
 > as a ready CA keypair Secret. The bundled `ca-issuer-and-cert.yaml` has
 > `REPLACE_WITH_YOUR_DOMAIN` placeholders, so substitute the demo domain on apply:
+>
 > ```bash
 > kubectl apply -f security/tls-trust/demo-pki/secret-org-ca-keypair.yaml
 > sed 's/REPLACE_WITH_YOUR_DOMAIN/kamiwaza.test/g' \
 >   security/tls-trust/ingress/ca-issuer-and-cert.yaml | kubectl apply -f -
 > kubectl apply -f security/tls-trust/ingress/tlsstore-default-byo.yaml
 > ```
+>
 > cert-manager then mints (and rotates) the leaf from the demo intermediate.
 > **Demo material only.**
 
@@ -152,9 +156,9 @@ beyond reapplying the known-good Secret.
 
 ## Files
 
-| File | Use |
-| --- | --- |
-| [`byo-ingress-tls-secret.template.yaml`](byo-ingress-tls-secret.template.yaml) | `kubernetes.io/tls` Secret template (BYO leaf cert). |
-| [`tlsstore-default-byo.yaml`](tlsstore-default-byo.yaml) | Repoint Traefik default `TLSStore` (0.13.0 manifest path). |
-| [`ca-issuer-and-cert.yaml`](ca-issuer-and-cert.yaml) | cert-manager `Issuer` (kind: CA) + repointed wildcard `Certificate` (CA-issuer approach). |
-| [`../demo-pki/`](../demo-pki/) | **FAKE** committed PKI + ready Secret manifests for both approaches, so the ingress cycle runs with zero generation. Never use for real. |
+| File                                                                           | Use                                                                                                                                      |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| [`byo-ingress-tls-secret.template.yaml`](byo-ingress-tls-secret.template.yaml) | `kubernetes.io/tls` Secret template (BYO leaf cert).                                                                                     |
+| [`tlsstore-default-byo.yaml`](tlsstore-default-byo.yaml)                       | Repoint Traefik default `TLSStore` (0.13.0 manifest path).                                                                               |
+| [`ca-issuer-and-cert.yaml`](ca-issuer-and-cert.yaml)                           | cert-manager `Issuer` (kind: CA) + repointed wildcard `Certificate` (CA-issuer approach).                                                |
+| [`../demo-pki/`](../demo-pki/)                                                 | **FAKE** committed PKI + ready Secret manifests for both approaches, so the ingress cycle runs with zero generation. Never use for real. |

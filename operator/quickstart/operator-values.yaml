@@ -18,6 +18,23 @@ adminPolicy:
     allowedDomains:
       - kamiwaza-examples.example.com
     allowedSuffixes: []
+  images:
+    # Digest enforcement and registry credentials are administrator policy,
+    # not platform intent. The platform names which image it runs; this says
+    # which repositories are approved and which local Secret pulls them, so
+    # the two cannot disagree about who owns the credential.
+    requireDigests: true
+    allowedRepositoryPrefixes:
+      - ghcr.io/kamiwaza-internal/
+      # The relationship store and the protocol data plane are third-party
+      # images the platform pins by digest, so their repositories are named
+      # here rather than left out of the approved set.
+      - ghcr.io/authzed/
+      - ghcr.io/agentgateway/
+    # The Secret created in the target namespace in step 3. It stays a name
+    # here: no registry credential belongs in a values file.
+    pullSecretNames:
+      - registry-pull
   modelRegistry:
     type: OCIRegistry
     endpoint: registry.kamiwaza-examples.svc.cluster.local:5000

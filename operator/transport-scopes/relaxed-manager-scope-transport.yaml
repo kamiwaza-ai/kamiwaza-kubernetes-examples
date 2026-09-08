@@ -1,0 +1,104 @@
+# The transport half of a relaxed manager scope: a separately placed manager
+# with a cluster-wide cache and more than one approved target namespace.
+#
+# Pair this fragment with `../namespace-scopes/all-namespaces-values.yaml`
+# (cluster-wide cache) or `../namespace-scopes/bounded-values.yaml` (explicit
+# watch list). The chart side widens what the manager may *read*; this side
+# widens where the distribution is *published*. They are separate decisions
+# and both have to be made.
+#
+# Two consequences of the wider scope that are easy to get wrong:
+#
+#   * Every approved namespace needs its own copy of the distribution, under
+#     the same name. A consumer resolves the name in its own namespace, so one
+#     unlisted namespace is one namespace whose consumers have no authority to
+#     verify against -- and the manager being able to see that namespace does
+#     not change it.
+#   * A cross-namespace copy is not owned by an owner reference it cannot
+#     have. It carries the platform UID, the policy revision, and the content
+#     digest instead, and the root finalizer prunes it when the namespace or
+#     the platform leaves scope. Removing a namespace from the approved list
+#     is therefore a deletion, not a no-op.
+#
+# The relaxed scope changes neither the authority keys' location nor the
+# identity verification rule. Keys stay in the manager/security namespace, and
+# every accepted identity is still named exactly -- there is no "anything in
+# this trust domain" value, and a wider cache does not create one.
+transport:
+  issuance:
+    mode: PlatformIssued
+    platformIssued:
+      workloadIdentity:
+        source: PlatformIssued
+        trustDomain: kamiwaza-examples.example.com
+        attestation: OfflineTokenReview
+        identityLifetime: 24h
+        identityRenewBefore: 8h
+
+  trust:
+    bundleConfigMapName: kamiwaza-trust-bundle
+    publicRoots: Include
+    # Both approved targets. These must match the chart's
+    # `adminPolicy.allowedTargetNamespaces`; the chart refuses a target
+    # namespace outside the watch set, and a namespace missing from this list
+    # gets no distribution.
+    targetNamespaces:
+      - kamiwaza-examples
+      - kamiwaza-examples-tenant
+    maximumBundleBytes: 900000
+
+  floor:
+    minimumTLSVersion: TLS1.2
+    hostnameVerification: Required
+
+  internal:
+    defaultTransport: PlatformTLS
+    workloadIngressFloor: true
+    hops:
+      - name: CoreToApplicationDatabase
+        transport: PlatformTLS
+        authentication:
+          type: MutualTLS
+          maxConnectionAge: 30m
+          mutualTLS:
+            clientIdentityRef: core-client
+      # An extension in the second namespace, calling back into the platform.
+      # The accepted identity names that namespace and that ServiceAccount,
+      # so widening the cache does not widen who may call.
+      - name: ExtensionToCore
+        transport: PlatformTLS
+        authentication:
+          type: WorkloadIdentityX509
+          maxConnectionAge: 30m
+          workloadIdentityX509:
+            trustDomain: kamiwaza-examples.example.com
+            acceptedIdentities:
+              - "spiffe://kamiwaza-examples.example.com/ns/kamiwaza-examples-tenant/sa/kamiwaza-extension"
+      # The extension's own image is arbitrary, so the platform renders the
+      # pinned proxy in front of it rather than assuming a trust-file
+      # integration.
+      - name: CoreToExtension
+        transport: ProxyTerminated
+        authentication:
+          type: WorkloadIdentityJWT
+          maxConnectionAge: 30m
+          workloadIdentityJWT:
+            audience: kamiwaza-workload-sts
+            attestationProfiles:
+              - kubernetes-offline-v1
+            ttlSeconds: 3600
+
+  clientIdentities:
+    - name: core-client
+      secretRef:
+        name: kamiwaza-core-client
+      commonName: core-client
+      validity: 2160h
+      renewBefore: 360h
+
+  egress:
+    deniedNetworks:
+      - Loopback
+      - LinkLocal
+      - CloudMetadata
+      - PrivateRanges

@@ -33,7 +33,6 @@ core:
       - name: botocore-region-hotfix
         mountPath: /app/hotfix
         readOnly: true
-
 # If you are ALSO applying the parent CA-trust recipe (you should be), merge its
 # AWS_CA_BUNDLE / SSL_CERT_FILE entries into the SAME core.scheduler.extraEnv list
 # (a values key can appear only once). Combined list:

@@ -14,6 +14,8 @@ Choose where the shared manager runs and which namespaces it can watch. Placemen
 
 `manager.watchAnyNamespace: false` requires a non-empty `watchNamespaces` list. `manager.watchAnyNamespace: true` requires that list to be empty and still requires explicit `adminPolicy.allowedTargetNamespaces` entries.
 
+Watch scope is only half of the decision. Where the trust distribution is published, and which workload identities are accepted, is transport policy, and it has to agree with the scope chosen here: a namespace the manager can see but the policy does not name gets no distribution, and a `BackendTLSPolicy` authority reference is namespace-local so it cannot borrow another namespace's copy. The paired transport policy for each scope is in [transport-scopes](../transport-scopes/).
+
 Pin `OPERATOR_CHART_VERSION` for a repository or OCI chart reference. For a
 reviewed local chart directory, record the checkout commit and omit
 `--version`. Render the selected values with `helm template` before install.

@@ -8,12 +8,12 @@ This document is the **hands-on runbook** for the `security/ldap` example. Start
 
 ## 1. How this scenario is organized (design)
 
-| Layer                    | Directory                              | What operators should know                                                                                             |
-| ------------------------ | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **Kubernetes manifests** | `namespace.yaml`, `openldap/`, `jobs/` | What `kubectl apply -k .` applies: the lab directory, its content, and the bootstrap Job. Images are pinned by digest. |
+| Layer                    | Directory                                                      | What operators should know                                                                                                                                                                                                     |
+| ------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Kubernetes manifests** | `namespace.yaml`, `openldap/`, `jobs/`                         | What `kubectl apply -k .` applies: the lab directory, its content, and the bootstrap Job. Images are pinned by digest.                                                                                                         |
 | **Administrator policy** | `auth-profile-fragment.yaml`, `transport-policy-fragment.yaml` | The auth profile and the egress destination an operator-managed platform uses for a directory the customer owns. Two files because they merge into different sections of the policy document, and each is separately loadable. |
-| **LDAP sample LDIF**     | `ldap-samples/`                        | Optional files you apply yourself with `ldapadd` / `ldapmodify`. Not mounted by default, and no passwords in them.     |
-| **Keycloak automation**  | `keycloak-federation/`                 | Versioned JSON and shell scripts that call the Keycloak Admin API from a workstation.                                  |
+| **LDAP sample LDIF**     | `ldap-samples/`                                                | Optional files you apply yourself with `ldapadd` / `ldapmodify`. Not mounted by default, and no passwords in them.                                                                                                             |
+| **Keycloak automation**  | `keycloak-federation/`                                         | Versioned JSON and shell scripts that call the Keycloak Admin API from a workstation.                                                                                                                                          |
 
 **Why split `ldap-samples/` from `keycloak-federation/`?**
 Operators think in two systems: the **directory** and the **identity provider**. Keeping Keycloak JSON out of `openldap/` matches that split, and matches the production one — directory team and platform team.

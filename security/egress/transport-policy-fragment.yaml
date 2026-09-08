@@ -1,0 +1,196 @@
+# The egress half of one transport policy, as a loadable fragment.
+#
+# Egress is closed until a destination class is declared. There is no
+# "allow everything" value and no per-workload exception: a KamiwazaExtension
+# or ModelDeployment selects an approved class by name and defines no host,
+# credential, proxy, or exception of its own.
+#
+# Read `enforcementMode` first. It is not a preference, it follows from who
+# dials: a platform-owned client can be given the policy-aware resolver and
+# dialer that validates the name, the port, every resolved address, every
+# redirect, and DNS re-resolution before it connects or loads a credential. An
+# arbitrary model or extension image can be given nothing, so its destination
+# is enforced outside it by an administrator-owned proxy while its own direct
+# external egress is denied by NetworkPolicy.
+#
+# Every host below is under the reserved documentation domain `example.invalid`
+# (RFC 6761), which cannot resolve anywhere. No credential, certificate body,
+# private host, or real proxy endpoint appears in this file: credentials are
+# exact-name Secret references the administrator creates, and authorities are
+# referenced as objects rather than pasted in.
+transport:
+  issuance:
+    mode: PlatformIssued
+
+  trust:
+    bundleConfigMapName: kamiwaza-trust-bundle
+    publicRoots: Include
+    targetNamespaces:
+      - kamiwaza-examples
+    # Entries union, so one authority may contribute more than one valid
+    # anchor while the far side rotates. These are public certificates, so a
+    # ConfigMap is the honest home for them.
+    additionalAuthorities:
+      - name: enterprise-root-2026
+        description: Retiring enterprise root, retained for the rotation overlap
+        configMapRef:
+          name: enterprise-trust
+          key: root-2026.pem
+      - name: enterprise-root-2027
+        configMapRef:
+          name: enterprise-trust
+          key: root-2027.pem
+
+  floor:
+    minimumTLSVersion: TLS1.2
+    hostnameVerification: Required
+    fipsApprovedOnly: false
+
+  internal:
+    defaultTransport: PlatformTLS
+    workloadIngressFloor: true
+
+  clientIdentities:
+    # One identity per destination class, never shared. Sharing one makes a
+    # single compromise a credential for every class it was shared with, and
+    # makes rotating one destination's identity a rotation of the others
+    # whether they were ready or not.
+    - name: directory-egress
+      secretRef:
+        name: kamiwaza-egress-directory
+      commonName: kamiwaza-directory-egress
+      validity: 2160h
+      renewBefore: 360h
+    - name: inference-egress
+      secretRef:
+        name: kamiwaza-egress-inference
+      commonName: kamiwaza-inference-egress
+      validity: 2160h
+      renewBefore: 360h
+
+  egress:
+    # Always denied, in every profile. A policy cannot shorten this list.
+    deniedNetworks:
+      - Loopback
+      - LinkLocal
+      - CloudMetadata
+      - PrivateRanges
+
+    destinations:
+      # Server-authenticated, no client credential: the platform's own client
+      # dials it and the authorization decision does not travel on this hop.
+      - name: enterprise-idp
+        kind: IdentityProvider
+        hosts:
+          - login.example.invalid
+        ports:
+          - 443
+        transport: TLS
+        authentication:
+          type: None
+        enforcementMode: PolicyAwareDialer
+        # Both anchors, so the far side can rotate without a policy change.
+        requiredAuthorities:
+          - enterprise-root-2026
+          - enterprise-root-2027
+
+      # Mutual TLS with a class-specific identity. maxConnectionAge is not
+      # cosmetic: a connection that outlives the certificate that authenticated
+      # it is an authenticated session whose authentication has expired.
+      - name: enterprise-directory
+        kind: Directory
+        hosts:
+          - ldap.example.invalid
+        ports:
+          - 636
+        transport: MutualTLS
+        authentication:
+          type: MutualTLS
+          maxConnectionAge: 30m
+          mutualTLS:
+            clientIdentityRef: directory-egress
+        enforcementMode: PolicyAwareDialer
+        requiredAuthorities:
+          - enterprise-root-2027
+
+      # A client secret, referenced by exact name. The destination is verified
+      # before the credential is loaded, and no credential ever appears in a
+      # container argument or a log line.
+      - name: model-artifacts
+        kind: ModelArtifactRegistry
+        hosts:
+          - registry.example.invalid
+        ports:
+          - 443
+        transport: TLS
+        authentication:
+          type: OAuth2ClientCredentials
+          maxConnectionAge: 15m
+          oauth2ClientCredentials:
+            tokenEndpoint: "https://auth.example.invalid/oauth2/token"
+            clientID: kamiwaza-registry
+            clientSecretRef:
+              name: registry-oauth
+              key: client-secret
+            audience: registry.example.invalid
+            scopes:
+              - "repository:read"
+            maxTokenLifetime: 15m
+        enforcementMode: PolicyAwareDialer
+
+      # A certificate-bound token: replaying a stolen token also requires the
+      # private key. Dialled by a platform-owned client, but through the
+      # corporate proxy, which is why the mode is the via-proxy dialer rather
+      # than the enforcing proxy.
+      - name: inference-provider
+        kind: ModelProvider
+        hosts:
+          - api.provider.example.invalid
+        ports:
+          - 443
+        transport: MutualTLS
+        authentication:
+          type: CertificateBoundOAuth
+          maxConnectionAge: 15m
+          certificateBoundOAuth:
+            tokenEndpoint: "https://auth.provider.example.invalid/token"
+            clientID: kamiwaza
+            clientIdentityRef: inference-egress
+            audience: api.provider.example.invalid
+            maxTokenLifetime: 15m
+        enforcementMode: PolicyAwareDialerViaProxy
+        proxyRef: corporate-egress
+        requiredAuthorities:
+          - enterprise-root-2027
+
+      # An extension's own outbound API. The image is arbitrary, so the only
+      # admissible mode is the enforcing proxy: nothing inside that image can
+      # be trusted to check a destination.
+      - name: extension-apis
+        kind: ExtensionExternalAPI
+        hosts:
+          - "*.partner.example.invalid"
+        ports:
+          - 443
+        transport: TLS
+        authentication:
+          type: None
+        enforcementMode: EnforcingProxy
+        proxyRef: corporate-egress
+
+    proxies:
+      - name: corporate-egress
+        # Placeholder endpoint under a domain that cannot resolve. Your own
+        # proxy endpoint belongs in your policy document, and the platform
+        # keeps it out of status, Events, metrics, and logs.
+        url: "https://egress-proxy.example.invalid:3128"
+        authorityName: enterprise-root-2027
+        # The proxy must enforce destination policy itself. A proxy that only
+        # forwards is not enforcement, and this field cannot be false.
+        enforcesDestinationPolicy: true
+        # Protected evidence that the proxy does enforce it. Stale or absent
+        # evidence reports EgressEnforcementUnavailable and a bounded profile
+        # stays closed.
+        evidenceRef:
+          name: proxy-conformance
+          key: result.json

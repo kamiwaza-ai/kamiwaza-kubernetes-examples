@@ -102,15 +102,15 @@ The revocation document the origin reads is a JSON object with a `generated_at` 
 
 ## Files
 
-| File                                                                             | Purpose                                                                   |
-| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| File                                                                             | Purpose                                                                           |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | [auth-profile-fragment.yaml](auth-profile-fragment.yaml)                         | a loadable `profiles` fragment; merge it as `authProfiles` in the policy document |
-| [platform-profile-selection.yaml](platform-profile-selection.yaml)               | merge patch selecting the approved profile by name                        |
-| [gateway-frontend-validation.yaml](gateway-frontend-validation.yaml)             | reference shape for the administrator-owned Gateway                       |
-| [edge-conformance-evidence.example.yaml](edge-conformance-evidence.example.yaml) | shape of the five conformance records (not for applying)                  |
-| [revocation-evidence.example.yaml](revocation-evidence.example.yaml)             | shape of the revocation record (not for applying)                         |
-| [core-values-snippet.yaml](core-values-snippet.yaml)                             | auth-origin configuration for the Helmfile lifecycle                      |
-| [kustomization.yaml](kustomization.yaml)                                         | generates `cac-edge-origin` and `cac-client-authorities` from local files |
+| [platform-profile-selection.yaml](platform-profile-selection.yaml)               | merge patch selecting the approved profile by name                                |
+| [gateway-frontend-validation.yaml](gateway-frontend-validation.yaml)             | reference shape for the administrator-owned Gateway                               |
+| [edge-conformance-evidence.example.yaml](edge-conformance-evidence.example.yaml) | shape of the five conformance records (not for applying)                          |
+| [revocation-evidence.example.yaml](revocation-evidence.example.yaml)             | shape of the revocation record (not for applying)                                 |
+| [core-values-snippet.yaml](core-values-snippet.yaml)                             | auth-origin configuration for the Helmfile lifecycle                              |
+| [kustomization.yaml](kustomization.yaml)                                         | generates `cac-edge-origin` and `cac-client-authorities` from local files         |
 
 ## Steps
 

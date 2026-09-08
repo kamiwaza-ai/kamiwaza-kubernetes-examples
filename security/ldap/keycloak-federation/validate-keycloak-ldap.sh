@@ -87,8 +87,8 @@ else
   fail=1
 fi
 case "$bind_dn" in
-  cn=federation-reader,*) echo "OK: bindDn is the read-only federation account" ;;
-  *) echo "WARN: bindDn='${bind_dn}' is not the read-only federation account" >&2 ;;
+cn=federation-reader,*) echo "OK: bindDn is the read-only federation account" ;;
+*) echo "WARN: bindDn='${bind_dn}' is not the read-only federation account" >&2 ;;
 esac
 
 echo ""

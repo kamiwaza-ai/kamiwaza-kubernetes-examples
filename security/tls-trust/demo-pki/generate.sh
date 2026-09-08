@@ -35,7 +35,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 DOMAIN="${DOMAIN:-kamiwaza.test}"
-DAYS_CA="${DAYS_CA:-3650}"   # 10y for the CAs so the demo doesn't rot quickly
+DAYS_CA="${DAYS_CA:-3650}"    # 10y for the CAs so the demo doesn't rot quickly
 DAYS_LEAF="${DAYS_LEAF:-825}" # 825d — within the 825-day max browsers accept
 
 say() { printf '\033[1m==> %s\033[0m\n' "$1"; }

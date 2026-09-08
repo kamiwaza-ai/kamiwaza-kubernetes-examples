@@ -1,3 +1,33 @@
+# One platform, stated in the keys this release's CRD actually serves.
+#
+# The previous version of this file named `spec.topology`, `spec.auth`,
+# `spec.models`, `spec.images.requireDigests`, `spec.images.pullSecrets`, and
+# `spec.dependencies.istio`. None of them exist in the current API, so the API
+# server refused the whole object under strict decoding -- the quickstart could
+# not be applied at all. Where each one went:
+#
+#   spec.topology          -> the manager's watch scope, in the operator
+#                             chart's `manager.watchNamespaces`. Namespace
+#                             scope is an installation decision, not platform
+#                             intent. See ../namespace-scopes/.
+#   spec.auth              -> spec.components.identityAndAccess below.
+#   spec.models            -> nowhere on this resource, by design. See the
+#                             note under `components` below.
+#   spec.images.*          -> `channel` and `pinned` only. Digest enforcement
+#                             and registry credentials are administrator
+#                             policy, and one property stated in two places
+#                             lets the two disagree with no visible rule for
+#                             which wins.
+#   spec.dependencies.istio -> gone. The platform declares certManager,
+#                             gatewayAPI, and trustManager; it names no mesh
+#                             or ingress implementation, and routing is
+#                             expressed only through standard Gateway API
+#                             objects.
+#
+# Every digest below is the reference this operator release was reviewed
+# against, copied from `config/release/reviewed-images.yaml` in the platform
+# operator repository. Replace them with the digests your own release
+# publishes; do not replace them with tags.
 apiVersion: platform.kamiwaza.io/v1alpha1
 kind: KamiwazaPlatform
 metadata:
@@ -7,47 +37,107 @@ spec:
   version: 1.3.0
   profile: Full
   domain: kamiwaza-examples.example.com
-  topology:
-    mode: SingleNamespace
   storage:
     # Keep this value in sync with operator-values.yaml.
     statefulClassName: example-rwo
     shared:
       enabled: false
   dependencies:
+    # `required: true` is an administrator statement that the controller is
+    # installed. The operator observes these prerequisites and never installs,
+    # credentials, or upgrades one.
     certManager:
       required: true
     trustManager:
       required: true
-    istio:
-      required: true
     gatewayAPI:
       required: true
-  auth:
-    enabled: true
-    rebac:
+  components:
+    # There is no model intent on this resource, and its absence is the
+    # design rather than an omission. `ModelDeployment` in
+    # serving.kamiwaza.io is the only surface that deploys a served model,
+    # and a conformance test asserts this CRD declares no `models` field
+    # precisely so that declaring a platform cannot deploy a model by
+    # default. A `ModelDeployment` also carries an engine-authored Pod
+    # template, which the application writes when a model is deployed
+    # through it, so this repository publishes no hand-written one: a
+    # template that has never served a request is a guess, not an example.
+    # Observe what exists with
+    # `kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io`.
+    identityAndAccess:
       enabled: true
-      allowCommunityFallback: false
+      rebac:
+        enabled: true
+        allowCommunityFallback: false
+    # Off in this quickstart to keep the installation small. Enabling it adds
+    # the catalog, its event store, and its search store, each of which needs
+    # its own pinned image below.
+    metadataCatalog:
+      enabled: false
+    # The governed endpoint. `enabled` defaults to true in this CRD, so it is
+    # stated here to be explicit rather than to switch it on. Fencing,
+    # last-known-good bounds, and the plane's disabled authority surfaces are
+    # in ../protocol-data-plane/.
+    protocolDataPlane:
+      enabled: true
   images:
-    requireDigests: true
-    pullSecrets:
-      - name: registry-pull
-  models:
-    - name: tinyllama
-      repository: TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF
-      version: 52e7645ba7c309695bec7ac98f4f005b139cf465
-      hub: huggingface
-      files:
-        - tinyllama-1.1b-chat-v1.0.Q2_K.gguf
-      contextWindow: 2048
-      deploymentTarget: Kubernetes
-      serving:
-        engine: llamacpp
-        minCopies: 1
-        startingCopies: 1
-        maxCopies: 1
-        forceCPU: true
-        activeRequestsPerReplica: 20
+    # Pins for the capabilities this platform runs. A capability it does not
+    # enable needs no entry, which is why there is no metadataCatalog pin
+    # here.
+    pinned:
+      - capability: durableData
+        role: database
+        reference: ghcr.io/kamiwaza-internal/containers/images/postgres@sha256:acc328f6560f46c9a82beb7084a454e2c1cd7075acfb720fe8032a17a86f770c
+      - capability: durableData
+        role: coordination
+        reference: ghcr.io/kamiwaza-internal/containers/images/etcd@sha256:b4ff089698e65ac95749f7404c7c33f82ad26cab1abc2536b8021104abf27873
+      - capability: identityAndAccess
+        role: application
+        reference: ghcr.io/kamiwaza-internal/containers/images/keycloak@sha256:ed907de15e7f7afe2db5fd9f6ea41f86fac0d8dfda7c6a17c1bfcf4d37a8571a
+      - capability: identityAndAccess
+        role: init
+        reference: ghcr.io/kamiwaza-internal/kamiwaza/images/init-keycloak-users@sha256:e2572c22171abb9fccbf5e2eae53385259a2db0e414d00cd2bc2b92636e95b73
+      - capability: identityAndAccess
+        role: database
+        reference: ghcr.io/kamiwaza-internal/containers/images/postgres@sha256:acc328f6560f46c9a82beb7084a454e2c1cd7075acfb720fe8032a17a86f770c
+      # The relationship store and its datastore migration are deliberately
+      # the same digest: the store refuses to serve against a datastore a
+      # different version migrated, so one reviewed reference for both roles
+      # is what keeps the pair honest. Needed because rebac is enabled above.
+      - capability: relationshipStore
+        role: application
+        reference: ghcr.io/authzed/spicedb@sha256:0efcb5fddb59f9e35618da84b02a0a752fc6f71b002661c2362e1903d0380a90
+      - capability: relationshipStore
+        role: upgrade
+        reference: ghcr.io/authzed/spicedb@sha256:0efcb5fddb59f9e35618da84b02a0a752fc6f71b002661c2362e1903d0380a90
+      - capability: applicationAPI
+        role: application
+        reference: ghcr.io/kamiwaza-internal/kamiwaza/images/core@sha256:8d3e5dfc799c8b6bf7fd66ed95cb78ab3f75a2345fbd0e78be46d4996ea3a291
+      - capability: applicationAPI
+        role: inference
+        reference: ghcr.io/kamiwaza-internal/containers/images/llamacpp-cpu@sha256:2cca4d9b2eda3088fb6cb28f00fb60ea8f71abfd8c5b1179d55df26476e3aeeb
+      - capability: applicationAPI
+        role: modelFetch
+        reference: ghcr.io/kamiwaza-internal/containers/images/model-fetch@sha256:ae20c33de54ab28f67513ae71432468ee603415e8462dc7d6d760ff174033a96
+      - capability: webInterface
+        role: application
+        reference: ghcr.io/kamiwaza-internal/kamiwaza/images/frontend@sha256:2190bd74ab275cf08398fdd7cf4450d89e2c65561d0bd69761b39e64c95dd293
+      - capability: objectStorage
+        role: application
+        reference: ghcr.io/kamiwaza-internal/containers/images/seaweedfs@sha256:9718824fcc1ea3a7cc887db74833d6850b649cc781391059085f8efbc2f4e73b
+      - capability: protocolDataPlane
+        role: application
+        reference: ghcr.io/agentgateway/agentgateway@sha256:bf2f339ef326d32def2aaeb44b1b4549801293c19b89e764a4228667d97d9896
+  # Not pinned here, and not required here: image declaration covers the
+  # capabilities a platform runs, and `platformTransport` -- the certificate
+  # signer, the workload identity agent, and the pinned transport proxy -- is
+  # not one of the capabilities the declaration check asks a platform to
+  # name. It is worth knowing why anyway: reviewed release data carries the
+  # all-zero placeholder digest for all three roles, a value that can never
+  # resolve to bytes in any registry, because this release renders those
+  # targets and has not published their images. The release metadata command
+  # refuses to publish a placeholder from a release build, which is what
+  # stops it reaching a customer. Nothing is invented here in its place.
   observability:
     mode: Disabled
   adoption:

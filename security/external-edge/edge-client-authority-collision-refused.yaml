@@ -1,0 +1,61 @@
+# Refused on purpose.
+#
+# This fragment is identical to transport-policy-fragment.yaml in every respect
+# that matters except one: the edge client-authority ConfigMap and the server
+# trust bundle are given the same name. Load it and the operator refuses the
+# whole policy at load time rather than publishing an edge that enforces
+# nothing:
+#
+#   edge client authorities stay separate from the trust bundle:
+#   transport.edge.clientCertificate.authorityConfigMapName: the edge client
+#   authority set must not share ConfigMap "kamiwaza-trust-bundle" with the
+#   server trust bundle
+#
+# The reason is EdgeInsecureValidationDetected, and it is terminal until the
+# policy changes.
+#
+# Why this is worth refusing rather than warning about: the two sets answer
+# different questions. The trust bundle says which servers the platform
+# trusts; the edge client authority set says which clients the Gateway will
+# accept a certificate from. Publishing both under one name means whichever
+# writer runs last replaces the other, and the failure is silent in the
+# dangerous direction -- the Gateway keeps validating client certificates
+# against whatever is in the ConfigMap, which may now be the public root set.
+#
+# Nothing here is applyable and nothing here is a Kubernetes object.
+transport:
+  issuance:
+    mode: PlatformIssued
+
+  trust:
+    bundleConfigMapName: kamiwaza-trust-bundle
+    publicRoots: Include
+    targetNamespaces:
+      - kamiwaza-examples
+
+  floor:
+    minimumTLSVersion: TLS1.2
+    hostnameVerification: Required
+
+  edge:
+    listenerCertificate: PlatformIssued
+    listenerCertificateSecretName: kamiwaza-gateway-tls
+    clientCertificate:
+      mode: RequireValid
+      # The defect: this is the trust bundle's name.
+      authorityConfigMapName: kamiwaza-trust-bundle
+      forwardingMode: ExternalEdgeHeader
+      externalEvidenceRef:
+        name: edge-conformance
+        key: result.json
+
+  internal:
+    defaultTransport: PlatformTLS
+    workloadIngressFloor: true
+
+  egress:
+    deniedNetworks:
+      - Loopback
+      - LinkLocal
+      - CloudMetadata
+      - PrivateRanges

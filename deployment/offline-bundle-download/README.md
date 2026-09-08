@@ -11,18 +11,18 @@ downloads every artifact, verifies the parts, concatenates them, and checks the
 assembled bundle against its published checksum.
 
 **Nothing is hardcoded per release.** The script asks Keygen for the release list of the
-*Kamiwaza Offline Bundles* package, picks the newest stable version (or `$RELEASE`), and
+_Kamiwaza Offline Bundles_ package, picks the newest stable version (or `$RELEASE`), and
 uses **that release's artifact list as the download manifest** — so part counts, the
 timestamped extensions-bundle name, and the RPM filename all come from the API.
 
 ## Prerequisites
 
-| Requirement | Notes |
-| --- | --- |
-| Kamiwaza license key | Your Keygen license key, passed as `KEYGEN_LICENSE`. Ask your Kamiwaza contact if you don't have one. |
-| Internet egress | To `api.keygen.sh` + `raw.pkg.keygen.sh`. Run this on a connected host, then move `$DEST` into the air gap. |
-| `curl`, `python3`, `sha256sum` | `python3` only parses the Keygen JSON — no packages needed. |
-| Disk | **~40 GB free**: the parts plus the assembled bundles (parts are removed after a verified assemble; `KEEP_PARTS=1` keeps them and roughly doubles the requirement). |
+| Requirement                    | Notes                                                                                                                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kamiwaza license key           | Your Keygen license key, passed as `KEYGEN_LICENSE`. Ask your Kamiwaza contact if you don't have one.                                                               |
+| Internet egress                | To `api.keygen.sh` + `raw.pkg.keygen.sh`. Run this on a connected host, then move `$DEST` into the air gap.                                                         |
+| `curl`, `python3`, `sha256sum` | `python3` only parses the Keygen JSON — no packages needed.                                                                                                         |
+| Disk                           | **~40 GB free**: the parts plus the assembled bundles (parts are removed after a verified assemble; `KEEP_PARTS=1` keeps them and roughly doubles the requirement). |
 
 ## Run it
 
@@ -33,13 +33,13 @@ DEST="./artifacts/kamiwaza-bundle-v1.2.0" \
   deployment/offline-bundle-download/download-bundle.sh
 ```
 
-| Env | Default | Meaning |
-| --- | --- | --- |
-| `KEYGEN_LICENSE` | *(required)* | Your Kamiwaza license key (sent as `Authorization: License …`). |
-| `RELEASE` | latest stable | **Which bundle version to fetch** — any published release, not just the newest (see below). Omit it to take the latest stable. |
-| `DEST` | `/opt/kamiwaza/prereqs` | Download directory; created with `sudo install -d` if it doesn't exist. |
-| `KEEP_PARTS` | `0` | `1` keeps the `.part-NNN` files + sidecars after assembly (to re-verify or redistribute the split files). |
-| `PACKAGE_ID` | offline-bundles pkg | Override the Keygen package id. |
+| Env              | Default                 | Meaning                                                                                                                        |
+| ---------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `KEYGEN_LICENSE` | _(required)_            | Your Kamiwaza license key (sent as `Authorization: License …`).                                                                |
+| `RELEASE`        | latest stable           | **Which bundle version to fetch** — any published release, not just the newest (see below). Omit it to take the latest stable. |
+| `DEST`           | `/opt/kamiwaza/prereqs` | Download directory; created with `sudo install -d` if it doesn't exist.                                                        |
+| `KEEP_PARTS`     | `0`                     | `1` keeps the `.part-NNN` files + sidecars after assembly (to re-verify or redistribute the split files).                      |
+| `PACKAGE_ID`     | offline-bundles pkg     | Override the Keygen package id.                                                                                                |
 
 ### Choosing a release
 
@@ -89,7 +89,7 @@ $DEST/
 ## Verify
 
 The script fails loudly on a checksum mismatch, so a clean exit already means verified.
-To re-check by hand — and to validate the GPG signature the script does *not* check:
+To re-check by hand — and to validate the GPG signature the script does _not_ check:
 
 ```bash
 cd "$DEST"
@@ -117,7 +117,7 @@ tar -tf kamiwaza-helm.tar | head                        # kamiwaza-helm/*.wrap
 ## Gotchas
 
 - **`RELEASE` is the bundle's version, not the platform version.** Every Keygen package
-  has its own `1.0.0`; this script scopes the lookup to the *Kamiwaza Offline Bundles*
+  has its own `1.0.0`; this script scopes the lookup to the _Kamiwaza Offline Bundles_
   package so "latest" means the newest bundle. Prereleases (`1.2.0-rc.1`) are ignored.
 - **`DEST` on the right disk.** ~12 GB of parts get concatenated into ~12 GB of bundle;
   a small `/opt` fills up mid-assemble. Point `DEST` at the big volume up front.

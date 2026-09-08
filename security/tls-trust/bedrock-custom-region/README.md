@@ -10,9 +10,10 @@ any network I/O. This packages a small `sitecustomize.py` botocore patch as a
 **Tags:** #security #bedrock #botocore #helm-values
 
 > **This is the companion to the parent [`../`](../README.md) CA-trust recipe.**
-> - **Region patch (here):** makes boto3 *accept* the custom region.
+>
+> - **Region patch (here):** makes boto3 _accept_ the custom region.
 > - **CA trust (parent):** makes the TLS handshake to the privately-signed endpoint
->   *succeed with verification ON*.
+>   _succeed with verification ON_.
 >
 > Apply **both** and you do **not** need `SSL_VERIFY=False` / `AUTH_GATEWAY_TLS_INSECURE`.
 
@@ -28,22 +29,22 @@ the chart on every sync and **flows to the scheduler AND every Ray head/worker**
 all read `scheduler.extraEnv` / `scheduler.extraVolumes` / `scheduler.extraVolumeMounts`),
 so there is no separate `kubectl edit raycluster` step.
 
-| Imperative (gets reverted) | Declarative (here) |
-| --- | --- |
-| `kubectl create configmap botocore-region-hotfix --from-file=...` | `kubectl apply -k .` (kustomize) |
-| `kubectl set env deployment/core-scheduler PYTHONPATH=...` | `core.scheduler.extraEnv` |
-| `kubectl patch deployment core-scheduler` (volume+mount) | `core.scheduler.extraVolumes` + `extraVolumeMounts` |
-| `kubectl edit raycluster core-raycluster` (head + every worker) | covered automatically by the same `scheduler.*` values |
+| Imperative (gets reverted)                                        | Declarative (here)                                     |
+| ----------------------------------------------------------------- | ------------------------------------------------------ |
+| `kubectl create configmap botocore-region-hotfix --from-file=...` | `kubectl apply -k .` (kustomize)                       |
+| `kubectl set env deployment/core-scheduler PYTHONPATH=...`        | `core.scheduler.extraEnv`                              |
+| `kubectl patch deployment core-scheduler` (volume+mount)          | `core.scheduler.extraVolumes` + `extraVolumeMounts`    |
+| `kubectl edit raycluster core-raycluster` (head + every worker)   | covered automatically by the same `scheduler.*` values |
 
 ---
 
 ## Compatibility
 
-| Item | Status |
-| --- | --- |
-| Validated against | **Kamiwaza 0.13.0** (k8s / Ray path) |
-| 0.13.0 backend URL validation | Backend accepts custom endpoint URLs; only the **frontend** rejects non-`amazonaws.com` → register via API (see below). |
-| 0.10.0 (systemd/Docker) | Out of scope here — that host-side path also needs an `AWSBedrockEngine._validate_endpoint_url` shim and a `botocore/session.py` edit, not a k8s manifest. |
+| Item                          | Status                                                                                                                                                     |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Validated against             | **Kamiwaza 0.13.0** (k8s / Ray path)                                                                                                                       |
+| 0.13.0 backend URL validation | Backend accepts custom endpoint URLs; only the **frontend** rejects non-`amazonaws.com` → register via API (see below).                                    |
+| 0.10.0 (systemd/Docker)       | Out of scope here — that host-side path also needs an `AWSBedrockEngine._validate_endpoint_url` shim and a `botocore/session.py` edit, not a k8s manifest. |
 
 > The proper code-side fix (per-endpoint region/CA fields, retiring the monkeypatch)
 > is tracked as platform follow-up work. This is the configuration-only stopgap.
@@ -52,12 +53,12 @@ so there is no separate `kubectl edit raycluster` step.
 
 ## Files
 
-| File | Purpose |
-| --- | --- |
-| [`sitecustomize.py`](sitecustomize.py) | Botocore region patch; reads `KAMIWAZA_EXTRA_BEDROCK_REGIONS` (no Python edits needed). |
-| [`kustomization.yaml`](kustomization.yaml) | Generates ConfigMap `botocore-region-hotfix` from `sitecustomize.py`. |
-| [`values-snippet.yaml`](values-snippet.yaml) | Mounts it at `/app/hotfix`, prepends to `PYTHONPATH`, sets the region env — scheduler + Ray. |
-| [`bedrock-custom-model.example.json`](bedrock-custom-model.example.json) | Reference API payload to register the custom Bedrock endpoint (bypasses the FE URL check). |
+| File                                                                     | Purpose                                                                                      |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| [`sitecustomize.py`](sitecustomize.py)                                   | Botocore region patch; reads `KAMIWAZA_EXTRA_BEDROCK_REGIONS` (no Python edits needed).      |
+| [`kustomization.yaml`](kustomization.yaml)                               | Generates ConfigMap `botocore-region-hotfix` from `sitecustomize.py`.                        |
+| [`values-snippet.yaml`](values-snippet.yaml)                             | Mounts it at `/app/hotfix`, prepends to `PYTHONPATH`, sets the region env — scheduler + Ray. |
+| [`bedrock-custom-model.example.json`](bedrock-custom-model.example.json) | Reference API payload to register the custom Bedrock endpoint (bypasses the FE URL check).   |
 
 ---
 

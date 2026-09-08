@@ -44,17 +44,17 @@ Review the resulting files. The platform StorageClass and domain must be allowed
 
 ## 2. Verify administrator-owned prerequisites
 
-The example policy selects Istio routing and cert-manager-managed trust. The operator observes or accepts administrator attestations for these dependencies; it does not install them.
+The example policy selects cert-manager-managed trust and a Gateway the administrator owns. The operator observes or accepts administrator attestations for these dependencies; it does not install them. The platform resource names no ingress or mesh implementation: `spec.dependencies` covers `certManager`, `trustManager`, and `gatewayAPI` only, and routing is expressed through standard Gateway API objects, so the implementation behind the Gateway is the administrator's choice and not platform intent.
 
 ```bash
 kubectl get storageclass "${KAMIWAZA_STORAGE_CLASS}"
 kubectl get crd certificates.cert-manager.io
 kubectl get crd bundles.trust.cert-manager.io
 kubectl get crd gateways.gateway.networking.k8s.io
-kubectl -n istio-system get deployment
+kubectl get gatewayclass
 ```
 
-If your release selects external trust or another routing adapter, change the chart policy and the matching `spec.dependencies` requirements instead of installing unused controllers.
+If your release selects external trust, change the chart policy and the matching `spec.dependencies` requirements instead of installing unused controllers. Also check the controller behind your chosen GatewayClass is running, in whichever namespace it was installed.
 
 ## 3. Create namespaces and image credentials
 
@@ -70,7 +70,7 @@ kubectl -n kamiwaza-examples create secret generic registry-pull \
   --dry-run=client -o yaml | kubectl apply --server-side -f -
 ```
 
-Do not commit the generated Secret or Docker configuration.
+Do not commit the generated Secret or Docker configuration. The platform resource carries no pull-secret field: the Secret's name is administrator policy, in `adminPolicy.images.pullSecretNames` in `operator-values.yaml`, so credential ownership is stated in one place.
 
 ## 4. Install the shared manager
 
@@ -114,7 +114,7 @@ kubectl apply --server-side \
   -f kamiwaza-platform.local.yaml
 ```
 
-The example declares a small CPU-only model so the model path does not require a GPU. Image and model artifacts still require the registries and outbound access approved for the cluster.
+This platform declares no model, and there is no field on the resource for one. `ModelDeployment` in `serving.kamiwaza.io` is the only surface that deploys a served model, and the platform CRD carries no model intent by design so that declaring a platform cannot deploy a model by default. A `ModelDeployment` also carries an engine-authored Pod template, which the application writes when a model is deployed through it, so this quickstart applies none by hand: a template that has never served a request would be a guess rather than an example. Image pulls still require the registries and outbound access approved for the cluster.
 
 ## 6. Observe convergence
 
@@ -139,8 +139,17 @@ Correct the administrator-owned prerequisite, immutable policy, or user intent n
 ./verify.sh
 ```
 
-Success requires the shared manager Deployment to be available, the platform `Ready` condition to be true, `status.currentVersion` to equal `1.3.0`, and subordinate model deployments to be visible.
+Success requires the shared manager Deployment to be available, the platform `Ready` condition to be true, and `status.currentVersion` to equal `1.3.0`. `verify.sh` also lists `ModelDeployment` objects in the namespace; on a fresh quickstart there are none, and an empty list is the expected result rather than a failure.
 
 ## Cleanup
 
 Use the [deletion and retention](../deletion/) workflow. Do not uninstall the operator first: the platform finalizer must complete the selected retention behavior.
+
+## How these inputs were validated
+
+| File                                             | Validated with                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [kamiwaza-platform.yaml](kamiwaza-platform.yaml) | `kubectl apply --dry-run=server --validate=strict`, with the namespace substituted for one that exists on the validating cluster — accepted. The previous version of this file was rejected by the same command as `unknown field "spec.auth", unknown field "spec.dependencies.istio", unknown field "spec.images.pullSecrets", unknown field "spec.images.requireDigests", unknown field "spec.models", unknown field "spec.topology"`, which is why it was rewritten. |
+| [operator-values.yaml](operator-values.yaml)     | `helm template` against the operator chart — renders. The policy document it produces was then loaded through the manager's own policy loader, including its cross-reference rules — accepted, with the pull-secret name and the three approved repository prefixes present. The control, the same document with `requireDigests: false`, was refused as `managed images must require digests`.                                                                          |
+
+Every digest in `kamiwaza-platform.yaml` is copied from the operator release's own reviewed-image record. Replace them with the digests your release publishes, and never with tags.

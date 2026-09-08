@@ -29,7 +29,10 @@ EXPECT_HTTP_PROXY="${EXPECT_HTTP_PROXY:-${HTTP_PROXY:-}}"
 EXPECT_NO_PROXY="${EXPECT_NO_PROXY:-${NO_PROXY:-}}"
 
 pass() { printf '  \033[32m✓\033[0m %s\n' "$1"; }
-fail() { printf '  \033[31m✗\033[0m %s\n' "$1"; exit 1; }
+fail() {
+  printf '  \033[31m✗\033[0m %s\n' "$1"
+  exit 1
+}
 info() { printf '\033[1m%s\033[0m\n' "$1"; }
 
 check_env_equals() {
@@ -37,9 +40,9 @@ check_env_equals() {
   local text="$2"
   local key="$3"
   local expected="$4"
-  echo "$text" | grep -q "^${key}=${expected}$" \
-    && pass "${label} ${key}=${expected}" \
-    || fail "${label} missing ${key}=${expected}"
+  echo "$text" | grep -q "^${key}=${expected}$" &&
+    pass "${label} ${key}=${expected}" ||
+    fail "${label} missing ${key}=${expected}"
 }
 
 check_env_if_expected() {
@@ -79,19 +82,19 @@ probe_httpx() {
 }
 
 info "1. Trust bundle ConfigMap present in extension and sandbox namespaces"
-kubectl -n "$EXT_NS" get configmap "$BUNDLE_CM" >/dev/null 2>&1 \
-  && pass "$EXT_NS/$BUNDLE_CM present" \
-  || fail "$EXT_NS/$BUNDLE_CM missing"
-kubectl -n "$SANDBOX_NS" get configmap "$BUNDLE_CM" >/dev/null 2>&1 \
-  && pass "$SANDBOX_NS/$BUNDLE_CM present" \
-  || fail "$SANDBOX_NS/$BUNDLE_CM missing (run build-trust-bundle-configmap.sh --include-sandboxes)"
+kubectl -n "$EXT_NS" get configmap "$BUNDLE_CM" >/dev/null 2>&1 &&
+  pass "$EXT_NS/$BUNDLE_CM present" ||
+  fail "$EXT_NS/$BUNDLE_CM missing"
+kubectl -n "$SANDBOX_NS" get configmap "$BUNDLE_CM" >/dev/null 2>&1 &&
+  pass "$SANDBOX_NS/$BUNDLE_CM present" ||
+  fail "$SANDBOX_NS/$BUNDLE_CM missing (run build-trust-bundle-configmap.sh --include-sandboxes)"
 
 info "2. Declared Kaizen backend pod has bundle mount + CA env"
 BACKEND_POD="$(kubectl -n "$EXT_NS" get pods -l "extensions.kamiwaza.io/deployment-id=${EXT_NAME},extensions.kamiwaza.io/service=backend" -o name 2>/dev/null | head -1)"
 [ -n "$BACKEND_POD" ] || fail "No backend pod found for extension ${EXT_NAME}"
 BACKEND_ENV="$(kubectl -n "$EXT_NS" exec "$BACKEND_POD" -- sh -c "ls $BUNDLE_PATH >/dev/null 2>&1 && env" 2>/dev/null || true)"
-[ -n "$BACKEND_ENV" ] && pass "backend has $BUNDLE_PATH mounted" \
-  || fail "backend missing $BUNDLE_PATH mount"
+[ -n "$BACKEND_ENV" ] && pass "backend has $BUNDLE_PATH mounted" ||
+  fail "backend missing $BUNDLE_PATH mount"
 check_cert_count "backend" "$BACKEND_POD" "$EXT_NS"
 check_env_equals "backend" "$BACKEND_ENV" "SSL_CERT_FILE" "$BUNDLE_PATH"
 check_env_equals "backend" "$BACKEND_ENV" "REQUESTS_CA_BUNDLE" "$BUNDLE_PATH"
@@ -123,9 +126,9 @@ except Exception as e:
     print("FAIL " + kind)
 ' 2>/dev/null || echo "FAIL exec-failed")"
 case "$API_PROBE" in
-  OK*)   pass "backend KAMIWAZA_API_URL verifies under verify-ON (HTTP ${API_PROBE#OK })" ;;
-  SKIP*) pass "backend KAMIWAZA_API_URL is plain HTTP (TLS not applicable): ${API_PROBE#SKIP }" ;;
-  *)     fail "backend cannot reach its KAMIWAZA_API_URL with verification ON (${API_PROBE#FAIL }). The platform gave this extension an HTTPS API URL whose hostname does not match the Traefik cert (*.kamiwaza.test). Point KAMIWAZA_API_URL at the public origin (https://kamiwaza.test/api) or add the internal hostname to the cert SANs — see README 'The internal API URL is the most common real-world tripwire'." ;;
+OK*) pass "backend KAMIWAZA_API_URL verifies under verify-ON (HTTP ${API_PROBE#OK })" ;;
+SKIP*) pass "backend KAMIWAZA_API_URL is plain HTTP (TLS not applicable): ${API_PROBE#SKIP }" ;;
+*) fail "backend cannot reach its KAMIWAZA_API_URL with verification ON (${API_PROBE#FAIL }). The platform gave this extension an HTTPS API URL whose hostname does not match the Traefik cert (*.kamiwaza.test). Point KAMIWAZA_API_URL at the public origin (https://kamiwaza.test/api) or add the internal hostname to the cert SANs — see README 'The internal API URL is the most common real-world tripwire'." ;;
 esac
 
 if [ -n "$PROBE_URL" ]; then
@@ -137,8 +140,8 @@ info "4. Spawned sandbox pod exists and inherits the trust bundle"
 SANDBOX_POD="$(kubectl -n "$SANDBOX_NS" get pods -l "kamiwaza.io/parent-extension=${EXT_NAME}" -o name 2>/dev/null | head -1)"
 [ -n "$SANDBOX_POD" ] || fail "No sandbox pod found for ${EXT_NAME}. Open or resume a Kaizen conversation, then rerun."
 SANDBOX_ENV="$(kubectl -n "$SANDBOX_NS" exec "$SANDBOX_POD" -- sh -c "ls $BUNDLE_PATH >/dev/null 2>&1 && env" 2>/dev/null || true)"
-[ -n "$SANDBOX_ENV" ] && pass "sandbox has $BUNDLE_PATH mounted" \
-  || fail "sandbox missing $BUNDLE_PATH mount (current config-only packet stops here)"
+[ -n "$SANDBOX_ENV" ] && pass "sandbox has $BUNDLE_PATH mounted" ||
+  fail "sandbox missing $BUNDLE_PATH mount (current config-only packet stops here)"
 # NOTE: structural checks confirm a CA bundle is present and that the agent's
 # SSL_CERT_FILE/REQUESTS_CA_BUNDLE point at it — NOT that the corporate CA is in
 # it. The Kaizen agent image already ships a full bundle (Mozilla + Traefik cert),

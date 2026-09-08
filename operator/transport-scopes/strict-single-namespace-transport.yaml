@@ -1,0 +1,87 @@
+# The transport half of a strict single-namespace installation.
+#
+# Pair this fragment with `../namespace-scopes/same-namespace-values.yaml`,
+# which is the chart side of the same decision: one watched namespace, one
+# target RoleBinding, no cluster-scoped target authority.
+#
+# The one field that has to agree with the scope is `trust.targetNamespaces`.
+# It lists exactly the namespace the manager watches. Publication is per
+# namespace and mandatory rather than optional, because a `BackendTLSPolicy`
+# certificate-authority reference is namespace-local and cannot point at a
+# central namespace -- so a consumer in an unlisted namespace has no authority
+# to verify its backend against, whatever the manager can see.
+#
+# What stays out of this namespace no matter how narrow the scope is: the
+# authority keys. They exist only in the manager/security namespace, in
+# exact-name Secrets the isolated signer reads through the API. A namespace
+# administrator here cannot read or mount one, and this fragment has no field
+# that would let them.
+#
+# Strict scope does not mean fewer transport guarantees. Every hop is still
+# protected, the ingress floor is still emitted, and the denied network set is
+# still complete. What shrinks is the manager's authority, not the policy.
+transport:
+  issuance:
+    mode: PlatformIssued
+    platformIssued:
+      workloadIdentity:
+        source: PlatformIssued
+        # One trust domain for this installation. Identity documents are named
+        # spiffe://<trustDomain>/ns/<namespace>/sa/<serviceAccount>, so in this
+        # scope every identity carries the one namespace below.
+        trustDomain: kamiwaza-examples.example.com
+        attestation: OfflineTokenReview
+        identityLifetime: 24h
+        identityRenewBefore: 8h
+
+  trust:
+    bundleConfigMapName: kamiwaza-trust-bundle
+    publicRoots: Include
+    # Exactly the watched namespace. Nothing wider is publishable, and
+    # nothing narrower would leave a consumer with an authority to verify
+    # against.
+    targetNamespaces:
+      - kamiwaza-examples
+
+  floor:
+    minimumTLSVersion: TLS1.2
+    hostnameVerification: Required
+
+  internal:
+    defaultTransport: PlatformTLS
+    workloadIngressFloor: true
+    hops:
+      - name: CoreToApplicationDatabase
+        transport: PlatformTLS
+        authentication:
+          type: MutualTLS
+          maxConnectionAge: 30m
+          mutualTLS:
+            clientIdentityRef: core-client
+      # Verification is per identity even inside one namespace. Trust-domain
+      # membership is not authorization, and an empty accepted list is invalid
+      # rather than permissive.
+      - name: CoreToKeyValueStore
+        transport: PlatformTLS
+        authentication:
+          type: WorkloadIdentityX509
+          maxConnectionAge: 30m
+          workloadIdentityX509:
+            trustDomain: kamiwaza-examples.example.com
+            acceptedIdentities:
+              - "spiffe://kamiwaza-examples.example.com/ns/kamiwaza-examples/sa/kamiwaza-core"
+
+  clientIdentities:
+    - name: core-client
+      secretRef:
+        name: kamiwaza-core-client
+      commonName: core-client
+      validity: 2160h
+      renewBefore: 360h
+
+  egress:
+    deniedNetworks:
+      - Loopback
+      - LinkLocal
+      - CloudMetadata
+      - PrivateRanges

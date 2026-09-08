@@ -1,0 +1,32 @@
+# Select the governed endpoint on an existing platform.
+#
+#   kubectl -n kamiwaza-examples patch kamiwazaplatform kamiwaza \
+#     --type merge \
+#     --patch-file operator/protocol-data-plane/plane-enable-patch.yaml
+#
+# Read this before applying it: in the current CRD `enabled` carries a
+# default of `true`, so a platform object applied against this CRD without
+# stating the field is defaulted to enabled by the API server. This patch is
+# therefore how you make the selection explicit and reviewable, not how you
+# turn something on that was off. To run without the plane, apply
+# plane-disable-patch.yaml -- and check what your object says today rather
+# than assuming:
+#
+#   kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
+#     -o jsonpath='{.spec.components.protocolDataPlane.enabled}{"\n"}'
+#
+# Enabling the plane adds a governed endpoint and its decision-service
+# dependency. It is refused with nothing mutated -- not half applied -- when
+# the reviewed release data names no digest for its image, when any plane-side
+# authority surface is requested, or when the replica count contradicts the
+# profile. The transport policy has to bound the configuration channel first;
+# see transport-policy-fragment.yaml in this directory.
+apiVersion: platform.kamiwaza.io/v1alpha1
+kind: KamiwazaPlatform
+metadata:
+  name: kamiwaza
+  namespace: kamiwaza-examples
+spec:
+  components:
+    protocolDataPlane:
+      enabled: true
