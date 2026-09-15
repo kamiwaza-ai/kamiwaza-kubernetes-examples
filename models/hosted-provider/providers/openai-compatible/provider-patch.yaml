@@ -1,0 +1,11 @@
+- op: replace
+  path: /spec/modelId
+  value: reviewed-model
+- op: replace
+  path: /spec/external
+  value:
+    provider: openai_compatible
+    credentialSecretRef:
+      name: model-provider-openai-compatible
+      key: credential
+    endpointURL: https://api.example.invalid/v1

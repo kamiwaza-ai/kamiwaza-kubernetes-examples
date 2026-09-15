@@ -1,0 +1,79 @@
+apiVersion: platform.kamiwaza.io/v1alpha1
+kind: KamiwazaPlatform
+metadata:
+  name: kamiwaza
+  namespace: kw-cert-supplied
+spec:
+  version: 1.3.0
+  clusterID: kw-cert-supplied
+  displayName: kw-cert-supplied
+  profile: Full
+  domain: cert-supplied.example.invalid
+  storage:
+    statefulClassName: example-rwo
+    shared:
+      enabled: false
+  dependencies:
+    gatewayAPI:
+      required: true
+  components:
+    durableData: {}
+    identityAndAccess:
+      enabled: true
+      rebac:
+        enabled: true
+        allowCommunityFallback: false
+        backend: spicedb
+    objectStorage: {}
+    metadataCatalog:
+      enabled: false
+    applicationAPI: {}
+    webInterface: {}
+    protocolDataPlane:
+      enabled: true
+  images:
+    pinned:
+      - capability: durableData
+        role: database
+        reference: ghcr.io/kamiwaza-internal/containers/images/postgres@sha256:acc328f6560f46c9a82beb7084a454e2c1cd7075acfb720fe8032a17a86f770c
+      - capability: durableData
+        role: coordination
+        reference: ghcr.io/kamiwaza-internal/containers/images/etcd@sha256:b4ff089698e65ac95749f7404c7c33f82ad26cab1abc2536b8021104abf27873
+      - capability: identityAndAccess
+        role: application
+        reference: ghcr.io/kamiwaza-internal/containers/images/keycloak@sha256:ed907de15e7f7afe2db5fd9f6ea41f86fac0d8dfda7c6a17c1bfcf4d37a8571a
+      - capability: identityAndAccess
+        role: init
+        reference: ghcr.io/kamiwaza-internal/kamiwaza/images/init-keycloak-users@sha256:e2572c22171abb9fccbf5e2eae53385259a2db0e414d00cd2bc2b92636e95b73
+      - capability: identityAndAccess
+        role: database
+        reference: ghcr.io/kamiwaza-internal/containers/images/postgres@sha256:acc328f6560f46c9a82beb7084a454e2c1cd7075acfb720fe8032a17a86f770c
+      - capability: relationshipStore
+        role: application
+        reference: ghcr.io/authzed/spicedb@sha256:0efcb5fddb59f9e35618da84b02a0a752fc6f71b002661c2362e1903d0380a90
+      - capability: relationshipStore
+        role: upgrade
+        reference: ghcr.io/authzed/spicedb@sha256:0efcb5fddb59f9e35618da84b02a0a752fc6f71b002661c2362e1903d0380a90
+      - capability: applicationAPI
+        role: application
+        reference: ghcr.io/kamiwaza-internal/kamiwaza/images/core@sha256:8d3e5dfc799c8b6bf7fd66ed95cb78ab3f75a2345fbd0e78be46d4996ea3a291
+      - capability: applicationAPI
+        role: inference
+        reference: ghcr.io/kamiwaza-internal/containers/images/llamacpp-cpu@sha256:2cca4d9b2eda3088fb6cb28f00fb60ea8f71abfd8c5b1179d55df26476e3aeeb
+      - capability: applicationAPI
+        role: modelFetch
+        reference: ghcr.io/kamiwaza-internal/containers/images/model-fetch@sha256:ae20c33de54ab28f67513ae71432468ee603415e8462dc7d6d760ff174033a96
+      - capability: webInterface
+        role: application
+        reference: ghcr.io/kamiwaza-internal/kamiwaza/images/frontend@sha256:2190bd74ab275cf08398fdd7cf4450d89e2c65561d0bd69761b39e64c95dd293
+      - capability: objectStorage
+        role: application
+        reference: ghcr.io/kamiwaza-internal/containers/images/seaweedfs@sha256:9718824fcc1ea3a7cc887db74833d6850b649cc781391059085f8efbc2f4e73b
+      - capability: protocolDataPlane
+        role: application
+        reference: ghcr.io/agentgateway/agentgateway@sha256:bf2f339ef326d32def2aaeb44b1b4549801293c19b89e764a4228667d97d9896
+  observability:
+    mode: Disabled
+  adoption:
+    mode: Disabled
+  deletionPolicy: RetainData

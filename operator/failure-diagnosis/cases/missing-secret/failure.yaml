@@ -1,0 +1,14 @@
+apiVersion: serving.kamiwaza.io/v1alpha1
+kind: ModelDeployment
+metadata:
+  name: missing-secret-model
+  namespace: kw-failure-diagnosis
+spec:
+  deploymentId: missing-secret-model
+  modelId: missing-secret-model
+  state: running
+  external:
+    provider: openrouter
+    credentialSecretRef:
+      name: absent-provider-credential
+      key: credential

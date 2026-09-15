@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base
+patches:
+  - target:
+      group: serving.kamiwaza.io
+      version: v1alpha1
+      kind: ModelDeployment
+      name: smollm2
+    patch: |-
+      - op: add
+        path: /spec/gpuCount
+        value: 1
+      - op: add
+        path: /spec/requiredVendor
+        value: nvidia
+      - op: replace
+        path: /spec/carriedPodTemplate/spec/containers/0/image
+        value: ghcr.io/ggml-org/llama.cpp@sha256:5268283a8d6510d167364f19aee93e98180d8eb0cac4b7edb20af7e3edf40c17
+      - op: add
+        path: /spec/carriedPodTemplate/spec/containers/0/args/-
+        value: --n-gpu-layers
+      - op: add
+        path: /spec/carriedPodTemplate/spec/containers/0/args/-
+        value: "-1"

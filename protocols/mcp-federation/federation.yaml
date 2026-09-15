@@ -1,0 +1,18 @@
+apiVersion: protocols.kamiwaza.io/v1alpha1
+kind: MCPFederation
+metadata:
+  name: team-tools
+  namespace: kw-mcp-federation
+spec:
+  protocolVersion: "2025-11-25"
+  transport: StreamableHTTP
+  path: /mcp/team-tools
+  sources:
+    - name: records
+      extensionRef:
+        name: records-tools
+        endpointName: mcp
+    - name: catalog
+      extensionRef:
+        name: catalog-tools
+        endpointName: mcp

@@ -6,16 +6,16 @@
 
 ## Service map
 
-| Service | In-cluster URL | Default port | Purpose |
-| --- | --- | --- | --- |
-| **Frontend (UI)** | `http://frontend:3000` | 3000 | Kamiwaza web interface |
-| **Core API** | `http://core-raycluster-head-svc:7777` | 7777 | REST API (served by Ray head) |
-| **Keycloak** | `http://keycloak:8080` | 8080 | Identity provider (when auth enabled) |
-| **Ray Dashboard** | `http://core-raycluster-head-svc:8265` | 8265 | Ray cluster management UI |
-| **Traefik** | `http://traefik:443` | 443 (HTTPS), 80 (HTTP) | Ingress controller (routes all traffic) |
-| **Grafana** | `http://kube-prometheus-stack-grafana:80` | 80 | Monitoring dashboards (if deployed) |
-| **PostgreSQL** | `core-postgres:5432` | 5432 | Application database (not exposed externally) |
-| **etcd** | `core-etcd:2379` | 2379 | Key-value store (not exposed externally) |
+| Service           | In-cluster URL                            | Default port           | Purpose                                       |
+| ----------------- | ----------------------------------------- | ---------------------- | --------------------------------------------- |
+| **Frontend (UI)** | `http://frontend:3000`                    | 3000                   | Kamiwaza web interface                        |
+| **Core API**      | `http://core-raycluster-head-svc:7777`    | 7777                   | REST API (served by Ray head)                 |
+| **Keycloak**      | `http://keycloak:8080`                    | 8080                   | Identity provider (when auth enabled)         |
+| **Ray Dashboard** | `http://core-raycluster-head-svc:8265`    | 8265                   | Ray cluster management UI                     |
+| **Traefik**       | `http://traefik:443`                      | 443 (HTTPS), 80 (HTTP) | Ingress controller (routes all traffic)       |
+| **Grafana**       | `http://kube-prometheus-stack-grafana:80` | 80                     | Monitoring dashboards (if deployed)           |
+| **PostgreSQL**    | `core-postgres:5432`                      | 5432                   | Application database (not exposed externally) |
+| **etcd**          | `core-etcd:2379`                          | 2379                   | Key-value store (not exposed externally)      |
 
 ## Port-forward (works on any cluster)
 
@@ -50,12 +50,12 @@ echo "Keycloak: http://localhost:9080"
 
 When Kamiwaza is deployed with the standard network chart, Traefik handles all external routing. The frontend, API, and Keycloak are all accessible through a single domain:
 
-| URL | Routes to |
-| --- | --- |
-| `https://kamiwaza.test/` | Frontend |
-| `https://kamiwaza.test/api/*` | Core API (via Ray head) |
+| URL                              | Routes to                 |
+| -------------------------------- | ------------------------- |
+| `https://kamiwaza.test/`         | Frontend                  |
+| `https://kamiwaza.test/api/*`    | Core API (via Ray head)   |
 | `https://kamiwaza.test/realms/*` | Keycloak (OIDC endpoints) |
-| `https://kamiwaza.test/admin/*` | Keycloak admin console |
+| `https://kamiwaza.test/admin/*`  | Keycloak admin console    |
 
 This requires DNS resolution for `kamiwaza.test` pointing to the Traefik service IP (or a load balancer in front of it).
 

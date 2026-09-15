@@ -1,0 +1,37 @@
+adminPolicy:
+  revision: federation-west-r1
+  federation:
+    maximumActiveLinks: 8
+    profiles:
+      - name: east
+        remoteClusterID: east
+        destinationClassRef: east-platform
+        workloadIdentity:
+          trustDomain: east.kamiwaza.example
+          bundleEndpoint: https://identity.east.kamiwaza.example/bundle
+          endpointProfile: HttpsSpiffe
+          acceptedIdentities:
+            - spiffe://east.kamiwaza.example/ns/kw-federation-east/sa/kamiwaza-dataplane
+          maximumBundleStaleness: 15m
+        failurePolicy: FailClosed
+  transport:
+    egress:
+      deniedNetworks:
+        - Loopback
+        - LinkLocal
+        - CloudMetadata
+        - PrivateRanges
+      destinations:
+        - name: east-platform
+          kind: PlatformInformation
+          hosts:
+            - protocol.east.kamiwaza.example
+          ports:
+            - 443
+          transport: MutualTLS
+          authentication:
+            type: FederatedWorkloadIdentity
+            maxConnectionAge: 15m
+            federatedWorkloadIdentity:
+              profileRef: east
+          enforcementMode: PolicyAwareDialer

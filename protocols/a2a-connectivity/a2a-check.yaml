@@ -1,0 +1,175 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: a2a-check
+  namespace: kw-a2a
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json
+              import os
+              import ssl
+              import urllib.error
+              import urllib.request
+
+              root = (
+                  "https://kamiwaza-dataplane.kw-a2a.svc.cluster.local"
+                  + ":8080/agents"
+              )
+              token = os.environ["A2A_CHECK_TOKEN"]
+              context = ssl.create_default_context(
+                  cafile="/etc/kamiwaza/trust/ca-certificates.crt"
+              )
+
+              def request(agent, method, path, payload=None, authenticate=True):
+                  headers = {"Accept": "application/json, text/event-stream"}
+                  if authenticate:
+                      headers["Authorization"] = "Bearer " + token
+                  data = None
+                  if payload is not None:
+                      data = json.dumps(payload).encode()
+                      headers["Content-Type"] = "application/json"
+                  item = urllib.request.Request(
+                      root + "/" + agent + path,
+                      data=data,
+                      headers=headers,
+                      method=method,
+                  )
+                  return urllib.request.urlopen(
+                      item, context=context, timeout=15
+                  )
+
+              for agent, skill in (("reviewer", "review"), ("researcher", "research")):
+                  response = request(
+                      agent, "GET", "/.well-known/agent-card.json"
+                  )
+                  card = json.load(response)
+                  assert card["name"] == agent
+                  assert card["skills"][0]["id"] == skill
+                  interface = card["supportedInterfaces"][0]
+                  assert interface == {
+                      "url": "https://a2a.example.invalid/agents/" + agent,
+                      "protocolBinding": "HTTP+JSON",
+                      "protocolVersion": "1.0",
+                  }
+                  assert ".svc" not in json.dumps(card)
+                  assert card["securityRequirements"] == [{"platformOAuth2": []}]
+                  assert "platformOAuth2" in card["securitySchemes"]
+
+              message = {
+                  "message": {
+                      "messageId": "review-001",
+                      "role": "ROLE_USER",
+                      "parts": [{"text": "contract", "mediaType": "text/plain"}],
+                  }
+              }
+              sent = json.load(
+                  request("reviewer", "POST", "/message:send", message)
+              )["task"]
+              assert sent["status"]["state"] == "TASK_STATE_COMPLETED"
+              assert sent["artifacts"][0]["parts"][0]["text"] == (
+                  "reviewer: CONTRACT"
+              )
+              task_id = sent["id"]
+              fetched = json.load(
+                  request("reviewer", "GET", "/tasks/" + task_id)
+              )
+              assert fetched["id"] == task_id
+              assert fetched["artifacts"] == sent["artifacts"]
+
+              streamed_message = {
+                  "message": {
+                      "messageId": "research-stream-001",
+                      "role": "ROLE_USER",
+                      "parts": [{"text": "stream", "mediaType": "text/plain"}],
+                  }
+              }
+              stream = request(
+                  "researcher", "POST", "/message:stream", streamed_message
+              )
+              assert stream.headers["Content-Type"].startswith("text/event-stream")
+              events = stream.read().decode()
+              assert "id: " in events
+              assert "TASK_STATE_COMPLETED" in events
+              assert "researcher: STREAM" in events
+
+              hold_message = {
+                  "message": {
+                      "messageId": "research-hold-001",
+                      "role": "ROLE_USER",
+                      "parts": [{"text": "hold", "mediaType": "text/plain"}],
+                  }
+              }
+              held = json.load(
+                  request("researcher", "POST", "/message:send", hold_message)
+              )["task"]
+              assert held["status"]["state"] == "TASK_STATE_WORKING"
+              canceled = json.load(
+                  request(
+                      "researcher",
+                      "POST",
+                      "/tasks/" + held["id"] + ":cancel",
+                      {"id": held["id"]},
+                  )
+              )
+              assert canceled["id"] == held["id"]
+              assert canceled["status"]["state"] == "TASK_STATE_CANCELED"
+
+              try:
+                  request(
+                      "reviewer",
+                      "GET",
+                      "/.well-known/agent-card.json",
+                      authenticate=False,
+                  )
+              except urllib.error.HTTPError as error:
+                  assert error.code == 401
+              else:
+                  raise AssertionError("unauthenticated agent discovery was accepted")
+              print("A2A cards, tasks, stream, cancellation, and authentication verified")
+          env:
+            - name: A2A_CHECK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: a2a-check-token
+                  key: token
+          volumeMounts:
+            - name: platform-trust
+              mountPath: /etc/kamiwaza/trust
+              readOnly: true
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: platform-trust
+          configMap:
+            name: kamiwaza-trust-bundle

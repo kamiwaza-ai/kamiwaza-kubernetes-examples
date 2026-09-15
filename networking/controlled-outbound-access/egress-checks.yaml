@@ -1,0 +1,81 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: egress-check-to-client
+  namespace: kw-controlled-egress
+spec:
+  podSelector:
+    matchLabels:
+      kamiwaza.io/extension: outbound-client
+      kamiwaza.io/component: client
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: egress-check
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: egress-check
+  namespace: kw-controlled-egress
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: egress-check
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json, urllib.request
+
+              endpoint = "http://outbound-client-client:8080"
+
+
+              def post(path, body):
+                  request = urllib.request.Request(
+                      endpoint + path,
+                      data=json.dumps(body).encode(),
+                      headers={"Content-Type": "application/json"},
+                  )
+                  return json.load(urllib.request.urlopen(request, timeout=10))
+
+
+              assert post("/fetch", {"destinationClass": "reviewed-echo"}) == {"allowed": True}
+              for kind in ("unlisted", "direct", "ip-literal", "link-local"):
+                  assert post("/probe", {"kind": kind}) == {"denied": True}, kind + " escaped"
+              print("approved proxy path passed; four bypass paths denied")
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true

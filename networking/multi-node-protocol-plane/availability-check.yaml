@@ -1,0 +1,281 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: protocol-plane-check
+  namespace: kw-protocol-ha
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: protocol-plane-check
+  namespace: kw-protocol-ha
+rules:
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - services
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - policy
+    resources:
+      - poddisruptionbudgets
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: protocol-plane-check
+  namespace: kw-protocol-ha
+subjects:
+  - kind: ServiceAccount
+    name: protocol-plane-check
+    namespace: kw-protocol-ha
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: protocol-plane-check
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kw-protocol-ha-check
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+      - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kw-protocol-ha-check
+subjects:
+  - kind: ServiceAccount
+    name: protocol-plane-check
+    namespace: kw-protocol-ha
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kw-protocol-ha-check
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: protocol-plane-shape-check
+  namespace: kw-protocol-ha
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      serviceAccountName: protocol-plane-check
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json
+              import os
+              import ssl
+              import urllib.parse
+              import urllib.request
+
+              host = os.environ["KUBERNETES_SERVICE_HOST"]
+              port = os.environ["KUBERNETES_SERVICE_PORT_HTTPS"]
+              root = f"https://{host}:{port}"
+              token = open(
+                  "/var/run/secrets/kubernetes.io/serviceaccount/token"
+              ).read()
+              context = ssl.create_default_context(
+                  cafile="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+              )
+
+              def get(path):
+                  request = urllib.request.Request(
+                      root + path,
+                      headers={"Authorization": "Bearer " + token},
+                  )
+                  return json.load(
+                      urllib.request.urlopen(request, context=context, timeout=10)
+                  )
+
+              namespace = "/namespaces/kw-protocol-ha"
+              deployment = get(
+                  "/apis/apps/v1" + namespace + "/deployments/kamiwaza-dataplane"
+              )
+              spec = deployment["spec"]
+              assert spec["replicas"] >= 3
+              rolling = spec["strategy"]["rollingUpdate"]
+              assert str(rolling["maxUnavailable"]) in {"0", "0%"}
+              assert str(rolling["maxSurge"]) in {"1", "1%"}
+
+              template = spec["template"]
+              spreads = template["spec"].get("topologySpreadConstraints", [])
+              spread = next(
+                  item
+                  for item in spreads
+                  if item["topologyKey"] == "topology.kubernetes.io/zone"
+              )
+              assert spread["maxSkew"] == 1
+              assert spread["minDomains"] == 3
+              assert spread["whenUnsatisfiable"] == "DoNotSchedule"
+
+              budget = get(
+                  "/apis/policy/v1" + namespace
+                  + "/poddisruptionbudgets/kamiwaza-dataplane"
+              )
+              assert str(budget["spec"]["maxUnavailable"]) in {"1", "1%"}
+
+              selector = urllib.parse.urlencode({
+                  "labelSelector": "app.kubernetes.io/component=dataplane"
+              })
+              pods = get("/api/v1" + namespace + "/pods?" + selector)["items"]
+              ready = [
+                  pod
+                  for pod in pods
+                  if any(
+                      condition["type"] == "Ready"
+                      and condition["status"] == "True"
+                      for condition in pod.get("status", {}).get("conditions", [])
+                  )
+              ]
+              assert len(ready) >= 3
+              nodes = {
+                  item["metadata"]["name"]: item["metadata"]["labels"].get(
+                      "topology.kubernetes.io/zone"
+                  )
+                  for item in get("/api/v1/nodes")["items"]
+              }
+              zones = {nodes[pod["spec"]["nodeName"]] for pod in ready}
+              assert None not in zones and len(zones) >= 3
+              digests = {
+                  pod["metadata"]["annotations"][
+                      "kamiwaza.ai/dataplane-config-digest"
+                  ]
+                  for pod in ready
+              }
+              assert len(digests) == 1
+              service = get(
+                  "/api/v1" + namespace + "/services/kamiwaza-dataplane"
+              )
+              assert service["spec"]["selector"] == spec["selector"]["matchLabels"]
+              print("replicas, zones, budget, rollout, and digest verified")
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: protocol-plane-continuity-check
+  namespace: kw-protocol-ha
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 360
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json
+              import os
+              import ssl
+              import time
+              import urllib.request
+              context = ssl.create_default_context(
+                  cafile="/etc/kamiwaza/trust/ca-certificates.crt"
+              )
+
+              headers = {
+                  "Authorization": "Bearer " + os.environ["PROTOCOL_CHECK_TOKEN"],
+                  "Accept": "application/json",
+              }
+              url = (
+                  "https://kamiwaza-dataplane.kw-protocol-ha.svc.cluster.local"
+                  + ":8080/v1/models"
+              )
+              for sample in range(300):
+                  request = urllib.request.Request(url, headers=headers)
+                  response = urllib.request.urlopen(
+                      request, context=context, timeout=3
+                  )
+                  assert response.status == 200
+                  payload = json.load(response)
+                  assert isinstance(payload.get("data"), list)
+                  time.sleep(1)
+              print("governed protocol traffic remained available for 300 samples")
+          env:
+            - name: PROTOCOL_CHECK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: protocol-check-token
+                  key: token
+          volumeMounts:
+            - name: platform-trust
+              mountPath: /etc/kamiwaza/trust
+              readOnly: true
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: platform-trust
+          configMap:
+            name: kamiwaza-trust-bundle

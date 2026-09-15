@@ -1,0 +1,500 @@
+manager:
+  watchNamespaces:
+    - kw-auth-built-in
+    - kw-auth-oidc
+    - kw-auth-saml
+    - kw-auth-ldap
+    - kw-auth-cac
+  watchAnyNamespace: false
+adminPolicy:
+  revision: kw-auth-built-in-r1
+  allowedTargetNamespaces:
+    - kw-auth-built-in
+    - kw-auth-oidc
+    - kw-auth-saml
+    - kw-auth-ldap
+    - kw-auth-cac
+  storage:
+    allowedClassNames:
+      - example-rwo
+      - absent-class
+    allowedSharedClassNames: []
+  routing:
+    gateway:
+      name: identity-gateway
+      namespace: gateway-system
+      sectionName: https
+  trust:
+    managementPolicy: CertManager
+    issuer:
+      group: cert-manager.io
+      kind: ClusterIssuer
+      name: infra-ca
+    certificate:
+      duration: 8760h
+      renewBefore: 720h
+      privateKey:
+        algorithm: ECDSA
+        size: 384
+        encoding: PKCS8
+        rotationPolicy: Always
+    bundle:
+      configMapName: kamiwaza-trust-bundle
+      sourceSecretName: core-client-tls
+      sourceKey: ca.crt
+  images:
+    requireDigests: true
+    allowedRepositoryPrefixes:
+      - ghcr.io/kamiwaza-internal/
+      - ghcr.io/authzed/
+      - ghcr.io/agentgateway/
+    pullSecretNames:
+      - registry-pull
+  modelRegistry:
+    type: OCIRegistry
+    endpoint: registry.kw-auth-built-in.svc.cluster.local:5000
+    credentialSecretName: kamiwaza-registry-credentials
+    usernameKey: username
+    passwordKey: password
+  metadataCatalog:
+    provider: DataHub
+  observability:
+    allowedModes:
+      - Disabled
+    approvedSinks: []
+    monitoring:
+      enabled: false
+      provider: PrometheusOperator
+  operations:
+    adoptionAllowed: false
+    deleteAllAllowed: false
+    genericSecretRotationAllowed: false
+    approvedForwardOnlyUpgradeTargets:
+      - 1.3.0
+  extensions:
+    enabled: true
+    allowedNamespaces:
+      - kw-auth-built-in
+    allowNamespaceCreation: false
+    allowCrossNamespaceResources: false
+    hostDiscovery: Disabled
+    sandbox: Disabled
+    dynamicRBAC: Disabled
+  dependencies:
+    certManager:
+      managementPolicy: External
+      versionConstraint: ">=1.20.0 <2.0.0"
+      evidenceSource: AdminAttested
+      namespace: cert-manager
+    trustManager:
+      managementPolicy: External
+      versionConstraint: ">=0.22.0 <1.0.0"
+      evidenceSource: AdminAttested
+      namespace: kw-auth-built-in
+    routing:
+      managementPolicy: External
+      versionConstraint: ">=1.28.0 <2.0.0"
+      evidenceSource: AdminAttested
+      namespace: gateway-system
+    gatewayAPI:
+      managementPolicy: External
+      versionConstraint: ">=1.5.0 <2.0.0"
+      evidenceSource: AdminAttested
+      namespace: gateway-system
+  domains:
+    allocationMode: ExplicitAllowlist
+    allowedDomains:
+      - auth-built-in.example.invalid
+      - auth-oidc.example.invalid
+      - auth-saml.example.invalid
+      - auth-ldap.example.invalid
+      - auth-cac.example.invalid
+    allowedSuffixes: []
+  transport:
+    issuance:
+      mode: PlatformIssued
+      platformIssued:
+        authorityValidity: 8760h
+        authorityRenewBefore: 720h
+        leafValidity: 2160h
+        leafRenewBefore: 360h
+        expirationPolicy: ReplaceKey
+        privateKeyPolicy:
+          algorithm: ECDSA
+          size: 384
+          rotationPolicy: Always
+      maintenanceWindows:
+        - 0 2 * * 6
+    trust:
+      bundleConfigMapName: kamiwaza-trust-bundle
+      publicRoots: Include
+      maximumBundleBytes: 900000
+      targetNamespaces:
+        - kw-auth-built-in
+        - kw-auth-oidc
+        - kw-auth-saml
+        - kw-auth-ldap
+        - kw-auth-cac
+      additionalAuthorities:
+        - name: enterprise-root-2026
+          description: Retiring enterprise root, retained for the rotation overlap
+          secretRef:
+            name: enterprise-trust
+            key: root-2026.pem
+        - name: enterprise-root-2027
+          secretRef:
+            name: enterprise-trust
+            key: root-2027.pem
+    floor:
+      minimumTLSVersion: TLS1.2
+      hostnameVerification: Required
+    edge:
+      listenerCertificate: PlatformIssued
+      listenerCertificateSecretName: kamiwaza-gateway-tls
+      httpsRedirect: RequireWhenSupported
+      backendTLS: RequireWhenSupported
+      clientCertificate:
+        mode: RequireValid
+        authorityConfigMapName: kamiwaza-edge-client-ca
+        forwardingMode: ExternalEdgeHeader
+        externalEvidenceRef:
+          name: edge-conformance
+          key: result.json
+    internal:
+      defaultTransport: PlatformTLS
+      workloadIngressFloor: true
+      hops:
+        - name: CoreToApplicationDatabase
+          transport: PlatformTLS
+          authentication:
+            type: MutualTLS
+            maxConnectionAge: 30m
+            mutualTLS:
+              clientIdentityRef: core-client
+        - name: CoreToKeyValueStore
+          transport: PlatformTLS
+          authentication:
+            type: MutualTLS
+            maxConnectionAge: 30m
+            mutualTLS:
+              clientIdentityRef: core-client
+        - name: CoreToIdentityProvider
+          transport: PlatformTLS
+          authentication:
+            type: None
+        - name: CoreToServedModel
+          transport: PlatformTLS
+          authentication:
+            type: WorkloadIdentityJWT
+            maxConnectionAge: 30m
+            workloadIdentityJWT:
+              audience: kamiwaza-workload-sts
+              attestationProfiles:
+                - kubernetes-tokenreview-v1
+                - kubernetes-offline-v1
+              ttlSeconds: 3600
+        - name: ExtensionToCore
+          transport: PlatformTLS
+          authentication:
+            type: WorkloadIdentityJWT
+            maxConnectionAge: 30m
+            workloadIdentityJWT:
+              audience: kamiwaza-workload-sts
+              attestationProfiles:
+                - kubernetes-offline-v1
+        - name: DistributedComputeInternal
+          transport: MeshDelegated
+          evidenceSource: AdminAttested
+          authentication:
+            type: None
+    clientIdentities:
+      - name: core-client
+        secretRef:
+          name: kamiwaza-core-client
+        commonName: core-client
+        validity: 2160h
+        renewBefore: 360h
+      - name: directory-egress
+        secretRef:
+          name: kamiwaza-egress-directory
+        commonName: kamiwaza-directory-egress
+        validity: 2160h
+        renewBefore: 360h
+      - name: inference-egress
+        secretRef:
+          name: kamiwaza-egress-inference
+        commonName: kamiwaza-inference-egress
+        validity: 2160h
+        renewBefore: 360h
+    egress:
+      deniedNetworks:
+        - Loopback
+        - LinkLocal
+        - CloudMetadata
+        - PrivateRanges
+      destinations:
+        - name: enterprise-idp
+          kind: IdentityProvider
+          hosts:
+            - login.example.com
+          ports:
+            - 443
+          transport: TLS
+          authentication:
+            type: None
+          enforcementMode: PolicyAwareDialer
+          requiredAuthorities:
+            - enterprise-root-2026
+            - enterprise-root-2027
+        - name: enterprise-directory
+          kind: Directory
+          hosts:
+            - ldap.example.com
+          ports:
+            - 636
+          transport: MutualTLS
+          authentication:
+            type: MutualTLS
+            maxConnectionAge: 30m
+            mutualTLS:
+              clientIdentityRef: directory-egress
+          requiredAuthorities:
+            - enterprise-root-2027
+          enforcementMode: PolicyAwareDialer
+        - name: model-artifacts
+          kind: ModelArtifactRegistry
+          hosts:
+            - registry.example.com
+          ports:
+            - 443
+          transport: TLS
+          authentication:
+            type: OAuth2ClientCredentials
+            maxConnectionAge: 15m
+            oauth2ClientCredentials:
+              tokenEndpoint: https://auth.example.com/oauth2/token
+              clientID: kamiwaza-registry
+              clientSecretRef:
+                name: registry-oauth
+                key: client-secret
+              audience: registry.example.com
+              scopes:
+                - repository:read
+              maxTokenLifetime: 15m
+          enforcementMode: PolicyAwareDialer
+        - name: inference-provider
+          kind: ModelProvider
+          hosts:
+            - api.provider.example.com
+          ports:
+            - 443
+          transport: MutualTLS
+          authentication:
+            type: CertificateBoundOAuth
+            maxConnectionAge: 15m
+            certificateBoundOAuth:
+              tokenEndpoint: https://auth.provider.example.com/token
+              clientID: kamiwaza
+              clientIdentityRef: inference-egress
+              audience: api.provider.example.com
+              maxTokenLifetime: 15m
+          enforcementMode: PolicyAwareDialerViaProxy
+          proxyRef: corporate-egress
+        - name: extension-apis
+          kind: ExtensionExternalAPI
+          hosts:
+            - "*.partner.example.com"
+          ports:
+            - 443
+          transport: TLS
+          authentication:
+            type: None
+          enforcementMode: EnforcingProxy
+          proxyRef: corporate-egress
+      proxies:
+        - name: corporate-egress
+          url: https://proxy.example.com:3128
+          authorityName: enterprise-root-2027
+          enforcesDestinationPolicy: true
+          evidenceRef:
+            name: proxy-conformance
+            key: result.json
+  authProfiles:
+    - name: built-in
+      methods:
+        - name: builtin
+          type: BuiltInKeycloak
+          providerID: builtin-keycloak
+          enabled: true
+          realm: kamiwaza
+          clientID: kamiwaza-platform
+          clientSecretRef:
+            name: builtin-keycloak-client
+            key: client-secret
+      jitAdmission: Allowed
+      requiredClaims: &id001
+        - sub
+        - roles
+        - tenant_id
+      authorizationProjection: ReBACOnly
+      tenantContext: RequiredClaimThenReBAC
+      assurance: &id002
+        requiredACR:
+          - urn:example:acr:multifactor
+        requiredAMR:
+          - pwd
+          - otp
+      session: &id003
+        overallTimeout: 12h
+        inactivityTimeout: 30m
+        reauthentication: StepUpForSensitiveAction
+        tokenAudience: kamiwaza-platform
+      failureMode: FailClosed
+    - name: oidc
+      methods:
+        - name: enterprise-oidc
+          type: BrokeredOIDC
+          providerID: enterprise-oidc
+          enabled: true
+          issuer: https://login.example.com/realms/enterprise
+          discoveryPolicy: PinnedMetadata
+          metadataRef:
+            name: enterprise-oidc-metadata
+            key: metadata.json
+          destinationClass: enterprise-idp
+          clientID: kamiwaza
+          clientSecretRef:
+            name: enterprise-oidc-client
+            key: client-secret
+          subjectClaim: sub
+          usernameClaims:
+            - preferred_username
+          emailClaims:
+            - email
+          groupClaims:
+            - groups
+          requiredACR:
+            - urn:example:acr:multifactor
+      jitAdmission: Allowed
+      requiredClaims: *id001
+      authorizationProjection: ReBACOnly
+      tenantContext: RequiredClaimThenReBAC
+      assurance: *id002
+      session: *id003
+      failureMode: FailClosed
+    - name: saml
+      methods:
+        - name: enterprise-saml
+          type: SAML
+          providerID: enterprise-saml
+          enabled: true
+          idpEntityID: https://idp.example.com/saml/metadata
+          metadataRef:
+            name: enterprise-saml-metadata
+            key: metadata.xml
+          spEntityID: https://kamiwaza.example.invalid/saml/sp
+          spSigningSecretRef:
+            name: enterprise-saml-sp
+            key: signing-key
+          signRequests: true
+          requireSignedAssertions: true
+          requiredAttributes:
+            - subject
+            - roles
+            - tenant_id
+          replayWindow: 5m
+      jitAdmission: Allowed
+      requiredClaims: *id001
+      authorizationProjection: ReBACOnly
+      tenantContext: RequiredClaimThenReBAC
+      assurance: *id002
+      session: *id003
+      failureMode: FailClosed
+    - name: ldap
+      methods:
+        - name: enterprise-ldap
+          type: LDAPThroughKeycloak
+          providerID: enterprise-ldap
+          enabled: true
+          connectionUrl: ldap://ldap.example.com:389
+          startTlsRequired: true
+          destinationClass: enterprise-directory
+          bindDN: cn=platform-service,ou=services,dc=example,dc=com
+          bindSecretRef:
+            name: enterprise-ldap-bind
+            key: password
+          usersDN: ou=people,dc=example,dc=com
+          uniqueIDAttribute: entryUUID
+          usernameAttribute: uid
+          editMode: READ_ONLY
+          syncPolicy: Changed
+          mappers:
+            - name: username
+              type: UserAttribute
+              source: uid
+              target: preferred_username
+            - name: groups
+              type: GroupRole
+              source: memberOf
+              target: groups
+      jitAdmission: Allowed
+      requiredClaims: *id001
+      authorizationProjection: ReBACOnly
+      tenantContext: RequiredClaimThenReBAC
+      assurance: *id002
+      session: *id003
+      failureMode: FailClosed
+    - name: cac
+      methods:
+        - name: cac
+          type: X509CAC
+          providerID: cac
+          enabled: true
+          clientCARef:
+            name: cac-client-authorities
+            key: authorities.pem
+          certificatePolicy:
+            requiredExtendedKeyUsages:
+              - ClientAuth
+              - PIVAuthentication
+            requiredPolicyOIDs:
+              - 1.3.6.1.4.1.99999.1.2
+            sourceIdentity: CustomOID
+            sourceIdentityOID: 1.3.6.1.4.1.99999.1.1
+            allowedIssuerKeyIDs:
+              - example-issuer-key-identifier
+            minimumKeyPolicy: FipsApproved
+          revocation:
+            mode: Both
+            required: true
+            maxEvidenceAge: 24h
+            failureMode: FailClosed
+            evidenceSource:
+              name: cac-revocation-evidence
+              key: evidence.json
+          edge:
+            capability: ClientCertificateAuthentication
+            backendAuthentication: MutualTLS
+            backendClientIdentityRef: cac-edge-client
+            externalEvidenceRef:
+              name: edge-conformance
+              key: result.json
+            protectedPath: /api/auth/cac/login
+            directAccessPolicy: Deny
+            sanitizeHeaders: AllCertificateVerificationEdgeAuthAndUserIdentityHeaders
+            requiredEvidence:
+              - ClientCertificateEnforced
+              - HeadersSanitized
+              - BackendAuthenticated
+              - PathRestricted
+              - DirectOriginDenied
+          certificateHeader: Client-Cert
+          certificateChainHeader: Client-Cert-Chain
+          maxHeaderBytes: 32768
+      jitAdmission: Allowed
+      requiredClaims: *id001
+      authorizationProjection: ReBACOnly
+      tenantContext: RequiredClaimThenReBAC
+      assurance: *id002
+      session: *id003
+      failureMode: FailClosed

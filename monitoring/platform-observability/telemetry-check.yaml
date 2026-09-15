@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: telemetry-check
+  namespace: kw-observability
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import re, time, urllib.request
+
+              pattern = re.compile(
+                  r"otelcol_receiver_accepted_(?:spans|metric_points|log_records)(?:{[^}]*})? ([1-9][0-9]*(?:\.[0-9]+)?)"
+              )
+              for attempt in range(60):
+                  text = (
+                      urllib.request.urlopen("http://otel-collector:8888/metrics", timeout=5)
+                      .read()
+                      .decode()
+                  )
+                  if pattern.search(text):
+                      print("collector accepted platform telemetry")
+                      break
+                  if attempt == 59:
+                      raise SystemExit("no accepted OTLP signal")
+                  time.sleep(min(1 + attempt // 5, 10))
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true

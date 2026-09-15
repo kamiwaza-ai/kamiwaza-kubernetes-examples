@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kw-hosted-models
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+---
+apiVersion: serving.kamiwaza.io/v1alpha1
+kind: ModelDeployment
+metadata:
+  name: hosted-model
+  namespace: kw-hosted-models
+spec:
+  deploymentId: hosted-model
+  modelId: openai/gpt-4o-mini
+  state: running
+  external:
+    provider: openrouter
+    credentialSecretRef:
+      name: model-provider-openrouter
+      key: credential

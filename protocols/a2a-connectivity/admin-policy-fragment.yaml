@@ -1,0 +1,17 @@
+adminPolicy:
+  revision: a2a-connectivity-r1
+  protocols:
+    a2a:
+      enabled: true
+      allowedVersions:
+        - "1.0"
+      allowedBindings:
+        - HTTP+JSON
+      maximumPayloadBytes: 65536
+      maximumTaskHistory: 50
+      maximumStreamReconnectWindow: 15m
+      identitySource: ExtensionIdentity
+      rewritePublicInterfaceURLs: Required
+      targetFailurePolicy: PreserveTask
+      streamDisconnectPolicy: PreserveTask
+      decisionFailurePolicy: Deny

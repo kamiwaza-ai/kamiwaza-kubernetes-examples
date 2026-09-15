@@ -1,0 +1,150 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: retention-check
+  namespace: kw-retention-recovery
+data:
+  check.py: |
+    import json, os, ssl, time, urllib.error, urllib.parse, urllib.request
+
+    ROOT = os.environ["ROOT"]
+    TOKEN = os.environ["TOKEN"]
+    CONTEXT = ssl.create_default_context(cafile="/trust/ca.crt")
+    HEADERS = {"Authorization": "Bearer " + TOKEN}
+
+
+    def call(method, path, data=None, headers=None, timeout=20):
+        request = urllib.request.Request(
+            ROOT + path, data=data, headers={**HEADERS, **(headers or {})}, method=method
+        )
+        return urllib.request.urlopen(request, context=CONTEXT, timeout=timeout)
+
+
+    def datasets():
+        with call("GET", "/catalog/datasets/") as response:
+            return json.load(response)
+
+
+    def selected():
+        return next(
+            (item for item in datasets() if item.get("name") == "retention-proof"), None
+        )
+
+
+    def ensure_dataset():
+        item = selected()
+        if item:
+            return item
+        body = json.dumps(
+            {
+                "name": "retention-proof",
+                "platform": "kamiwaza",
+                "environment": "PROD",
+                "description": "Declarative retention proof",
+                "tags": ["retention-example"],
+                "properties": {"proof": "relational-and-catalog"},
+                "writable": True,
+                "storage": {"backend": "object"},
+            },
+            separators=(",", ":"),
+        ).encode()
+        try:
+            with call(
+                "POST", "/catalog/datasets/", body, {"Content-Type": "application/json"}
+            ) as response:
+                json.load(response)
+        except urllib.error.HTTPError as error:
+            if error.code != 409:
+                raise
+        return selected()
+
+
+    def object_path(urn):
+        return "/catalog/datasets/v2/" + urllib.parse.quote(urn, safe="") + "/objects"
+
+
+    def ensure_object(item):
+        path = object_path(item["urn"])
+        with call("GET", path) as response:
+            objects = json.load(response)
+        found = next(
+            (
+                obj
+                for obj in objects
+                if obj.get("logical_path") == "retained.txt" and obj.get("state") == "live"
+            ),
+            None,
+        )
+        if found:
+            return found
+        boundary = "kamiwaza-retention-boundary"
+        content = b"retained-kamiwaza-data-v1\n"
+        body = (
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="logical_path"\r\n\r\n'
+            f"retained.txt\r\n--{boundary}\r\n"
+            'Content-Disposition: form-data; name="file"; filename="retained.txt"\r\n'
+            "Content-Type: text/plain\r\n\r\n"
+        ).encode() + content + f"\r\n--{boundary}--\r\n".encode()
+        with call(
+            "POST",
+            path,
+            body,
+            {"Content-Type": "multipart/form-data; boundary=" + boundary},
+        ) as response:
+            return json.load(response)
+
+
+    def verify(item):
+        assert item["properties"]["proof"] == "relational-and-catalog", item
+        obj = ensure_object(item) if os.environ["MODE"] == "seed" else None
+        path = object_path(item["urn"])
+        if obj is None:
+            with call("GET", path) as response:
+                objects = json.load(response)
+            obj = next(
+                entry
+                for entry in objects
+                if entry.get("logical_path") == "retained.txt"
+                and entry.get("state") == "live"
+            )
+        with call("GET", path + "/" + obj["item_id"] + "/content") as response:
+            assert response.read() == b"retained-kamiwaza-data-v1\n"
+        payload = json.dumps(
+            {
+                "model": "smollm2-135m-instruct",
+                "messages": [
+                    {"role": "user", "content": "Reply with exactly: retained model ready"}
+                ],
+                "max_tokens": 32,
+            }
+        ).encode()
+        with call(
+            "POST",
+            "/v1/chat/completions",
+            payload,
+            {"Content-Type": "application/json", "X-KZ-Deployment-Id": "retention-smollm2"},
+            60,
+        ) as response:
+            chat = json.load(response)
+        assert (
+            chat.get("model") == "smollm2-135m-instruct"
+            and chat["choices"][0]["message"]["content"].strip()
+        ), chat
+        print(
+            json.dumps(
+                {"dataset": item["urn"], "object": obj["item_id"], "model": chat["model"]}
+            )
+        )
+
+
+    for attempt in range(60):
+        try:
+            item = ensure_dataset() if os.environ["MODE"] == "seed" else selected()
+            assert item, "retention-proof dataset missing"
+            verify(item)
+            break
+        except Exception:
+            if attempt == 59:
+                raise
+            time.sleep(min(1 + attempt // 5, 10))

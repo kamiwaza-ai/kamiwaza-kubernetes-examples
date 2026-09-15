@@ -1,0 +1,10 @@
+- op: replace
+  path: /spec/modelId
+  value: openai/gpt-4o-mini
+- op: replace
+  path: /spec/external
+  value:
+    provider: openrouter
+    credentialSecretRef:
+      name: model-provider-openrouter
+      key: credential

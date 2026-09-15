@@ -1,0 +1,189 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: extension-bundle-7f68eaaf130f
+  namespace: kw-retention-recovery
+data:
+  bundle.yaml: |
+    apiVersion: extensions.kamiwaza.io/bundle-v1alpha1
+    components:
+    - name: worker
+      image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+      command:
+      - python
+      - -c
+      args:
+      - |
+        import hashlib, json, os, threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+        root = "/state/results"
+        os.makedirs(root, exist_ok=True)
+        lock = threading.Lock()
+
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path == "/healthz":
+                    self.send_response(200)
+                    self.end_headers()
+                    return
+                name = self.path.removeprefix("/tasks/")
+                path = os.path.join(root, name + ".json")
+                if not name or not os.path.exists(path):
+                    self.send_error(404)
+                    return
+                body = open(path, "rb").read()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_POST(self):
+                if self.path != "/tasks":
+                    self.send_error(404)
+                    return
+                request = json.loads(
+                    self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                )
+                name = request.get("id", "")
+                if not name.isalnum() or len(name) > 64 or set(request) != {"id", "input"}:
+                    self.send_error(400)
+                    return
+                path = os.path.join(root, name + ".json")
+                with lock:
+                    created = not os.path.exists(path)
+                    if created:
+                        result = {
+                            "id": name,
+                            "result": request["input"][::-1],
+                            "digest": hashlib.sha256(request["input"].encode()).hexdigest(),
+                        }
+                        temporary = path + ".tmp"
+                        open(temporary, "w").write(json.dumps(result, separators=(",", ":")))
+                        os.replace(temporary, path)
+                    body = open(path, "rb").read()
+                self.send_response(201 if created else 200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+
+        ThreadingHTTPServer(("0.0.0.0", 8081), Handler).serve_forever()
+      envFromSecret: workflow-signing
+      ports:
+      - name: http
+        port: 8081
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 250m
+          memory: 128Mi
+      volumes:
+      - name: state
+        mountPath: /state
+        kind: state
+        size: 1Gi
+      - name: tmp
+        mountPath: /tmp
+        kind: scratch
+    - name: api
+      image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+      command:
+      - python
+      - -c
+      args:
+      - |
+        import http.client
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+
+        class Handler(BaseHTTPRequestHandler):
+            def proxy(self, method, path):
+                body = (
+                    self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                    if method == "POST"
+                    else None
+                )
+                connection = http.client.HTTPConnection(
+                    "persistent-workflow-worker", 8081, timeout=10
+                )
+                headers = {"Content-Type": "application/json"} if body else {}
+                connection.request(method, path, body, headers)
+                response = connection.getresponse()
+                payload = response.read()
+                self.send_response(response.status)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def do_GET(self):
+                if self.path == "/healthz":
+                    self.send_response(200)
+                    self.end_headers()
+                    return
+                self.proxy("GET", self.path)
+
+            def do_POST(self):
+                self.proxy("POST", self.path)
+
+            def log_message(self, *args):
+                pass
+
+
+        ThreadingHTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+      envFromSecret: workflow-signing
+      dependsOn:
+      - worker
+      ports:
+      - name: http
+        port: 8080
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 250m
+          memory: 128Mi
+      volumes:
+      - name: tmp
+        mountPath: /tmp
+        kind: scratch
+---
+apiVersion: extensions.kamiwaza.io/v1alpha1
+kind: ExtensionRuntime
+metadata:
+  name: persistent-services
+  namespace: kw-retention-recovery
+spec:
+  domain: retained-extension.example.invalid
+  storage:
+    className: example-rwo
+  identity:
+    contractVersions:
+      - v1
+---
+apiVersion: extensions.kamiwaza.io/v1alpha1
+kind: Extension
+metadata:
+  name: persistent-workflow
+  namespace: kw-retention-recovery
+  labels:
+    kamiwaza.io/runtime: persistent-services
+spec:
+  package:
+    repository: example.invalid/kamiwaza/extensions/persistent-workflow
+    version: 1.0.0
+    digest: sha256:7f68eaaf130f3c322da5f4c578ad785d62736f14583b6393aa8c9928fbf68348
+  state: running
+  secrets:
+    existing:
+      name: workflow-signing
+  config:
+    idempotency: required
+    persistence: Retain

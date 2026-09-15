@@ -1,0 +1,28 @@
+apiVersion: platform.kamiwaza.io/v1alpha1
+kind: KamiwazaPlatform
+metadata:
+  name: kamiwaza
+  namespace: kw-mcp-federation
+spec:
+  version: 1.3.0
+  clusterID: kw-mcp-federation
+  displayName: MCP federation
+  profile: Full
+  domain: mcp.example.invalid
+  storage:
+    statefulClassName: example-rwo
+    shared:
+      enabled: false
+  images:
+    pinned:
+      - capability: protocolDataPlane
+        role: application
+        reference: example.invalid/kamiwaza/protocol-data-plane@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+  components:
+    protocolDataPlane:
+      enabled: true
+  observability:
+    mode: Disabled
+  adoption:
+    mode: Disabled
+  deletionPolicy: RetainData

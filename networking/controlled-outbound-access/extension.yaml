@@ -1,0 +1,150 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: extension-bundle-406ea49e9072
+  namespace: kw-controlled-egress
+data:
+  bundle.yaml: |
+    apiVersion: extensions.kamiwaza.io/bundle-v1alpha1
+    components:
+    - name: client
+      image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+      command:
+      - python
+      - -c
+      args:
+      - |
+        import json, os, urllib.error, urllib.request
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+
+        def fetch(url, direct=False):
+            opener = urllib.request.build_opener(
+                urllib.request.ProxyHandler({}) if direct else urllib.request.ProxyHandler()
+            )
+            return opener.open(url, timeout=5).read()
+
+
+        class Handler(BaseHTTPRequestHandler):
+            def respond(self, code, body):
+                payload = json.dumps(body, separators=(",", ":")).encode()
+                self.send_response(code)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def do_GET(self):
+                self.respond(200, {"healthy": True})
+
+            def do_POST(self):
+                request = json.loads(
+                    self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                )
+                if self.path == "/fetch" and request == {"destinationClass": "reviewed-echo"}:
+                    document = json.loads(fetch(os.environ["DESTINATION_URL"]))
+                    marker = document.get("args", {}).get("marker")
+                    self.respond(200, {"allowed": marker == "kamiwaza-egress"})
+                    return
+                targets = {
+                    "unlisted": ("https://example.net/", False),
+                    "direct": (os.environ["DESTINATION_URL"], True),
+                    "ip-literal": ("https://93.184.216.34/", False),
+                    "link-local": ("http://169.254.169.254/latest/meta-data/", False),
+                }
+                if self.path == "/probe" and request.get("kind") in targets:
+                    try:
+                        fetch(*targets[request["kind"]])
+                    except Exception:
+                        self.respond(200, {"denied": True})
+                        return
+                    self.respond(502, {"denied": False})
+                    return
+                self.respond(400, {"error": "unsupported request"})
+
+            def log_message(self, *args):
+                pass
+
+
+        ThreadingHTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+      envFromSecret: extension-egress
+      ports:
+      - name: http
+        port: 8080
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+      volumes:
+      - name: tmp
+        mountPath: /tmp
+        kind: scratch
+---
+apiVersion: extensions.kamiwaza.io/v1alpha1
+kind: ExtensionRuntime
+metadata:
+  name: controlled-egress
+  namespace: kw-controlled-egress
+spec:
+  domain: egress.example.invalid
+  identity:
+    contractVersions:
+      - v1
+---
+apiVersion: extensions.kamiwaza.io/v1alpha1
+kind: Extension
+metadata:
+  name: outbound-client
+  namespace: kw-controlled-egress
+  labels:
+    kamiwaza.io/runtime: controlled-egress
+spec:
+  package:
+    repository: example.invalid/kamiwaza/extensions/outbound-client
+    version: 1.0.0
+    digest: sha256:406ea49e9072e9fcfb87c435ff6c004d62999a4b10fe44348e98a5a79551b867
+  state: running
+  secrets:
+    existing:
+      name: extension-egress
+  config:
+    destinationClasses:
+      - reviewed-echo
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: outbound-client-egress
+  namespace: kw-controlled-egress
+spec:
+  podSelector:
+    matchLabels:
+      kamiwaza.io/extension: outbound-client
+      kamiwaza.io/component: client
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: egress-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: egress-authority
+      ports:
+        - protocol: TCP
+          port: 3128

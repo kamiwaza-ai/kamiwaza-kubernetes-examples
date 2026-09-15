@@ -1,0 +1,30 @@
+apiVersion: platform.kamiwaza.io/v1alpha1
+kind: KamiwazaPlatform
+metadata:
+  name: kamiwaza
+  namespace: kw-federation-west
+spec:
+  version: 1.3.0
+  clusterID: west
+  displayName: Kamiwaza West
+  profile: Full
+  domain: west.kamiwaza.example
+  storage:
+    statefulClassName: example-rwo
+    shared:
+      enabled: false
+  images:
+    pinned:
+      - capability: protocolDataPlane
+        role: application
+        reference: example.invalid/kamiwaza/protocol-data-plane@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+  availability:
+    failureDomainKey: topology.kubernetes.io/zone
+  components:
+    protocolDataPlane:
+      enabled: true
+  observability:
+    mode: Disabled
+  adoption:
+    mode: Disabled
+  deletionPolicy: RetainData

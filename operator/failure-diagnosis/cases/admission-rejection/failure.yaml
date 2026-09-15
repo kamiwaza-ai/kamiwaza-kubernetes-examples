@@ -1,0 +1,7 @@
+apiVersion: platform.kamiwaza.io/v1alpha1
+kind: KamiwazaPlatform
+metadata:
+  name: kamiwaza
+  namespace: kw-failure-diagnosis
+spec:
+  profile: Development

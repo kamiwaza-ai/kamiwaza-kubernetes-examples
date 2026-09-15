@@ -1,0 +1,18 @@
+adminPolicy:
+  revision: mcp-federation-r1
+  protocols:
+    mcp:
+      enabled: true
+      allowedVersions:
+        - "2025-11-25"
+      allowedTransports:
+        - StreamableHTTP
+      maximumSourcesPerFederation: 16
+      maximumPayloadBytes: 65536
+      maximumSessionLifetime: 30m
+      requireOriginValidation: true
+      allowedOrigins:
+        - https://client.example.invalid
+      sourceFailurePolicy: IsolateUnavailable
+      nameCollisionPolicy: PrefixSource
+      decisionFailurePolicy: Deny

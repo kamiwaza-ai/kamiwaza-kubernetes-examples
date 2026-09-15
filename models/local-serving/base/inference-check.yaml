@@ -1,0 +1,75 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: local-model-inference-check
+  namespace: kw-local-models
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json, time, urllib.request
+
+              payload = json.dumps(
+                  {
+                      "model": "smollm2-135m-instruct",
+                      "messages": [{"role": "user", "content": "Reply with local serving ready"}],
+                      "max_tokens": 32,
+                      "stream": True,
+                  }
+              ).encode()
+              for attempt in range(20):
+                  try:
+                      request = urllib.request.Request(
+                          "http://smollm2:8080/v1/chat/completions",
+                          data=payload,
+                          headers={"Content-Type": "application/json"},
+                      )
+                      chunks, final = 0, ""
+                      with urllib.request.urlopen(request, timeout=30) as response:
+                          for raw in response:
+                              line = raw.decode().strip()
+                              if not line.startswith("data: ") or line == "data: [DONE]":
+                                  continue
+                              event = json.loads(line[6:])
+                              chunks += 1
+                              final += (
+                                  event.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                              )
+                      assert chunks > 1, chunks
+                      assert final.strip(), final
+                      print(json.dumps({"model": "smollm2-135m-instruct", "streamChunks": chunks}))
+                      break
+                  except Exception:
+                      if attempt == 19:
+                          raise
+                      time.sleep(min(2**attempt, 15))
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true

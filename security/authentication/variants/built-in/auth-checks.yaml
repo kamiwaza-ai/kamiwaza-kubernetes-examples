@@ -1,0 +1,74 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: auth-check
+  namespace: kw-auth-built-in
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          env:
+            - name: PUBLIC_BASE_URL
+              value: https://auth-built-in.example.invalid
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json, os, urllib.error, urllib.request
+
+              base = os.environ["PUBLIC_BASE_URL"]
+
+
+              class NoRedirect(urllib.request.HTTPRedirectHandler):
+                  def redirect_request(self, *args, **kwargs):
+                      return None
+
+
+              opener = urllib.request.build_opener(NoRedirect)
+
+
+              def reject(url, data=None, headers={}):
+                  try:
+                      opener.open(urllib.request.Request(url, data=data, headers=headers), timeout=10)
+                  except urllib.error.HTTPError as error:
+                      assert error.code in (400, 401, 403), f"unexpected refusal {error.code}"
+                      return
+                  raise AssertionError("unauthenticated request was accepted")
+
+
+              def discovery(url):
+                  with urllib.request.urlopen(url, timeout=10) as response:
+                      document = json.load(response)
+                  assert document.get("issuer") and document.get("jwks_uri")
+                  return document
+
+
+              reject(base + "/v1/models", headers={"Authorization": "Bearer malformed"})
+              discovery(base + "/realms/kamiwaza/.well-known/openid-configuration")
+              print("built-in discovery and fail-closed checks passed")
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true

@@ -1,0 +1,166 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mcp-check
+  namespace: kw-mcp-federation
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json
+              import os
+              import ssl
+              import urllib.error
+              import urllib.request
+
+              url = (
+                  "https://kamiwaza-dataplane.kw-mcp-federation.svc.cluster.local"
+                  + ":8080/mcp/team-tools"
+              )
+              token = os.environ["MCP_CHECK_TOKEN"]
+              origin = "https://client.example.invalid"
+              context = ssl.create_default_context(
+                  cafile="/etc/kamiwaza/trust/ca-certificates.crt"
+              )
+
+              def request(method, payload=None, session=None, request_origin=origin):
+                  headers = {
+                      "Authorization": "Bearer " + token,
+                      "Accept": "application/json, text/event-stream",
+                      "Content-Type": "application/json",
+                      "MCP-Protocol-Version": "2025-11-25",
+                      "Origin": request_origin,
+                  }
+                  if session:
+                      headers["MCP-Session-Id"] = session
+                  data = None
+                  if payload is not None:
+                      data = json.dumps(payload).encode()
+                  item = urllib.request.Request(
+                      url, data=data, headers=headers, method=method
+                  )
+                  return urllib.request.urlopen(
+                      item, context=context, timeout=15
+                  )
+
+              initialize = {
+                  "jsonrpc": "2.0",
+                  "id": 1,
+                  "method": "initialize",
+                  "params": {
+                      "protocolVersion": "2025-11-25",
+                      "capabilities": {},
+                      "clientInfo": {"name": "contract-check", "version": "1.0"},
+                  },
+              }
+              initialized = request("POST", initialize)
+              session = initialized.headers["MCP-Session-Id"]
+              result = json.load(initialized)["result"]
+              assert result["protocolVersion"] == "2025-11-25"
+              assert session
+
+              listed = request(
+                  "POST",
+                  {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+                  session,
+              )
+              tools = json.load(listed)["result"]["tools"]
+              names = sorted(tool["name"] for tool in tools)
+              assert names == [
+                  "catalog.catalog_version",
+                  "catalog.lookup",
+                  "records.lookup",
+                  "records.record_count",
+              ]
+
+              for request_id, name, source in (
+                  (3, "records.lookup", "records"),
+                  (4, "catalog.lookup", "catalog"),
+              ):
+                  call = {
+                      "jsonrpc": "2.0",
+                      "id": request_id,
+                      "method": "tools/call",
+                      "params": {"name": name, "arguments": {"query": "contract"}},
+                  }
+                  response = json.load(request("POST", call, session))
+                  output = response["result"]["structuredContent"]
+                  assert output == {
+                      "source": source,
+                      "tool": "lookup",
+                      "query": "contract",
+                  }
+
+              restricted = {
+                  "jsonrpc": "2.0",
+                  "id": 5,
+                  "method": "tools/call",
+                  "params": {"name": "records.restricted", "arguments": {}},
+              }
+              try:
+                  request("POST", restricted, session)
+              except urllib.error.HTTPError as error:
+                  assert error.code == 403
+              else:
+                  raise AssertionError("restricted tool call was not denied")
+
+              try:
+                  request(
+                      "POST",
+                      {"jsonrpc": "2.0", "id": 6, "method": "ping"},
+                      session,
+                      "https://untrusted.example.invalid",
+                  )
+              except urllib.error.HTTPError as error:
+                  assert error.code == 403
+              else:
+                  raise AssertionError("unapproved Origin was not denied")
+
+              deleted = request("DELETE", session=session)
+              assert deleted.status == 204
+              print("MCP negotiation, routing, authorization, origin, and session verified")
+          env:
+            - name: MCP_CHECK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: mcp-check-token
+                  key: token
+          volumeMounts:
+            - name: platform-trust
+              mountPath: /etc/kamiwaza/trust
+              readOnly: true
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: platform-trust
+          configMap:
+            name: kamiwaza-trust-bundle

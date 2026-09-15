@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kamiwaza-platform-dashboard
+  namespace: kw-observability
+  labels:
+    grafana_dashboard: "1"
+data:
+  dashboard.json: |
+    {
+      "title": "Kamiwaza platform health",
+      "schemaVersion": 39,
+      "panels": [
+        {
+          "title": "Reconcile errors",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "sum(rate(kamiwaza_reconcile_total{result=\"error\",platform=\"kamiwaza\",namespace=\"kw-observability\"}[5m]))"
+            }
+          ]
+        },
+        {
+          "title": "Blocked components",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "sum(kamiwaza_component_condition{status=\"false\",namespace=\"kw-observability\"})"
+            }
+          ]
+        },
+        {
+          "title": "Dependency waits",
+          "type": "logs",
+          "targets": [
+            {
+              "expr": "{namespace=\"kw-observability\"} |= `DependencyUnavailable`"
+            }
+          ]
+        },
+        {
+          "title": "Reconcile duration",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95,sum by (le)(rate(kamiwaza_reconcile_duration_seconds_bucket{namespace=\"kw-observability\"}[5m])))"
+            }
+          ]
+        }
+      ]
+    }

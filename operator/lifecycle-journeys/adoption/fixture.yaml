@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: legacy-core-head
+  namespace: kw-lifecycle
+  annotations:
+    platform.kamiwaza.io/source-version: 1.1.0
+    platform.kamiwaza.io/source-revision: 0bd9c641fbf990e347dc7b875db7b5425aa51ec7
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: legacy-core-head
+  template:
+    metadata:
+      labels:
+        app: legacy-core-head
+        ray.io/cluster: core-raycluster
+        ray.io/node-type: head
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: source-api
+          image: docker.io/hashicorp/http-echo@sha256:fcb75f691c8b0414d670ae570240cbf95502cc18a9ba57e982ecac589760a186
+          args: ["-listen=:7777", "-text=legacy-source-ready"]
+          ports:
+            - { name: http, containerPort: 7777 }
+          readinessProbe: { httpGet: { path: /, port: http } }
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { cpu: 100m, memory: 32Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+            readOnlyRootFilesystem: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-api
+  namespace: kw-lifecycle
+  annotations:
+    platform.kamiwaza.io/source-version: 1.1.0
+    platform.kamiwaza.io/source-revision: 0bd9c641fbf990e347dc7b875db7b5425aa51ec7
+spec:
+  selector:
+    ray.io/cluster: core-raycluster
+    ray.io/node-type: head
+  ports:
+    - { name: http, port: 7777, targetPort: http }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: legacy-core-data
+  namespace: kw-lifecycle
+  annotations:
+    platform.kamiwaza.io/source-version: 1.1.0
+    platform.kamiwaza.io/source-revision: 0bd9c641fbf990e347dc7b875db7b5425aa51ec7
+spec:
+  storageClassName: example-rwo
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 1Gi }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: not-in-adoption-allowlist
+  namespace: kw-lifecycle
+data:
+  owner: independent-root

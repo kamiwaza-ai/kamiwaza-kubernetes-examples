@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: legacy-service-check
+  namespace: kw-lifecycle
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: check
+          image: docker.io/curlimages/curl@sha256:463eaf60785eb2ed151afc79f8567011c3967d5cad7af5f14c336f22fbcbfb85
+          command: [sh, -ec]
+          args:
+            [
+              'test "$(curl --fail --silent --show-error --retry 8 --retry-all-errors http://core-api:7777/)" = legacy-source-ready',
+            ]
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { cpu: 50m, memory: 32Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+            readOnlyRootFilesystem: true

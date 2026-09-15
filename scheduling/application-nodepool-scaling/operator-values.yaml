@@ -1,0 +1,99 @@
+manager:
+  watchNamespaces:
+    - kw-nodepool-scale
+  watchAnyNamespace: false
+adminPolicy:
+  revision: kw-nodepool-scale-r1
+  allowedTargetNamespaces:
+    - kw-nodepool-scale
+  storage:
+    allowedClassNames:
+      - example-rwo
+      - absent-class
+    allowedSharedClassNames: []
+  routing:
+    gateway:
+      name: kamiwaza-gateway
+      namespace: kw-nodepool-scale
+      sectionName: https
+  trust:
+    managementPolicy: CertManager
+    issuer:
+      group: cert-manager.io
+      kind: ClusterIssuer
+      name: infra-ca
+    certificate:
+      duration: 8760h
+      renewBefore: 720h
+      privateKey:
+        algorithm: ECDSA
+        size: 384
+        encoding: PKCS8
+        rotationPolicy: Always
+    bundle:
+      configMapName: kamiwaza-trust-bundle
+      sourceSecretName: core-client-tls
+      sourceKey: ca.crt
+  images:
+    requireDigests: true
+    allowedRepositoryPrefixes:
+      - ghcr.io/kamiwaza-internal/
+      - ghcr.io/authzed/
+      - ghcr.io/agentgateway/
+    pullSecretNames:
+      - registry-pull
+  modelRegistry:
+    type: OCIRegistry
+    endpoint: registry.kw-nodepool-scale.svc.cluster.local:5000
+    credentialSecretName: kamiwaza-registry-credentials
+    usernameKey: username
+    passwordKey: password
+  metadataCatalog:
+    provider: DataHub
+  observability:
+    allowedModes: [Disabled]
+    approvedSinks: []
+    monitoring:
+      enabled: false
+      provider: PrometheusOperator
+  operations:
+    adoptionAllowed: false
+    deleteAllAllowed: false
+    genericSecretRotationAllowed: false
+    approvedForwardOnlyUpgradeTargets:
+      - 1.3.0
+  extensions:
+    enabled: true
+    allowedNamespaces:
+      - kw-nodepool-scale
+    allowNamespaceCreation: false
+    allowCrossNamespaceResources: false
+    hostDiscovery: Disabled
+    sandbox: Disabled
+    dynamicRBAC: Disabled
+  dependencies:
+    certManager:
+      managementPolicy: External
+      versionConstraint: ">=1.20.0 <2.0.0"
+      evidenceSource: AdminAttested
+      namespace: cert-manager
+    trustManager:
+      managementPolicy: External
+      versionConstraint: ">=0.22.0 <1.0.0"
+      evidenceSource: AdminAttested
+      namespace: kw-nodepool-scale
+    routing:
+      managementPolicy: External
+      versionConstraint: ">=1.28.0 <2.0.0"
+      evidenceSource: AdminAttested
+      namespace: kw-nodepool-scale
+    gatewayAPI:
+      managementPolicy: External
+      versionConstraint: ">=1.4.0 <2.0.0"
+      evidenceSource: AdminAttested
+      namespace: kw-nodepool-scale
+  domains:
+    allocationMode: ExplicitAllowlist
+    allowedDomains:
+      - scale.example.invalid
+    allowedSuffixes: []

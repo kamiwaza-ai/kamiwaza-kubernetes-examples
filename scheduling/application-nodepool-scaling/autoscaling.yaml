@@ -1,0 +1,102 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: application-workers
+  namespace: kw-nodepool-scale
+spec:
+  scaleTargetRef:
+    apiVersion: platform.kamiwaza.io/v1alpha1
+    kind: KamiwazaNodePool
+    name: application-workers
+  minReplicas: 1
+  maxReplicas: 4
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      selectPolicy: Max
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      selectPolicy: Min
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bounded-request-load
+  namespace: kw-nodepool-scale
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 600
+  activeDeadlineSeconds: 240
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: load
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import concurrent.futures, time, urllib.request
+
+              end = time.monotonic() + 180
+
+
+              def request(_):
+                  count = 0
+                  while time.monotonic() < end:
+                      with urllib.request.urlopen(
+                          "http://core-api:7777/healthz", timeout=3
+                      ) as response:
+                          if response.status != 200:
+                              raise RuntimeError(response.status)
+                          response.read()
+                      count += 1
+                  return count
+
+
+              with concurrent.futures.ThreadPoolExecutor(max_workers=24) as pool:
+                  counts = list(pool.map(request, range(24)))
+              print("completed requests", sum(counts))
+          resources:
+            requests:
+              cpu: 250m
+              memory: 64Mi
+            limits:
+              cpu: "2"
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true

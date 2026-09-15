@@ -1,0 +1,144 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: webhook-results
+  namespace: kw-webhook
+spec:
+  storageClassName: example-rwo
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook-receiver
+  namespace: kw-webhook
+spec:
+  selector:
+    app.kubernetes.io/name: webhook-receiver
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-receiver
+  namespace: kw-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webhook-receiver
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: webhook-receiver
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: receiver
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json, os
+              from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+              os.makedirs("/data", exist_ok=True)
+              path = "/data/accepted"
+
+
+              class Handler(BaseHTTPRequestHandler):
+                  def do_GET(self):
+                      key = self.path.rsplit("/", 1)[-1]
+                      values = open(path).read().splitlines() if os.path.exists(path) else []
+                      body = json.dumps(
+                          {"idempotencyKey": key, "accepted": values.count(key)}
+                      ).encode()
+                      self.send_response(200)
+                      self.end_headers()
+                      self.wfile.write(body)
+
+                  def do_POST(self):
+                      self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                      key = self.headers.get("Idempotency-Key", "")
+                      values = open(path).read().splitlines() if os.path.exists(path) else []
+                      if key and key not in values:
+                          open(path, "a").write(key + "\n")
+                          code = 201
+                      else:
+                          code = 200
+                      self.send_response(code)
+                      self.end_headers()
+
+                  def log_message(self, *args):
+                      pass
+
+
+              ThreadingHTTPServer(("0.0.0", 8080), Handler).serve_forever()
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: webhook-results
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: webhook-receiver
+  namespace: kw-webhook
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: webhook-receiver
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              kamiwaza.io/extension: webhook-connector
+              kamiwaza.io/component: connector
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: webhook-check
+      ports:
+        - protocol: TCP
+          port: 8080

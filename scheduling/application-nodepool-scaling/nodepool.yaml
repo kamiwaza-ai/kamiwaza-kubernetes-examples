@@ -1,0 +1,21 @@
+apiVersion: platform.kamiwaza.io/v1alpha1
+kind: KamiwazaNodePool
+metadata:
+  name: application-workers
+  namespace: kw-nodepool-scale
+  labels:
+    platform.kamiwaza.io/cluster: kamiwaza
+spec:
+  capability: applicationAPI
+  replicas: 1
+  placement:
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: core-raycluster
+            ray.io/node-type: worker
+  disruption:
+    maxUnavailable: 1

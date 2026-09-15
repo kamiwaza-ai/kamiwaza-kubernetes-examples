@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: desired-state-check
+  namespace: kw-gitops
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: desired-state-check
+  namespace: kw-gitops
+rules:
+  - apiGroups:
+      - platform.kamiwaza.io
+    resources:
+      - kamiwazaplatforms
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: desired-state-check
+  namespace: kw-gitops
+subjects:
+  - kind: ServiceAccount
+    name: desired-state-check
+    namespace: kw-gitops
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: desired-state-check
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: desired-state-check
+  namespace: kw-gitops
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      serviceAccountName: desired-state-check
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json, os, ssl, urllib.request
+
+              host = os.environ["KUBERNETES_SERVICE_HOST"]
+              port = os.environ["KUBERNETES_SERVICE_PORT_HTTPS"]
+              token = open("/var/run/secrets/kubernetes.io/serviceaccount/token").read()
+              request = urllib.request.Request(
+                  f"https://{host}:{port}/apis/platform.kamiwaza.io/v1alpha1/namespaces/kw-gitops/kamiwazaplatforms/kamiwaza",
+                  headers={"Authorization": "Bearer " + token},
+              )
+              context = ssl.create_default_context(
+                  cafile="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+              )
+              platform = json.load(urllib.request.urlopen(request, context=context, timeout=10))
+              generation = platform["metadata"]["generation"]
+              assert platform["spec"]["deletionPolicy"] == "RetainData"
+              assert platform["spec"]["domain"] == "gitops.example.invalid"
+              assert any(
+                  item["type"] == "Ready"
+                  and item["status"] == "True"
+                  and item["observedGeneration"] == generation
+                  for item in platform.get("status", {}).get("conditions", [])
+              )
+              print("Git desired state reached current-generation readiness")
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true

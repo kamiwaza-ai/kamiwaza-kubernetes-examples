@@ -1,0 +1,133 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: extension-bundle-28ea0799d44e
+  namespace: kw-webhook
+data:
+  bundle.yaml: |
+    apiVersion: extensions.kamiwaza.io/bundle-v1alpha1
+    components:
+    - name: connector
+      image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+      command:
+      - python
+      - -c
+      args:
+      - |
+        import hashlib, hmac, http.client, json, os, random, threading, time
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+        queue = "/state/queue"
+        os.makedirs(queue, exist_ok=True)
+
+
+        def deliver():
+            while True:
+                for path in list(os.scandir(queue)):
+                    try:
+                        body = open(path.path, "rb").read()
+                        conn = http.client.HTTPConnection("webhook-receiver", 8080, timeout=5)
+                        conn.request(
+                            "POST",
+                            "/events",
+                            body,
+                            {"Content-Type": "application/json", "Idempotency-Key": path.name},
+                        )
+                        response = conn.getresponse()
+                        response.read()
+                        if response.status in (200, 201):
+                            os.remove(path.path)
+                    except Exception:
+                        pass
+                time.sleep(2 + random.random())
+
+
+        threading.Thread(target=deliver, daemon=True).start()
+
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = json.dumps({"queued": len(list(os.scandir(queue)))}).encode()
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_POST(self):
+                body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                key = self.headers.get("Idempotency-Key", "")
+                want = hmac.new(
+                    os.environ["WEBHOOK_SECRET"].encode(), body, hashlib.sha256
+                ).hexdigest()
+                if not key or not hmac.compare_digest(
+                    want, self.headers.get("X-Signature", "")
+                ):
+                    self.send_error(401)
+                    return
+                path = os.path.join(queue, key)
+                if not os.path.exists(path):
+                    tmp = path + ".tmp"
+                    open(tmp, "wb").write(body)
+                    os.replace(tmp, path)
+                self.send_response(202)
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+
+        ThreadingHTTPServer(("0.0.0", 8080), Handler).serve_forever()
+      envFromSecret: webhook-signing
+      ports:
+      - name: http
+        port: 8080
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+      route:
+        path: /hooks
+        port: 8080
+      volumes:
+      - name: state
+        mountPath: /state
+        kind: state
+        size: 1Gi
+      - name: tmp
+        mountPath: /tmp
+        kind: scratch
+---
+apiVersion: extensions.kamiwaza.io/v1alpha1
+kind: ExtensionRuntime
+metadata:
+  name: webhooks
+  namespace: kw-webhook
+spec:
+  domain: webhook.example.invalid
+  storage:
+    className: example-rwo
+  identity:
+    contractVersions:
+      - v1
+---
+apiVersion: extensions.kamiwaza.io/v1alpha1
+kind: Extension
+metadata:
+  name: webhook-connector
+  namespace: kw-webhook
+  labels:
+    kamiwaza.io/runtime: webhooks
+spec:
+  package:
+    repository: example.invalid/kamiwaza/extensions/http-webhook-connector
+    version: 1.0.0
+    digest: sha256:28ea0799d44ed85c05179cfb53cfed95938e8ae3a521b1e3f4c2b81d64d5f4ca
+  state: running
+  secrets:
+    existing:
+      name: webhook-signing
+  config:
+    delivery: at-least-once
+    idempotency: required

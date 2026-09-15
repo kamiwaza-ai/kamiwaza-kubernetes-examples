@@ -1,0 +1,28 @@
+apiVersion: platform.kamiwaza.io/v1alpha1
+kind: KamiwazaPlatform
+metadata:
+  name: kamiwaza
+  namespace: kw-a2a
+spec:
+  version: 1.3.0
+  clusterID: kw-a2a
+  displayName: A2A connectivity
+  profile: Full
+  domain: a2a.example.invalid
+  storage:
+    statefulClassName: example-rwo
+    shared:
+      enabled: false
+  images:
+    pinned:
+      - capability: protocolDataPlane
+        role: application
+        reference: example.invalid/kamiwaza/protocol-data-plane@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+  components:
+    protocolDataPlane:
+      enabled: true
+  observability:
+    mode: Disabled
+  adoption:
+    mode: Disabled
+  deletionPolicy: RetainData

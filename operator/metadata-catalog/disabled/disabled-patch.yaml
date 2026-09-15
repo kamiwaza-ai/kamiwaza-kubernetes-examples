@@ -1,0 +1,23 @@
+apiVersion: platform.kamiwaza.io/v1alpha1
+kind: KamiwazaPlatform
+metadata:
+  name: kamiwaza
+  namespace: kw-metadata-catalog
+spec:
+  components:
+    metadataCatalog:
+      enabled: false
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: catalog-ingest
+  namespace: kw-metadata-catalog
+$patch: delete
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: catalog-query
+  namespace: kw-metadata-catalog
+$patch: delete

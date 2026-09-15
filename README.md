@@ -51,10 +51,12 @@ Category indexes:
 
 - **Platform operator:** [operator/README.md](operator/README.md)
 - **Deployment:** [deployment/README.md](deployment/README.md)
+- **Federation:** [federation/README.md](federation/README.md)
 - **Multi-tenancy:** [multi-tenancy/README.md](multi-tenancy/README.md)
 - **Monitoring:** [monitoring/README.md](monitoring/README.md)
 - **Networking:** [networking/README.md](networking/README.md)
 - **Operations:** [operations/README.md](operations/README.md)
+- **Protocols:** [protocols/README.md](protocols/README.md)
 - **Security:** [security/README.md](security/README.md)
 - **Troubleshooting:** [troubleshooting/README.md](troubleshooting/README.md)
 
@@ -73,6 +75,10 @@ Category indexes:
 | Administrator-owned development registry               | [operator/registry](operator/registry)                                                                                                 | #operator #registry #development                            |
 | Transport under a strict and a relaxed scope           | [operator/transport-scopes](operator/transport-scopes)                                                                                 | #operator #transport #namespaces #rbac                      |
 | Governed endpoint and configuration fencing            | [operator/protocol-data-plane](operator/protocol-data-plane)                                                                           | #operator #transport #fencing #data-plane                   |
+| Cross-Kamiwaza federation                              | [federation/cross-kamiwaza](federation/cross-kamiwaza)                                                                                 | #federation #multi-cluster #spiffe #fail-closed             |
+| Multi-node protocol plane                              | [networking/multi-node-protocol-plane](networking/multi-node-protocol-plane)                                                           | #networking #availability #protocols #disruption            |
+| MCP federation                                         | [protocols/mcp-federation](protocols/mcp-federation)                                                                                   | #protocols #mcp #tools #authorization                       |
+| A2A connectivity                                       | [protocols/a2a-connectivity](protocols/a2a-connectivity)                                                                               | #protocols #a2a #agents #tasks                              |
 | Tomo shared-workroom tenant isolation                  | [multi-tenancy/tomo-shared-workrooms](multi-tenancy/tomo-shared-workrooms)                                                             | #multi-tenancy #tomo #rebac #models                         |
 | Environment profile matrix (lite/full/dev/dev-full)    | [deployment/env-profile-matrix](deployment/env-profile-matrix)                                                                         | #deployment #topology #helmfile                             |
 | Offline bundle download (Keygen)                       | [deployment/offline-bundle-download](deployment/offline-bundle-download)                                                               | #deployment #offline #bundle #keygen                        |
@@ -106,7 +112,7 @@ Category indexes:
 - **Kubernetes resources** use `kubectl diff` before server-side apply with an explicit field manager. Do not force field conflicts outside a reviewed adoption transfer.
 - **Secrets stay out of Git, custom resources, command output, and status.** Examples create only Secret references or interactive lab inputs.
 - **Use real shipped components.** When a release includes an application such as Tomo, deploy that catalog artifact and inspect its generated resources instead of inventing a demonstration extension.
-- **Do not demonstrate unsupported APIs.** Record the boundary explicitly; for example, tenant-authored model intent is not available while models remain in `KamiwazaPlatform.spec.models`.
+- **Keep supported and proposed contracts distinct.** Runnable examples use released APIs. A contract-design example must identify every proposed API, render offline, and remain blocked from server-side apply until its CRD, validation, status, controller, and conformance checks exist.
 
 ---
 

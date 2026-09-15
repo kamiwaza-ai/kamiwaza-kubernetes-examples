@@ -1,0 +1,96 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: retention-smollm2-model
+  namespace: kw-retention-recovery
+spec:
+  storageClassName: example-rwo
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: serving.kamiwaza.io/v1alpha1
+kind: ModelDeployment
+metadata:
+  name: retention-smollm2
+  namespace: kw-retention-recovery
+spec:
+  deploymentId: retention-smollm2
+  modelId: smollm2-135m-instruct
+  state: running
+  engineName: llamacpp
+  servicePort: 8080
+  carriedPodTemplate:
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: pull-model
+          image: ghcr.io/kamiwaza-internal/containers/images/model-fetch@sha256:ae20c33de54ab28f67513ae71432468ee603415e8462dc7d6d760ff174033a96
+          command: [/busybox/sh, -ec]
+          args:
+            - |
+              model=/models/model.gguf
+              expected=2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d
+              if [ -s "$model" ] && echo "$expected  $model" | sha256sum -c -s; then exit 0; fi
+              tmp="${model}.tmp"
+              rm -f "$tmp"
+              source=https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF
+              revision=09816acd5d99df7be770d85ea30822623dab342c
+              wget -qO "$tmp" "$source/resolve/$revision/SmolLM2-135M-Instruct-Q4_K_M.gguf"
+              echo "$expected  $tmp" | sha256sum -c
+              mv "$tmp" "$model"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+          volumeMounts:
+            - { name: model, mountPath: /models }
+      containers:
+        - name: server
+          image: ghcr.io/kamiwaza-internal/containers/images/llamacpp-cpu@sha256:2cca4d9b2eda3088fb6cb28f00fb60ea8f71abfd8c5b1179d55df26476e3aeeb
+          args:
+            [
+              --model,
+              /models/model.gguf,
+              --alias,
+              smollm2-135m-instruct,
+              --host,
+              0.0.0.0,
+              --port,
+              "8080",
+              --ctx-size,
+              "2048",
+              --threads,
+              "4",
+              --parallel,
+              "1",
+            ]
+          ports:
+            - { name: http, containerPort: 8080 }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 12
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "4", memory: 2Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+          volumeMounts:
+            - { name: model, mountPath: /models, readOnly: true }
+      volumes:
+        - name: model
+          persistentVolumeClaim: { claimName: retention-smollm2-model }

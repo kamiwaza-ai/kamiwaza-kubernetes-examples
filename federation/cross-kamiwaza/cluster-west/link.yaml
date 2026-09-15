@@ -1,0 +1,9 @@
+apiVersion: federation.kamiwaza.io/v1alpha1
+kind: FederationLink
+metadata:
+  name: east
+  namespace: kw-federation-west
+spec:
+  state: active
+  profileRef:
+    name: east

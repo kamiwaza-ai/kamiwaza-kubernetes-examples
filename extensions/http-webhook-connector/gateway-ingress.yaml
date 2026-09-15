@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: webhook-gateway-ingress
+  namespace: kw-webhook
+spec:
+  podSelector:
+    matchLabels:
+      kamiwaza.io/extension: webhook-connector
+      kamiwaza.io/component: connector
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gateway-system
+      ports: [{ protocol: TCP, port: 8080 }]

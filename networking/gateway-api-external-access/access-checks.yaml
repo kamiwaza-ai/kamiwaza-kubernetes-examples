@@ -1,0 +1,85 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gateway-access-checks
+  namespace: kw-gateway-access
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import ssl, time, urllib.error, urllib.request
+
+              base = "https://gateway-access.example.invalid"
+              context = ssl.create_default_context(cafile="/trust/ca.crt")
+              expected = {
+                  "/": {200},
+                  "/.well-known/openid-configuration": {200},
+                  "/api": {401, 403, 404},
+                  "/v1/models": {401},
+                  "/datahub": {200, 301, 302, 307, 308},
+              }
+              for attempt in range(20):
+                  try:
+                      for path, statuses in expected.items():
+                          try:
+                              response = urllib.request.urlopen(
+                                  base + path, context=context, timeout=10
+                              )
+                              status = response.status
+                          except urllib.error.HTTPError as error:
+                              status = error.code
+                          assert status in statuses, (path, status, statuses)
+                      break
+                  except Exception:
+                      if attempt == 19:
+                          raise
+                      time.sleep(min(2**attempt, 15))
+              try:
+                  urllib.request.urlopen(
+                      "http://core-api.kw-gateway-access.svc.cluster.local:7777/healthz", timeout=5
+                  )
+              except Exception:
+                  print("public routes reachable; direct backend denied")
+              else:
+                  raise SystemExit("direct backend unexpectedly reachable")
+          volumeMounts:
+            - name: gateway-ca
+              mountPath: /trust
+              readOnly: true
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: gateway-ca
+          secret:
+            secretName: kamiwaza-gateway-tls
+            items:
+              - key: ca.crt
+                path: ca.crt

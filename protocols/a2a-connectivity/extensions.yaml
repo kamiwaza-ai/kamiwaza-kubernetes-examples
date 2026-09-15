@@ -1,0 +1,470 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: extension-bundle-2d5c91c6fff6
+  namespace: kw-a2a
+data:
+  bundle.yaml: |
+    apiVersion: extensions.kamiwaza.io/bundle-v1alpha1
+    components:
+    - name: api
+      image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+      command:
+      - python
+      - -c
+      args:
+      - |
+            import hashlib
+            import json
+            import os
+            import threading
+            from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+            from urllib.parse import urlsplit
+
+            AGENT = 'reviewer'
+            SKILL_ID = 'review'
+            SKILL_NAME = 'Review'
+            ROOT = "/state/tasks"
+            os.makedirs(ROOT, exist_ok=True)
+            LOCK = threading.Lock()
+
+
+            def task_path(task_id):
+                return os.path.join(ROOT, task_id + ".json")
+
+
+            def write_task(task):
+                temporary = task_path(task["id"]) + ".tmp"
+                with open(temporary, "w", encoding="utf-8") as stream:
+                    json.dump(task, stream, separators=(",", ":"))
+                os.replace(temporary, task_path(task["id"]))
+
+
+            def read_task(task_id):
+                if not task_id or not task_id.isalnum() or len(task_id) > 64:
+                    return None
+                path = task_path(task_id)
+                if not os.path.exists(path):
+                    return None
+                with open(path, encoding="utf-8") as stream:
+                    return json.load(stream)
+
+
+            def create_task(request):
+                message = request.get("message", {})
+                if not isinstance(message, dict):
+                    raise ValueError("message must be an object")
+                message_id = message.get("messageId")
+                parts = message.get("parts", [])
+                if not isinstance(message_id, str) or not message_id or len(message_id) > 128:
+                    raise ValueError("messageId is required")
+                if message.get("role") != "ROLE_USER" or not isinstance(parts, list) or not parts:
+                    raise ValueError("one user message part is required")
+                if not isinstance(parts[0], dict):
+                    raise ValueError("message part must be an object")
+                text = parts[0].get("text")
+                if not isinstance(text, str) or not text or len(text) > 2048:
+                    raise ValueError("one bounded text part is required")
+                task_id = hashlib.sha256((AGENT + "\0" + message_id).encode()).hexdigest()[:24]
+                context_id = message.get("contextId") or task_id
+                if not isinstance(context_id, str) or len(context_id) > 128:
+                    raise ValueError("contextId must be a bounded string")
+                state = "TASK_STATE_WORKING" if text == "hold" else "TASK_STATE_COMPLETED"
+                artifact = {
+                    "artifactId": "answer",
+                    "name": AGENT + " result",
+                    "parts": [{"text": AGENT + ": " + text.upper(), "mediaType": "text/plain"}],
+                }
+                task = {
+                    "id": task_id,
+                    "contextId": context_id,
+                    "status": {"state": state},
+                    "artifacts": [] if state == "TASK_STATE_WORKING" else [artifact],
+                    "history": [message],
+                }
+                with LOCK:
+                    existing = read_task(task_id)
+                    if existing is not None:
+                        return existing
+                    write_task(task)
+                return task
+
+
+            class Handler(BaseHTTPRequestHandler):
+                def reply(self, status, payload=None, content_type="application/json"):
+                    body = json.dumps(payload, separators=(",", ":")).encode() if payload is not None else b""
+                    self.send_response(status)
+                    if payload is not None:
+                        self.send_header("Content-Type", content_type)
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+
+                def do_GET(self):
+                    path = urlsplit(self.path).path
+                    if path == "/healthz":
+                        self.reply(200, {"status": "ready", "agent": AGENT})
+                        return
+                    if path == "/.well-known/agent-card.json":
+                        self.reply(200, {
+                            "name": AGENT,
+                            "description": "Deterministic " + SKILL_NAME.lower() + " contract agent",
+                            "supportedInterfaces": [{
+                                "url": "http://" + AGENT + "-api:8080",
+                                "protocolBinding": "HTTP+JSON",
+                                "protocolVersion": "1.0",
+                            }],
+                            "version": "1.0.0",
+                            "capabilities": {"streaming": True},
+                            "securitySchemes": {},
+                            "securityRequirements": [],
+                            "defaultInputModes": ["text/plain"],
+                            "defaultOutputModes": ["text/plain"],
+                            "skills": [{
+                                "id": SKILL_ID,
+                                "name": SKILL_NAME,
+                                "description": "Return a deterministic response for contract checks",
+                                "tags": ["contract"],
+                            }],
+                        })
+                        return
+                    if path.startswith("/tasks/") and not path.endswith(":subscribe"):
+                        task = read_task(path.removeprefix("/tasks/"))
+                        self.reply(200, task) if task else self.reply(404, {"error": "task not found"})
+                        return
+                    self.reply(404, {"error": "not found"})
+
+                def do_POST(self):
+                    path = urlsplit(self.path).path
+                    if self.headers.get("Content-Type", "").split(";", 1)[0] != "application/json":
+                        self.reply(415, {"error": "application/json is required"})
+                        return
+                    length = int(self.headers.get("Content-Length", "0"))
+                    if length < 2 or length > 65536:
+                        self.reply(413, {"error": "invalid payload size"})
+                        return
+                    try:
+                        request = json.loads(self.rfile.read(length))
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        self.reply(400, {"error": "invalid JSON"})
+                        return
+                    if not isinstance(request, dict):
+                        self.reply(400, {"error": "request must be an object"})
+                        return
+                    if path in {"/message:send", "/message:stream"}:
+                        try:
+                            task = create_task(request)
+                        except ValueError as error:
+                            self.reply(400, {"error": str(error)})
+                            return
+                        if path == "/message:send":
+                            self.reply(200, {"task": task})
+                            return
+                        event = "id: " + task["id"] + ":1\ndata: "
+                        event += json.dumps({"task": task}, separators=(",", ":")) + "\n\n"
+                        body = event.encode()
+                        self.send_response(200)
+                        self.send_header("Content-Type", "text/event-stream")
+                        self.send_header("Content-Length", str(len(body)))
+                        self.end_headers()
+                        self.wfile.write(body)
+                        return
+                    if path.startswith("/tasks/") and path.endswith(":cancel"):
+                        task_id = path.removeprefix("/tasks/").removesuffix(":cancel")
+                        if request.get("id") != task_id:
+                            self.reply(400, {"error": "request id must match task path"})
+                            return
+                        with LOCK:
+                            task = read_task(task_id)
+                            if task is None:
+                                self.reply(404, {"error": "task not found"})
+                                return
+                            if task["status"]["state"] == "TASK_STATE_WORKING":
+                                task["status"] = {"state": "TASK_STATE_CANCELED"}
+                                write_task(task)
+                        self.reply(200, task)
+                        return
+                    self.reply(404, {"error": "not found"})
+
+                def log_message(self, *args):
+                    pass
+
+            ThreadingHTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+      ports:
+      - name: a2a
+        port: 8080
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 250m
+          memory: 128Mi
+      volumes:
+      - name: state
+        mountPath: /state
+        kind: state
+        size: 1Gi
+      - name: tmp
+        mountPath: /tmp
+        kind: scratch
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: extension-bundle-3cad86850c33
+  namespace: kw-a2a
+data:
+  bundle.yaml: |
+    apiVersion: extensions.kamiwaza.io/bundle-v1alpha1
+    components:
+    - name: api
+      image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+      command:
+      - python
+      - -c
+      args:
+      - |
+            import hashlib
+            import json
+            import os
+            import threading
+            from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+            from urllib.parse import urlsplit
+
+            AGENT = 'researcher'
+            SKILL_ID = 'research'
+            SKILL_NAME = 'Research'
+            ROOT = "/state/tasks"
+            os.makedirs(ROOT, exist_ok=True)
+            LOCK = threading.Lock()
+
+
+            def task_path(task_id):
+                return os.path.join(ROOT, task_id + ".json")
+
+
+            def write_task(task):
+                temporary = task_path(task["id"]) + ".tmp"
+                with open(temporary, "w", encoding="utf-8") as stream:
+                    json.dump(task, stream, separators=(",", ":"))
+                os.replace(temporary, task_path(task["id"]))
+
+
+            def read_task(task_id):
+                if not task_id or not task_id.isalnum() or len(task_id) > 64:
+                    return None
+                path = task_path(task_id)
+                if not os.path.exists(path):
+                    return None
+                with open(path, encoding="utf-8") as stream:
+                    return json.load(stream)
+
+
+            def create_task(request):
+                message = request.get("message", {})
+                if not isinstance(message, dict):
+                    raise ValueError("message must be an object")
+                message_id = message.get("messageId")
+                parts = message.get("parts", [])
+                if not isinstance(message_id, str) or not message_id or len(message_id) > 128:
+                    raise ValueError("messageId is required")
+                if message.get("role") != "ROLE_USER" or not isinstance(parts, list) or not parts:
+                    raise ValueError("one user message part is required")
+                if not isinstance(parts[0], dict):
+                    raise ValueError("message part must be an object")
+                text = parts[0].get("text")
+                if not isinstance(text, str) or not text or len(text) > 2048:
+                    raise ValueError("one bounded text part is required")
+                task_id = hashlib.sha256((AGENT + "\0" + message_id).encode()).hexdigest()[:24]
+                context_id = message.get("contextId") or task_id
+                if not isinstance(context_id, str) or len(context_id) > 128:
+                    raise ValueError("contextId must be a bounded string")
+                state = "TASK_STATE_WORKING" if text == "hold" else "TASK_STATE_COMPLETED"
+                artifact = {
+                    "artifactId": "answer",
+                    "name": AGENT + " result",
+                    "parts": [{"text": AGENT + ": " + text.upper(), "mediaType": "text/plain"}],
+                }
+                task = {
+                    "id": task_id,
+                    "contextId": context_id,
+                    "status": {"state": state},
+                    "artifacts": [] if state == "TASK_STATE_WORKING" else [artifact],
+                    "history": [message],
+                }
+                with LOCK:
+                    existing = read_task(task_id)
+                    if existing is not None:
+                        return existing
+                    write_task(task)
+                return task
+
+
+            class Handler(BaseHTTPRequestHandler):
+                def reply(self, status, payload=None, content_type="application/json"):
+                    body = json.dumps(payload, separators=(",", ":")).encode() if payload is not None else b""
+                    self.send_response(status)
+                    if payload is not None:
+                        self.send_header("Content-Type", content_type)
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+
+                def do_GET(self):
+                    path = urlsplit(self.path).path
+                    if path == "/healthz":
+                        self.reply(200, {"status": "ready", "agent": AGENT})
+                        return
+                    if path == "/.well-known/agent-card.json":
+                        self.reply(200, {
+                            "name": AGENT,
+                            "description": "Deterministic " + SKILL_NAME.lower() + " contract agent",
+                            "supportedInterfaces": [{
+                                "url": "http://" + AGENT + "-api:8080",
+                                "protocolBinding": "HTTP+JSON",
+                                "protocolVersion": "1.0",
+                            }],
+                            "version": "1.0.0",
+                            "capabilities": {"streaming": True},
+                            "securitySchemes": {},
+                            "securityRequirements": [],
+                            "defaultInputModes": ["text/plain"],
+                            "defaultOutputModes": ["text/plain"],
+                            "skills": [{
+                                "id": SKILL_ID,
+                                "name": SKILL_NAME,
+                                "description": "Return a deterministic response for contract checks",
+                                "tags": ["contract"],
+                            }],
+                        })
+                        return
+                    if path.startswith("/tasks/") and not path.endswith(":subscribe"):
+                        task = read_task(path.removeprefix("/tasks/"))
+                        self.reply(200, task) if task else self.reply(404, {"error": "task not found"})
+                        return
+                    self.reply(404, {"error": "not found"})
+
+                def do_POST(self):
+                    path = urlsplit(self.path).path
+                    if self.headers.get("Content-Type", "").split(";", 1)[0] != "application/json":
+                        self.reply(415, {"error": "application/json is required"})
+                        return
+                    length = int(self.headers.get("Content-Length", "0"))
+                    if length < 2 or length > 65536:
+                        self.reply(413, {"error": "invalid payload size"})
+                        return
+                    try:
+                        request = json.loads(self.rfile.read(length))
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        self.reply(400, {"error": "invalid JSON"})
+                        return
+                    if not isinstance(request, dict):
+                        self.reply(400, {"error": "request must be an object"})
+                        return
+                    if path in {"/message:send", "/message:stream"}:
+                        try:
+                            task = create_task(request)
+                        except ValueError as error:
+                            self.reply(400, {"error": str(error)})
+                            return
+                        if path == "/message:send":
+                            self.reply(200, {"task": task})
+                            return
+                        event = "id: " + task["id"] + ":1\ndata: "
+                        event += json.dumps({"task": task}, separators=(",", ":")) + "\n\n"
+                        body = event.encode()
+                        self.send_response(200)
+                        self.send_header("Content-Type", "text/event-stream")
+                        self.send_header("Content-Length", str(len(body)))
+                        self.end_headers()
+                        self.wfile.write(body)
+                        return
+                    if path.startswith("/tasks/") and path.endswith(":cancel"):
+                        task_id = path.removeprefix("/tasks/").removesuffix(":cancel")
+                        if request.get("id") != task_id:
+                            self.reply(400, {"error": "request id must match task path"})
+                            return
+                        with LOCK:
+                            task = read_task(task_id)
+                            if task is None:
+                                self.reply(404, {"error": "task not found"})
+                                return
+                            if task["status"]["state"] == "TASK_STATE_WORKING":
+                                task["status"] = {"state": "TASK_STATE_CANCELED"}
+                                write_task(task)
+                        self.reply(200, task)
+                        return
+                    self.reply(404, {"error": "not found"})
+
+                def log_message(self, *args):
+                    pass
+
+            ThreadingHTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+      ports:
+      - name: a2a
+        port: 8080
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 250m
+          memory: 128Mi
+      volumes:
+      - name: state
+        mountPath: /state
+        kind: state
+        size: 1Gi
+      - name: tmp
+        mountPath: /tmp
+        kind: scratch
+---
+apiVersion: extensions.kamiwaza.io/v1alpha1
+kind: ExtensionRuntime
+metadata:
+  name: a2a-agents
+  namespace: kw-a2a
+spec:
+  domain: a2a.example.invalid
+  storage:
+    className: example-rwo
+  identity:
+    contractVersions:
+      - v1
+---
+apiVersion: extensions.kamiwaza.io/v1alpha1
+kind: Extension
+metadata:
+  name: reviewer
+  namespace: kw-a2a
+  labels:
+    kamiwaza.io/runtime: a2a-agents
+spec:
+  package:
+    repository: example.invalid/kamiwaza/extensions/reviewer
+    version: 1.0.0
+    digest: sha256:2d5c91c6fff671469b997b850882595037fa2f59374cb02d5d6f4c87e1f1e6d1
+  state: running
+  config:
+    protocol: A2A
+    protocolVersion: "1.0"
+    endpointName: a2a
+---
+apiVersion: extensions.kamiwaza.io/v1alpha1
+kind: Extension
+metadata:
+  name: researcher
+  namespace: kw-a2a
+  labels:
+    kamiwaza.io/runtime: a2a-agents
+spec:
+  package:
+    repository: example.invalid/kamiwaza/extensions/researcher
+    version: 1.0.0
+    digest: sha256:3cad86850c3317e92a1683d8b6ad2d6d6e20fd66a602f800ef7515e6d991edeb
+  state: running
+  config:
+    protocol: A2A
+    protocolVersion: "1.0"
+    endpointName: a2a

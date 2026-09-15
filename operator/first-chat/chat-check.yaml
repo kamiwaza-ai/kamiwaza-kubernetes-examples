@@ -1,0 +1,99 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: first-chat-check
+  namespace: kw-first-chat
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json, os, ssl, time, urllib.request
+
+              payload = json.dumps(
+                  {
+                      "model": "smollm2-135m-instruct",
+                      "messages": [
+                          {"role": "user", "content": "Reply with exactly: declarative chat ready"}
+                      ],
+                      "max_tokens": 32,
+                  }
+              ).encode()
+              context = ssl.create_default_context(cafile="/trust/ca.crt")
+              for attempt in range(20):
+                  request = urllib.request.Request(
+                      os.environ["CHAT_URL"],
+                      data=payload,
+                      headers={
+                          "Authorization": "Bearer " + os.environ["TOKEN"],
+                          "Content-Type": "application/json",
+                          "X-KZ-Deployment-Id": "smollm2-cpu",
+                      },
+                  )
+                  try:
+                      with urllib.request.urlopen(request, context=context, timeout=20) as response:
+                          body = json.load(response)
+                      content = body["choices"][0]["message"]["content"].strip()
+                      assert body.get("model") == "smollm2-135m-instruct", body
+                      assert content, body
+                      print(
+                          json.dumps(
+                              {
+                                  "model": body["model"],
+                                  "finish_reason": body["choices"][0].get("finish_reason"),
+                              }
+                          )
+                      )
+                      break
+                  except Exception:
+                      if attempt == 19:
+                          raise
+                      time.sleep(min(2**attempt, 15))
+          env:
+            - name: CHAT_URL
+              value: https://first-chat.example.invalid/v1/chat/completions
+            - name: TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: first-chat-client
+                  key: token
+          volumeMounts:
+            - name: gateway-ca
+              mountPath: /trust
+              readOnly: true
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: gateway-ca
+          secret:
+            secretName: kamiwaza-gateway-tls
+            items:
+              - key: ca.crt
+                path: ca.crt

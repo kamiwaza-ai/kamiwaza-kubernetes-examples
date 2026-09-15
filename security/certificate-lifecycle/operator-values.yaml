@@ -1,0 +1,143 @@
+manager:
+  watchNamespaces:
+    - kw-cert-platform
+  watchAnyNamespace: false
+adminPolicy:
+  revision: kw-cert-platform-r1
+  allowedTargetNamespaces:
+    - kw-cert-platform
+  storage:
+    allowedClassNames:
+      - example-rwo
+      - absent-class
+    allowedSharedClassNames: []
+  routing:
+    gateway:
+      name: kamiwaza-gateway
+      namespace: kw-cert-platform
+      sectionName: https
+  trust:
+    managementPolicy: External
+    issuer:
+      group: cert-manager.io
+      kind: ClusterIssuer
+      name: infra-ca
+    certificate:
+      duration: 8760h
+      renewBefore: 720h
+      privateKey:
+        algorithm: ECDSA
+        size: 384
+        encoding: PKCS8
+        rotationPolicy: Always
+    bundle:
+      configMapName: kamiwaza-trust-bundle
+      sourceSecretName: core-client-tls
+      sourceKey: ca.crt
+  images:
+    requireDigests: true
+    allowedRepositoryPrefixes:
+      - ghcr.io/kamiwaza-internal/
+      - ghcr.io/authzed/
+      - ghcr.io/agentgateway/
+    pullSecretNames:
+      - registry-pull
+  modelRegistry:
+    type: OCIRegistry
+    endpoint: registry.kw-cert-platform.svc.cluster.local:5000
+    credentialSecretName: kamiwaza-registry-credentials
+    usernameKey: username
+    passwordKey: password
+  metadataCatalog:
+    provider: DataHub
+  observability:
+    allowedModes:
+      - Disabled
+    approvedSinks: []
+    monitoring:
+      enabled: false
+      provider: PrometheusOperator
+  operations:
+    adoptionAllowed: false
+    deleteAllAllowed: false
+    genericSecretRotationAllowed: false
+    approvedForwardOnlyUpgradeTargets:
+      - 1.3.0
+  extensions:
+    enabled: true
+    allowedNamespaces:
+      - kw-cert-platform
+    allowNamespaceCreation: false
+    allowCrossNamespaceResources: false
+    hostDiscovery: Disabled
+    sandbox: Disabled
+    dynamicRBAC: Disabled
+  dependencies:
+    certManager:
+      managementPolicy: External
+      versionConstraint: ">=1.20.0 <2.0.0"
+      evidenceSource: AdminAttested
+      namespace: cert-manager
+    trustManager:
+      managementPolicy: External
+      versionConstraint: ">=0.22.0 <1.0.0"
+      evidenceSource: AdminAttested
+      namespace: kw-cert-platform
+    routing:
+      managementPolicy: External
+      versionConstraint: ">=1.28.0 <2.0.0"
+      evidenceSource: AdminAttested
+      namespace: kw-cert-platform
+    gatewayAPI:
+      managementPolicy: External
+      versionConstraint: ">=1.4.0 <2.0.0"
+      evidenceSource: AdminAttested
+      namespace: kw-cert-platform
+  domains:
+    allocationMode: ExplicitAllowlist
+    allowedDomains:
+      - cert-platform.example.invalid
+    allowedSuffixes: []
+  transport:
+    issuance:
+      mode: PlatformIssued
+      platformIssued:
+        authorityValidity: 8760h
+        authorityRenewBefore: 720h
+        leafValidity: 2160h
+        leafRenewBefore: 360h
+        expirationPolicy: ReplaceKey
+        privateKeyPolicy:
+          algorithm: ECDSA
+          size: 384
+          rotationPolicy: Always
+      maintenanceWindows:
+        - 0 2 * * 6
+    trust:
+      bundleConfigMapName: kamiwaza-trust-bundle
+      publicRoots: Include
+      maximumBundleBytes: 900000
+      targetNamespaces:
+        - kw-cert-platform
+    floor:
+      minimumTLSVersion: TLS1.2
+      hostnameVerification: Required
+    edge:
+      listenerCertificate: PlatformIssued
+      listenerCertificateSecretName: kamiwaza-gateway-tls
+      httpsRedirect: RequireWhenSupported
+      backendTLS: RequireWhenSupported
+      clientCertificate:
+        mode: Disabled
+    internal:
+      defaultTransport: PlatformTLS
+      workloadIngressFloor: true
+    clientIdentities: []
+    egress:
+      deniedNetworks:
+        - Loopback
+        - LinkLocal
+        - CloudMetadata
+        - PrivateRanges
+      destinations: []
+      proxies: []

@@ -1,0 +1,104 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: hosted-provider-inference-check
+  namespace: kw-hosted-models
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json, os, ssl, time, urllib.error, urllib.request
+
+              payload = json.dumps(
+                  {
+                      "model": "gemini-2.5-flash",
+                      "messages": [{"role": "user", "content": "Reply with hosted provider ready"}],
+                      "max_tokens": 32,
+                  }
+              ).encode()
+              context = ssl.create_default_context(cafile="/trust/ca.crt")
+              for attempt in range(5):
+                  request = urllib.request.Request(
+                      "https://hosted-models.example.invalid/v1/chat/completions",
+                      data=payload,
+                      headers={
+                          "Authorization": "Bearer " + os.environ["TOKEN"],
+                          "Content-Type": "application/json",
+                          "X-KZ-Deployment-Id": "hosted-model",
+                      },
+                  )
+                  try:
+                      with urllib.request.urlopen(request, context=context, timeout=30) as response:
+                          body = json.load(response)
+                      answer = body.get("choices", [{}])[0].get("message", {}).get("content", "")
+                      tool_calls = (
+                          body.get("choices", [{}])[0].get("message", {}).get("tool_calls", [])
+                      )
+                      assert body.get("model"), body
+                      assert answer.strip() or tool_calls, body
+                      print(
+                          json.dumps(
+                              {
+                                  "providerModel": body["model"],
+                                  "finishReason": body["choices"][0].get("finish_reason"),
+                              }
+                          )
+                      )
+                      break
+                  except urllib.error.HTTPError as error:
+                      if error.code not in {429, 500, 502, 503, 504}:
+                          raise
+                      if attempt == 4:
+                          raise
+                      time.sleep(min(2**attempt, 10))
+                  except (TimeoutError, urllib.error.URLError):
+                      if attempt == 4:
+                          raise
+                      time.sleep(min(2**attempt, 10))
+          env:
+            - name: TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hosted-check-client
+                  key: token
+          volumeMounts:
+            - name: gateway-ca
+              mountPath: /trust
+              readOnly: true
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: gateway-ca
+          secret:
+            secretName: kamiwaza-gateway-tls
+            items:
+              - key: ca.crt
+                path: ca.crt

@@ -1,0 +1,44 @@
+apiVersion: serving.kamiwaza.io/v1alpha1
+kind: ModelDeployment
+metadata:
+  name: image-pull-failure
+  namespace: kw-failure-diagnosis
+spec:
+  deploymentId: image-pull-failure
+  modelId: image-pull-failure
+  state: running
+  engineName: failure-probe
+  servicePort: 8080
+  carriedPodTemplate:
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: server
+          image: docker.io/hashicorp/http-echo@sha256:fcb75f691c8b0414d670ae570240cbf95502cc18a9ba57e982ecac589760a186
+          args:
+            - -listen=:8080
+            - -text=ready
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true

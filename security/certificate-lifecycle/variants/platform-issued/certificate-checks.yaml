@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: certificate-check
+  namespace: kw-cert-platform
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import hashlib, ssl, urllib.request
+
+              path = "/trust/ca-certificates.crt"
+              context = ssl.create_default_context(cafile=path)
+              with urllib.request.urlopen(
+                  "https://cert-platform.example.invalid/healthz", context=context, timeout=10
+              ) as response:
+                  assert response.status == 200
+              payload = open(path, "rb").read()
+              assert payload.count(b"BEGIN CERTIFICATE") >= 1
+              print(
+                  "mode=PlatformIssued handshake=verified bundle_sha256="
+                  + hashlib.sha256(payload).hexdigest()
+              )
+          volumeMounts:
+            - name: trust
+              mountPath: /trust
+              readOnly: true
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: trust
+          configMap:
+            name: kamiwaza-trust-bundle
+            items:
+              - key: ca-certificates.crt
+                path: ca-certificates.crt

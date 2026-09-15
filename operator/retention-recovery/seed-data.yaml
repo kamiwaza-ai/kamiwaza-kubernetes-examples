@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: seed-retained-data
+  namespace: kw-retention-recovery
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command: [python, /checks/check.py]
+          env:
+            - { name: MODE, value: seed }
+            - { name: ROOT, value: "https://retention.example.invalid" }
+            - name: TOKEN
+              valueFrom:
+                secretKeyRef: { name: retention-client, key: token }
+          volumeMounts:
+            - { name: checks, mountPath: /checks, readOnly: true }
+            - { name: gateway-ca, mountPath: /trust, readOnly: true }
+          resources:
+            requests: { cpu: 25m, memory: 32Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: checks
+          configMap: { name: retention-check }
+        - name: gateway-ca
+          secret:
+            secretName: kamiwaza-gateway-tls
+            items:
+              - { key: ca.crt, path: ca.crt }

@@ -1,0 +1,187 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: federation-check
+  namespace: kw-federation-west
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: federation-check
+  namespace: kw-federation-west
+rules:
+  - apiGroups:
+      - federation.kamiwaza.io
+    resources:
+      - federationlinks
+    verbs:
+      - get
+  - apiGroups:
+      - platform.kamiwaza.io
+    resources:
+      - kamiwazaplatforms
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: federation-check
+  namespace: kw-federation-west
+subjects:
+  - kind: ServiceAccount
+    name: federation-check
+    namespace: kw-federation-west
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: federation-check
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: federation-check
+  namespace: kw-federation-west
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      serviceAccountName: federation-check
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json
+              import os
+              import ssl
+              import time
+              import urllib.error
+              import urllib.request
+
+              namespace = "kw-federation-west"
+              remote = "east"
+              host = os.environ["KUBERNETES_SERVICE_HOST"]
+              port = os.environ["KUBERNETES_SERVICE_PORT_HTTPS"]
+              root = f"https://{host}:{port}"
+              service_token = open(
+                  "/var/run/secrets/kubernetes.io/serviceaccount/token"
+              ).read()
+              context = ssl.create_default_context(
+                  cafile="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+              )
+              platform_context = ssl.create_default_context(
+                  cafile="/etc/kamiwaza/trust/ca-certificates.crt"
+              )
+
+              def kube(path):
+                  request = urllib.request.Request(
+                      root + path,
+                      headers={"Authorization": "Bearer " + service_token},
+                  )
+                  return json.load(
+                      urllib.request.urlopen(request, context=context, timeout=10)
+                  )
+
+              path = (
+                  "/apis/federation.kamiwaza.io/v1alpha1/namespaces/"
+                  + namespace
+                  + "/federationlinks/"
+                  + remote
+              )
+              for _ in range(60):
+                  link = kube(path)
+                  conditions = {
+                      item["type"]: item
+                      for item in link.get("status", {}).get("conditions", [])
+                  }
+                  if conditions.get("Ready", {}).get("status") == "True":
+                      break
+                  time.sleep(5)
+              else:
+                  raise AssertionError("federation link did not become Ready")
+
+              status = link["status"]
+              assert status["observedGeneration"] == link["metadata"]["generation"]
+              assert status["remoteClusterID"] == remote
+              for condition_type in (
+                  "TrustBundleReady",
+                  "RemoteIdentityVerified",
+                  "TransportReady",
+                  "Ready",
+              ):
+                  assert conditions[condition_type]["status"] == "True"
+
+              headers = {
+                  "Authorization": "Bearer " + os.environ["FEDERATION_CHECK_TOKEN"],
+                  "Accept": "application/json",
+              }
+              models_url = (
+                  "https://kamiwaza-dataplane.kw-federation-west.svc.cluster.local"
+                  + ":8080/clusters/"
+                  + remote
+                  + "/v1/models"
+              )
+              response = urllib.request.Request(models_url, headers=headers)
+              inventory = json.load(
+                  urllib.request.urlopen(
+                      response, context=platform_context, timeout=15
+                  )
+              )
+              assert inventory["clusterID"] == remote
+              assert [item["name"] for item in inventory["items"]] == [
+                  "federation-contract-model"
+              ]
+
+              denied_url = models_url + "/restricted-contract-probe"
+              try:
+                  urllib.request.urlopen(
+                      urllib.request.Request(denied_url, headers=headers),
+                      context=platform_context,
+                      timeout=15,
+                  )
+              except urllib.error.HTTPError as error:
+                  assert error.code == 403
+              else:
+                  raise AssertionError("ungranted remote resource was accessible")
+              print("remote identity, granted inventory, and denial verified")
+          env:
+            - name: FEDERATION_CHECK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: federation-check-token
+                  key: token
+          volumeMounts:
+            - name: platform-trust
+              mountPath: /etc/kamiwaza/trust
+              readOnly: true
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: platform-trust
+          configMap:
+            name: kamiwaza-trust-bundle

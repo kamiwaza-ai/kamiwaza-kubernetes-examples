@@ -1,0 +1,219 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: catalog-ingest
+  namespace: kw-metadata-catalog
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ingest
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json, os, ssl, time, urllib.error, urllib.request
+
+              root = os.environ["CATALOG_URL"]
+              context = ssl.create_default_context(cafile="/trust/ca.crt")
+              headers = {"Authorization": "Bearer " + os.environ["TOKEN"]}
+
+
+              def call(method, path, body=None):
+                  data = (
+                      json.dumps(body, separators=(",", ":")).encode() if body is not None else None
+                  )
+                  request = urllib.request.Request(
+                      root + path,
+                      data=data,
+                      headers={**headers, **({"Content-Type": "application/json"} if data else {})},
+                      method=method,
+                  )
+                  return urllib.request.urlopen(request, context=context, timeout=15)
+
+
+              def listing(path):
+                  with call("GET", path) as response:
+                      return json.load(response)
+
+
+              for attempt in range(30):
+                  try:
+                      containers = listing("/containers/")
+                      container = next(
+                          (item for item in containers if item.get("name") == "catalog-example"), None
+                      )
+                      if not container:
+                          try:
+                              with call(
+                                  "POST",
+                                  "/containers/",
+                                  {
+                                      "name": "catalog-example",
+                                      "platform": "kamiwaza",
+                                      "description": "Deterministic relationship root",
+                                      "tags": ["declarative-example"],
+                                      "properties": {"classification": "example"},
+                                  },
+                              ) as response:
+                                  container_urn = json.load(response)
+                          except urllib.error.HTTPError as error:
+                              if error.code != 409:
+                                  raise
+                              container_urn = next(
+                                  item["urn"]
+                                  for item in listing("/containers/")
+                                  if item.get("name") == "catalog-example"
+                              )
+                      else:
+                          container_urn = container["urn"]
+                      datasets = listing("/datasets/")
+                      if not any(item.get("name") == "catalog-sample" for item in datasets):
+                          try:
+                              with call(
+                                  "POST",
+                                  "/datasets/",
+                                  {
+                                      "name": "catalog-sample",
+                                      "platform": "kamiwaza",
+                                      "environment": "PROD",
+                                      "description": "Deterministic catalog entity",
+                                      "tags": ["declarative-example"],
+                                      "properties": {"classification": "example"},
+                                      "container_urn": container_urn,
+                                  },
+                              ) as response:
+                                  json.load(response)
+                          except urllib.error.HTTPError as error:
+                              if error.code != 409:
+                                  raise
+                      print("deterministic catalog entity and relationship accepted")
+                      break
+                  except urllib.error.HTTPError as error:
+                      if error.code not in (404, 429, 500, 502, 503, 504) or attempt == 29:
+                          raise
+                      time.sleep(min(1 + attempt // 3, 10))
+              else:
+                  raise AssertionError("catalog writes never became available")
+          env:
+            - name: CATALOG_URL
+              value: https://catalog.example.invalid/catalog
+            - name: TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: catalog-client
+                  key: token
+          volumeMounts:
+            - name: gateway-ca
+              mountPath: /trust
+              readOnly: true
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: gateway-ca
+          secret:
+            secretName: kamiwaza-gateway-tls
+            items:
+              - key: ca.crt
+                path: ca.crt
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: catalog-query
+  namespace: kw-metadata-catalog
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: query
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json,os,ssl,time,urllib.error,urllib.parse,urllib.request
+              root=os.environ['CATALOG_URL']
+              context=ssl.create_default_context(cafile='/trust/ca.crt')
+              headers={'Authorization':'Bearer '+os.environ['TOKEN']}
+              def get(path):
+               request=urllib.request.Request(root+path,headers=headers)
+               return json.load(urllib.request.urlopen(request,context=context,timeout=15))
+              for attempt in range(60):
+               try:
+                datasets=get('/datasets/'); summary=next(item for item in datasets if item.get('name')=='catalog-sample')
+                dataset=get('/datasets/by-urn?urn='+urllib.parse.quote(summary['urn'],safe=''))
+                container=get('/containers/by-urn?urn='+urllib.parse.quote(dataset['container_urn'],safe=''))
+                assert dataset['properties']['classification']=='example',dataset
+                assert dataset['urn'] in container.get('datasets',[]),container
+                print('catalog entity and container relationship verified'); break
+               except (StopIteration,KeyError,AssertionError,urllib.error.HTTPError):
+                if attempt==59: raise
+                time.sleep(min(1+attempt//5,10))
+              else: raise AssertionError('catalog result never became queryable')
+          env:
+            - name: CATALOG_URL
+              value: https://catalog.example.invalid/catalog
+            - name: TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: catalog-client
+                  key: token
+          volumeMounts:
+            - name: gateway-ca
+              mountPath: /trust
+              readOnly: true
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: gateway-ca
+          secret:
+            secretName: kamiwaza-gateway-tls
+            items:
+              - key: ca.crt
+                path: ca.crt

@@ -1,0 +1,8 @@
+apiVersion: platform.kamiwaza.io/v1alpha1
+kind: KamiwazaPlatform
+metadata:
+  name: kamiwaza
+  namespace: kw-cert-platform
+  annotations:
+    transport.kamiwaza.io/rotate-authority: Server
+    transport.kamiwaza.io/rotate-operation: ReplaceKey

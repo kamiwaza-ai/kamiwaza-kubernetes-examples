@@ -1,0 +1,186 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workflow-check
+  namespace: kw-persistent-extension
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workflow-check
+  namespace: kw-persistent-extension
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - policy
+    resources:
+      - pods/eviction
+    verbs:
+      - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workflow-check
+  namespace: kw-persistent-extension
+subjects:
+  - kind: ServiceAccount
+    name: workflow-check
+    namespace: kw-persistent-extension
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: workflow-check
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: workflow-check-to-api
+  namespace: kw-persistent-extension
+spec:
+  podSelector:
+    matchLabels:
+      kamiwaza.io/extension: persistent-workflow
+      kamiwaza.io/component: api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: workflow-check
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: workflow-check
+  namespace: kw-persistent-extension
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: workflow-check
+    spec:
+      serviceAccountName: workflow-check
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json, os, ssl, time, urllib.error, urllib.parse, urllib.request
+
+              api = "http://persistent-workflow-api:8080"
+              payload = {"id": "workflow001", "input": "durable-result"}
+
+
+              def call(method, path, body=None):
+                  request = urllib.request.Request(
+                      api + path,
+                      data=json.dumps(body).encode() if body else None,
+                      headers={"Content-Type": "application/json"},
+                      method=method,
+                  )
+                  return json.load(urllib.request.urlopen(request, timeout=10))
+
+
+              first = call("POST", "/tasks", payload)
+              second = call("POST", "/tasks", payload)
+              assert first == second and first["result"] == "tluser-elbarud"
+              host = os.environ["KUBERNETES_SERVICE_HOST"]
+              port = os.environ["KUBERNETES_SERVICE_PORT_HTTPS"]
+              root = f"https://{host}:{port}"
+              token = open("/var/run/secrets/kubernetes.io/serviceaccount/token").read()
+              context = ssl.create_default_context(
+                  cafile="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+              )
+
+
+              def kube(path, method="GET", body=None):
+                  request = urllib.request.Request(
+                      root + path,
+                      data=json.dumps(body).encode() if body else None,
+                      headers={
+                          "Authorization": "Bearer " + token,
+                          "Content-Type": "application/json",
+                      },
+                      method=method,
+                  )
+                  return json.load(urllib.request.urlopen(request, context=context, timeout=10))
+
+
+              selector = urllib.parse.quote(
+                  "kamiwaza.io/extension=persistent-workflow,kamiwaza.io/component=worker"
+              )
+              path = "/api/v1/namespaces/kw-persistent-extension/pods?labelSelector=" + selector
+              old = kube(path)["items"][0]
+              name = old["metadata"]["name"]
+              uid = old["metadata"]["uid"]
+              eviction = {
+                  "apiVersion": "policy/v1",
+                  "kind": "Eviction",
+                  "metadata": {"name": name, "namespace": "kw-persistent-extension"},
+              }
+              kube(
+                  "/api/v1/namespaces/kw-persistent-extension/pods/" + name + "/eviction",
+                  "POST",
+                  eviction,
+              )
+              for _ in range(120):
+                  items = kube(path)["items"]
+                  if any(
+                      item["metadata"]["uid"] != uid
+                      and any(
+                          c["type"] == "Ready" and c["status"] == "True"
+                          for c in item.get("status", {}).get("conditions", [])
+                      )
+                      for item in items
+                  ):
+                      break
+                  time.sleep(1)
+              else:
+                  raise AssertionError("replacement worker never became ready")
+              for _ in range(60):
+                  try:
+                      restored = call("GET", "/tasks/workflow001")
+                      break
+                  except urllib.error.URLError:
+                      time.sleep(1)
+              else:
+                  raise AssertionError("durable result never returned")
+              assert restored == first
+              print("one idempotent workflow survived worker replacement")
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true

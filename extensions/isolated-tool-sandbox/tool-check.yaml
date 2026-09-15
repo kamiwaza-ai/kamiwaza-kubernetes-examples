@@ -1,0 +1,134 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tool-check
+  namespace: kw-tool-sandbox
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tool-check
+  namespace: kw-tool-sandbox
+rules:
+  - apiGroups:
+      - extensions.agents.x-k8s.io
+    resources:
+      - sandboxclaims
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tool-check
+  namespace: kw-tool-sandbox
+subjects:
+  - kind: ServiceAccount
+    name: tool-check
+    namespace: kw-tool-sandbox
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: tool-check
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tool-check
+  namespace: kw-tool-sandbox
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 240
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      serviceAccountName: tool-check
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json, os, ssl, time, urllib.error, urllib.request
+
+              request = urllib.request.Request(
+                  "http://isolated-tool-api:8080/invoke",
+                  data=json.dumps({"marker": "sandbox-contract"}).encode(),
+                  headers={"Content-Type": "application/json"},
+              )
+              result = json.load(urllib.request.urlopen(request, timeout=90))
+              assert result["distinct"] and result["markerEchoed"]
+              claim = result["claim"]
+              sandbox = result["sandbox"]
+              host = os.environ["KUBERNETES_SERVICE_HOST"]
+              port = os.environ["KUBERNETES_SERVICE_PORT_HTTPS"]
+              root = f"https://{host}:{port}"
+              token = open("/var/run/secrets/kubernetes.io/serviceaccount/token").read()
+              context = ssl.create_default_context(
+                  cafile="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+              )
+
+
+              def get(path):
+                  item = urllib.request.Request(
+                      root + path, headers={"Authorization": "Bearer " + token}
+                  )
+                  return json.load(urllib.request.urlopen(item, context=context, timeout=10))
+
+
+              pod = get("/api/v1/namespaces/kw-tool-sandbox/pods/" + sandbox)
+              spec = pod["spec"]
+              container = spec["containers"][0]
+              assert spec.get("runtimeClassName") == "gvisor", (
+                  "sandbox did not use required RuntimeClass"
+              )
+              assert (
+                  not spec.get("hostNetwork", False)
+                  and not spec.get("hostPID", False)
+                  and not spec.get("hostIPC", False)
+              )
+              assert container.get("securityContext", {}).get("privileged", False) is False
+              path = (
+                  "/apis/extensions.agents.x-k8s.io/v1beta1/namespaces/kw-tool-sandbox/sandboxclaims/"
+                  + claim
+              )
+              for attempt in range(90):
+                  try:
+                      get(path)
+                  except urllib.error.HTTPError as error:
+                      if error.code == 404:
+                          break
+                      raise
+                  time.sleep(2)
+              else:
+                  raise AssertionError("sandbox claim exceeded 120-second lifetime")
+              print("sandbox request, isolation metadata, and teardown verified")
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
