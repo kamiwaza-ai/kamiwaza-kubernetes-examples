@@ -1,4 +1,7 @@
 manager:
+  # This example starts on an empty cluster. Publish and own the APIs that
+  # coexistence mode withholds while an incumbent operator still serves them.
+  adoptWithheldKinds: true
   watchNamespaces:
     - kamiwaza-examples
   watchAnyNamespace: false

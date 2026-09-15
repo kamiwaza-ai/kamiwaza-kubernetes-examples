@@ -29,6 +29,12 @@ helm show chart "${OPERATOR_CHART}" --version "${OPERATOR_CHART_VERSION}"
 For a reviewed local checkout, set `OPERATOR_CHART` to its chart directory and
 record the checkout commit instead of using `--version`.
 
+The checked-in values enable `manager.adoptWithheldKinds` because this is a
+fresh-install workflow on an empty cluster. That setting publishes the
+`KamiwazaExtension` and `ModelDeployment` schemas and registers their
+controllers under this manager. Never use it while an incumbent operator still
+owns those kinds; complete the adoption preflight and ownership transfer first.
+
 Copy the two checked-in inputs, then replace their lab values together:
 
 ```bash
@@ -98,7 +104,7 @@ kubectl -n kamiwaza-examples-system rollout status \
   --timeout=5m
 ```
 
-For a local chart directory, run `helm lint "${OPERATOR_CHART}" --values operator-values.local.yaml`, retain the manager image digest override, and omit both `--version` flags. The release installs three CRDs and one manager. Helm installs CRDs from the chart's `crds/` directory before templates, but does not upgrade or delete existing CRDs; use the release-provided CRD upgrade workflow before a chart upgrade that changes an API. Do not install a second extension or model manager.
+For a local chart directory, run `helm lint "${OPERATOR_CHART}" --values operator-values.local.yaml`, retain the manager image digest override, and omit both `--version` flags. The release installs its explicitly selected API schemas and one manager. Helm templates the schemas as kept release resources so a chart upgrade can update them without deleting custom resources on uninstall; use the release-provided CRD upgrade workflow before changing a served API. Do not install a second extension or model manager.
 
 ## 5. Apply platform intent
 

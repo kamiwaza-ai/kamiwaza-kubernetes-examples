@@ -36,7 +36,7 @@ echo
 printf '%s' "${REGISTRY_USERNAME}" >"${CREDENTIAL_DIR}/username"
 printf '%s' "${REGISTRY_PASSWORD}" >"${CREDENTIAL_DIR}/password"
 printf '%s\n' "${REGISTRY_PASSWORD}" | \
-  htpasswd -cBin "${CREDENTIAL_DIR}/htpasswd" "${REGISTRY_USERNAME}"
+  htpasswd -cBi "${CREDENTIAL_DIR}/htpasswd" "${REGISTRY_USERNAME}"
 
 kubectl -n kamiwaza-examples create secret generic registry-htpasswd \
   --from-file=htpasswd="${CREDENTIAL_DIR}/htpasswd" \
