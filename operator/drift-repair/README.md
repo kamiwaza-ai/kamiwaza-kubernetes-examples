@@ -16,17 +16,23 @@ This scenario intentionally deletes a Deployment. Use only on a disposable insta
 
 ```bash
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
-  -o custom-columns=GENERATION:.metadata.generation,OBSERVED:.status.observedGeneration,PHASE:.status.phase,CURRENT:.status.currentVersion
+  -o custom-columns=GENERATION:.metadata.generation,OBSERVED:.status.observedGeneration,CURRENT:.status.currentVersion
+kubectl -n kamiwaza-examples wait \
+  --for=condition=Ready \
+  kamiwazaplatform/kamiwaza \
+  --timeout=10m
 kubectl -n kamiwaza-examples get deployments \
-  -l app.kubernetes.io/managed-by=kamiwaza-platform-operator,platform.kamiwaza.io/controller-domain=platform
+  -l app.kubernetes.io/managed-by=kamiwaza-platform-operator,platform.kamiwaza.io/controller-domain=platform \
+  -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,READY:.status.readyReplicas,DESIRED:.spec.replicas
 kubectl -n kamiwaza-examples get jobs \
-  -l app.kubernetes.io/managed-by=kamiwaza-platform-operator
+  -l app.kubernetes.io/managed-by=kamiwaza-platform-operator \
+  -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,SUCCEEDED:.status.succeeded
 kubectl -n kamiwaza-examples get secrets \
   -l platform.kamiwaza.io/uid \
   -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,DATA_VERSION:.metadata.resourceVersion
 ```
 
-Save the Job and Secret output. Secret data must never be printed for this test.
+Save the Deployment, Job, and Secret output. Secret data must never be printed for this test.
 
 ## 2. Delete one replaceable Deployment
 
@@ -37,13 +43,17 @@ TARGET_DEPLOYMENT=<reviewed-stateless-deployment>
 kubectl -n kamiwaza-examples delete deployment "${TARGET_DEPLOYMENT}"
 ```
 
-The platform should move through Progressing while the controller recreates the missing desired object.
+The platform may report `Progressing=True` while the controller recreates the missing desired object. Fast reconciliation can make that transition too short to observe from an interactive shell.
 
 ## 3. Observe recovery
 
 ```bash
 kubectl -n kamiwaza-examples get events \
   --sort-by=.metadata.creationTimestamp
+kubectl -n kamiwaza-examples wait \
+  --for=create \
+  "deployment/${TARGET_DEPLOYMENT}" \
+  --timeout=2m
 kubectl -n kamiwaza-examples rollout status \
   "deployment/${TARGET_DEPLOYMENT}" \
   --timeout=10m
