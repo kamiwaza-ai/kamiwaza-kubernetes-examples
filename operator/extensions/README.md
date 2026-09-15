@@ -9,9 +9,8 @@ Apply a `KamiwazaExtension` through the extension controller in the shared manag
 - The shared manager is installed and watches `kamiwaza-examples`.
 - Immutable policy enables extensions in `kamiwaza-examples`.
 - The image repository and digest are approved by immutable image policy and accessible through an installed pull Secret.
-- The quickstart domain remains `kamiwaza-examples.example.com`, or you have updated the three public URL fields in the manifest.
 
-The checked-in manifest mirrors the operator's release-verification extension sample. Before use against another release, replace the image tag and digest together with the values published for that release.
+The checked-in manifest mirrors the operator's release-verification extension sample. Before use against another release, replace the image tag and digest together with the values published for that release. Platform addresses and trust settings are derived from the `KamiwazaPlatform`; the extension does not restate or weaken them.
 
 ## Apply
 
@@ -46,14 +45,23 @@ kubectl -n kamiwaza-examples get deployment,service,networkpolicy \
 
 ## Verify root isolation
 
-Record the platform resource version, update or delete the extension, and verify the platform root remains unchanged:
+Record the platform identity and generation, delete the extension, and verify that the independent platform root remains Ready:
 
 ```bash
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
-  -o custom-columns=NAME:.metadata.name,RESOURCE_VERSION:.metadata.resourceVersion,PHASE:.status.phase
+  -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,GENERATION:.metadata.generation
+
 kubectl -n kamiwaza-examples delete kamiwazaextension.extensions.kamiwaza.io example-web
+
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
-  -o custom-columns=NAME:.metadata.name,RESOURCE_VERSION:.metadata.resourceVersion,PHASE:.status.phase
+  -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,GENERATION:.metadata.generation
+kubectl -n kamiwaza-examples wait \
+  --for=condition=Ready \
+  kamiwazaplatform.platform.kamiwaza.io/kamiwaza \
+  --timeout=10m
+kubectl -n kamiwaza-examples get deployment,service,networkpolicy,httproute \
+  -l app.kubernetes.io/instance=example-web
+kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io
 ```
 
-Deleting the extension removes only its extension-owned children. It does not delete the platform or subordinate model resources.
+The platform UID and generation must remain unchanged. The final child query must return no extension-owned resources. Deleting the extension does not delete the platform or subordinate model resources.

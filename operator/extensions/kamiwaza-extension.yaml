@@ -44,19 +44,13 @@ spec:
         startPeriod: 120
   kamiwaza:
     namespace: kamiwaza-examples
-    apiUrl: http://core-api.kamiwaza-examples.svc.cluster.local:7777/api
-    publicApiUrl: https://kamiwaza-examples.example.com/api
-    origin: https://kamiwaza-examples.example.com
-    tlsRejectUnauthorized: "1"
     useAuth: "false"
   networking:
     ingress:
       enabled: true
       pathPrefix: /extensions/example-web
-      routeBackend: virtualservice
       stripPrefix: false
     networkPolicy:
       enabled: true
       allowNamespaces:
         - kamiwaza-examples
-      allowExternalAccess: false
