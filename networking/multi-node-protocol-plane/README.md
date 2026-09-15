@@ -22,7 +22,7 @@ No tenant replica field is proposed. One top-level availability claim remains th
 - `platform.yaml` carries one intentionally non-pullable, provider-neutral image pin only to satisfy the current CRD shape. Replace `spec.images.pinned` with the complete reviewed release inventory and replace `example-rwo` before apply.
 - Existing Secret `protocol-check-token` in `kw-protocol-ha` with a short-lived bearer token authorized for the read-only `/v1/models` check.
 - Operator-projected ConfigMap `kamiwaza-trust-bundle` with key `ca-certificates.crt` for protocol-plane server verification.
-- Administrator permission to create the read-only Node `ClusterRole` in `availability-check.yaml`.
+- Permission to create the namespaced verification `Role` and `RoleBinding` in `availability-check.yaml`.
 
 Verify capacity without changing labels:
 
@@ -43,7 +43,7 @@ kubectl -n kw-protocol-ha logs job/protocol-plane-shape-check
 Expected owned resources:
 
 - Deployment, Service, ConfigMap, and ServiceAccount named `kamiwaza-dataplane`.
-- Three ready Pods in three zones.
+- Three ready Pods on three distinct nodes under a hard three-zone spread constraint.
 - Hard spread: `maxSkew: 1`, `minDomains: 3`, `DoNotSchedule`.
 - PodDisruptionBudget `kamiwaza-dataplane` with `maxUnavailable: 1`.
 - Rolling update with `maxUnavailable: 0` and `maxSurge: 1`.
@@ -82,7 +82,6 @@ Apply unchanged intent to a two-zone test cluster. Protocol-plane Pods that cann
 
 ```bash
 kubectl delete -k .
-kubectl delete clusterrolebinding/kw-protocol-ha-check clusterrole/kw-protocol-ha-check
 kubectl -n kw-protocol-ha get pvc
 ```
 

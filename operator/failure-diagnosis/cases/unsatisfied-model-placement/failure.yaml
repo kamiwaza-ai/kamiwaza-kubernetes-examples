@@ -4,43 +4,28 @@ metadata:
   name: unsatisfied-placement
   namespace: kw-failure-diagnosis
 spec:
-  deploymentId: unsatisfied-placement
-  modelId: unsatisfied-placement
-  state: running
-  engineName: failure-probe
-  servicePort: 8080
-  carriedPodTemplate:
-    spec:
-      automountServiceAccountToken: false
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
-      containers:
-        - name: server
-          image: docker.io/hashicorp/http-echo@sha256:fcb75f691c8b0414d670ae570240cbf95502cc18a9ba57e982ecac589760a186
-          args:
-            - -listen=:8080
-            - -text=ready
-          ports:
-            - name: http
-              containerPort: 8080
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
-          resources:
-            requests:
-              cpu: 10m
-              memory: 16Mi
-            limits:
-              cpu: 100m
-              memory: 32Mi
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-            readOnlyRootFilesystem: true
-  gpuCount: 99
-  requiredVendor: nvidia
+  deploymentID: unsatisfied-placement
+  modelID: smollm2-135m-instruct
+  state: Running
+  replicas: 1
+  engine:
+    name: LlamaCpp
+    profileRef:
+      name: llamacpp-nvidia
+    contextWindow: 2048
+    parallelism: 1
+  artifact:
+    sourceProfileRef:
+      name: huggingface
+    repository: bartowski/SmolLM2-135M-Instruct-GGUF
+    revision: 09816acd5d99df7be770d85ea30822623dab342c
+    file: SmolLM2-135M-Instruct-Q4_K_M.gguf
+    digest: sha256:2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d
+  accelerator:
+    resourceName: nvidia.com/gpu
+    count: 99
+  service:
+    port: 8080
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: "4", memory: 2Gi }

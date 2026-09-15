@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Run one immutable SmolLM2 artifact through the same `ModelDeployment` API on CPU, NVIDIA, or AMD hardware. Each lane uses kube-scheduler and an administrator-installed device plugin; the operator never inventories or binds nodes.
+Run one immutable SmolLM2 artifact through the same `ModelDeployment` API on CPU, NVIDIA, or AMD hardware. Tenant intent declares model identity, engine settings, artifact digest, storage, resources, and accelerator demand. Administrator policy owns serving images and artifact-source transport. Kube-scheduler and administrator-installed device plugins own placement and allocation.
 
 ## Grounded design
 
-Confluent's [pod scheduling examples](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/scheduling/pod-scheduling) make hardware and placement choices explicit. Kamiwaza keeps native scheduling fields and improves lifecycle ownership: a persistent `ModelDeployment` is the sole model intent, immutable artifact identity is checked before start, and missing hardware stays an actionable scheduling condition instead of triggering a controller-side fallback.
+Confluent's [pod scheduling examples](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/scheduling/pod-scheduling) make hardware and placement choices explicit. Kamiwaza keeps native extended-resource names and improves lifecycle ownership: a persistent `ModelDeployment` is the sole model intent, immutable artifact identity is checked before start, and missing hardware stays an actionable scheduling condition instead of triggering a controller-side fallback. Tenant intent cannot inject a Pod template, image, command, or unreviewed artifact endpoint.
 
 ## Choose one lane
 
@@ -16,7 +16,7 @@ kubectl kustomize nvidia
 kubectl kustomize amd
 ```
 
-Apply exactly one lane to namespace `kw-local-models`. Replace `example-rwo`. CPU uses the release-reviewed Kamiwaza llama.cpp image. NVIDIA and AMD use current upstream multi-architecture and amd64-only image-index digests respectively; review and repin them with your release. Install the matching device plugin before the accelerated lane. Never label or mutate nodes from this example.
+Apply exactly one lane to namespace `kw-local-models`. Replace `example-rwo`. Administrator policy maps each engine and accelerator resource to a release-reviewed, digest-pinned serving image. Install the matching device plugin before an accelerated lane. Never label or mutate nodes from this example.
 
 ```bash
 kubectl diff --server-side --field-manager=model-owner -k cpu
@@ -29,7 +29,7 @@ The check requires more than one server-sent event and a non-empty final answer.
 
 ## Declarative lifecycle
 
-`base/model-deployment.yaml` is `running`. Apply `lifecycle/paused` or `lifecycle/stopped`, then reapply the selected hardware lane to resume. These states scale the owned workload through reconciliation; they do not call Core or delete pods.
+`base/model-deployment.yaml` is `Running`. Apply `lifecycle/paused` or `lifecycle/stopped`, then reapply the selected hardware lane to resume. These states scale the owned workload through reconciliation; they do not call Core or delete pods.
 
 ```bash
 kubectl apply --server-side --field-manager=model-owner -k lifecycle/paused

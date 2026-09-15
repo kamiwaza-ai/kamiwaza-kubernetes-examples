@@ -11,4 +11,4 @@ patches:
     patch: |-
       - op: replace
         path: /spec/state
-        value: stopped
+        value: Stopped

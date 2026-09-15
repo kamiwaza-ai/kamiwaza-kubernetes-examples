@@ -6,7 +6,7 @@ Create one fresh platform and one small local `ModelDeployment`, then prove one 
 
 ## Grounded design
 
-Confluent's [KRaft quickstart](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/quickstart-deploy/kraft-quickstart) uses one scenario directory, ordered apply steps, and a real producer/consumer check. This example keeps that executable shape. Kamiwaza improves authority boundaries: administrator policy owns namespace, registry, trust, and Gateway choices; tenant YAML owns platform and model intent; the operator continuously reconciles both.
+Confluent's [KRaft quickstart](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/quickstart-deploy/kraft-quickstart) uses one scenario directory, ordered apply steps, and a real producer/consumer check. This example keeps that executable shape. Kamiwaza improves authority boundaries: administrator policy owns namespace, registry, trust, Gateway, artifact source, and digest-pinned runtime image choices; tenant YAML owns platform and typed model intent; the operator continuously reconciles both.
 
 ## Prerequisites
 

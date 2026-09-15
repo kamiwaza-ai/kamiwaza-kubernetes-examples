@@ -17,6 +17,12 @@ rules:
     verbs:
       - get
       - list
+  - apiGroups:
+      - platform.kamiwaza.io
+    resources:
+      - kamiwazanodepools
+    verbs:
+      - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -31,32 +37,6 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: availability-check
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: kw-multi-zone-availability-check
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - nodes
-    verbs:
-      - get
-      - list
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: kw-multi-zone-availability-check
-subjects:
-  - kind: ServiceAccount
-    name: availability-check
-    namespace: kw-multi-zone
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: kw-multi-zone-availability-check
 ---
 apiVersion: batch/v1
 kind: Job
@@ -102,16 +82,22 @@ spec:
                   return json.load(urllib.request.urlopen(request, context=ctx, timeout=10))
 
 
-              nodes = {
-                  item["metadata"]["name"]: item["metadata"]["labels"].get(
-                      "topology.kubernetes.io/zone"
-                  )
-                  for item in get("/api/v1/nodes")["items"]
-              }
-              selector = urllib.parse.quote(
-                  "app.kubernetes.io/name=core-raycluster,ray.io/node-type=worker"
+              pool = get(
+                  "/apis/platform.kamiwaza.io/v1alpha1"
+                  + "/namespaces/kw-multi-zone/kamiwazanodepools/application-workers"
               )
-              pods = get("/api/v1/namespaces/kw-multi-zone/pods?labelSelector=" + selector)["items"]
+              generation = pool["metadata"]["generation"]
+              assert pool["status"]["observedGeneration"] == generation
+              assert any(
+                  condition["type"] == "Ready"
+                  and condition["status"] == "True"
+                  and condition.get("observedGeneration") == generation
+                  for condition in pool["status"]["conditions"]
+              )
+              selector = urllib.parse.quote(pool["status"]["labelSelector"])
+              pods = get(
+                  "/api/v1/namespaces/kw-multi-zone/pods?labelSelector=" + selector
+              )["items"]
               ready = [
                   pod
                   for pod in pods
@@ -120,11 +106,11 @@ spec:
                       for condition in pod.get("status", {}).get("conditions", [])
                   )
               ]
-              zones = {nodes.get(pod["spec"].get("nodeName")) for pod in ready}
-              zones.discard(None)
+              nodes = {pod["spec"].get("nodeName") for pod in ready}
+              nodes.discard(None)
               assert len(ready) >= 3, f"only {len(ready)} ready workers"
-              assert len(zones) >= 3, f"workers occupy only {sorted(zones)}"
-              print("three ready application workers span", sorted(zones))
+              assert len(nodes) >= 3, f"workers occupy only {sorted(nodes)}"
+              print("three ready workers occupy distinct nodes under hard zone spread")
           resources:
             requests:
               cpu: 25m

@@ -357,7 +357,7 @@ spec:
     repository: example.invalid/kamiwaza/extensions/records-tools
     version: 1.0.0
     digest: sha256:a6e505c20e7617d3927403967f91cf202bd71f39eb3c7e9e1fff6634bca5c01b
-  state: running
+  state: Running
   config:
     protocol: MCP
     protocolVersion: "2025-11-25"
@@ -375,7 +375,7 @@ spec:
     repository: example.invalid/kamiwaza/extensions/catalog-tools
     version: 1.0.0
     digest: sha256:4c29a68fa1c5ba11cb96f7c293bb8797c9934ee7ca78d3cddbcf339379f9683d
-  state: running
+  state: Running
   config:
     protocol: MCP
     protocolVersion: "2025-11-25"

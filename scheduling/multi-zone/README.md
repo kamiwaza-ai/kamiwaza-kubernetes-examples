@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Require three standard Kubernetes failure domains for platform workloads and delegated application workers. Preserve service through one voluntary worker eviction without weakening topology intent.
+Require three standard Kubernetes failure domains for platform workloads and application API pool members. Preserve service through one voluntary worker eviction without weakening topology intent.
 
 ## Grounded design
 
@@ -12,7 +12,7 @@ Confluent's [pod-scheduling examples](https://github.com/confluentinc/confluent-
 
 - Three schedulable domains labeled `topology.kubernetes.io/zone`.
 - Storage class `example-rwo` with topology-aware provisioning.
-- Administrator permission to create the read-only Node `ClusterRole` used only by `zone-placement-check`.
+- Permission to create the namespaced verification `Role` and `RoleBinding`.
 
 Verify labels without changing them:
 
@@ -30,7 +30,7 @@ kubectl -n kw-multi-zone wait --for=condition=Ready kamiwazanodepool/application
 kubectl -n kw-multi-zone logs job/zone-placement-check
 ```
 
-Three worker Pods must occupy three different zones. Platform workloads use the same hard spread constraint and a preferred anti-affinity rule. Operator-owned disruption budgets derive minimum availability from replicas and `maxUnavailable: 1`.
+Three worker Pods must occupy three different zones under the hard spread constraint. Platform workloads use the same constraint. Operator-owned disruption budgets derive minimum availability from replicas and `maxUnavailable: 1`.
 
 ## Bounded disruption
 
@@ -39,7 +39,8 @@ Start `service-continuity-check`, then select one worker Pod and submit one Kube
 ```bash
 kubectl -n kw-multi-zone delete job/service-continuity-check --ignore-not-found
 kubectl -n kw-multi-zone apply -f availability-checks.yaml
-POD=$(kubectl -n kw-multi-zone get pod -l 'app.kubernetes.io/name=core-raycluster,ray.io/node-type=worker' -o jsonpath='{.items[0].metadata.name}')
+SELECTOR=$(kubectl -n kw-multi-zone get kamiwazanodepool/application-workers -o jsonpath='{.status.labelSelector}')
+POD=$(kubectl -n kw-multi-zone get pod -l "${SELECTOR}" -o jsonpath='{.items[0].metadata.name}')
 kubectl -n kw-multi-zone create -f - <<EOF
 apiVersion: policy/v1
 kind: Eviction
@@ -47,7 +48,7 @@ metadata:
   name: ${POD}
   namespace: kw-multi-zone
 EOF
-kubectl -n kw-multi-zone wait --for=condition=Ready pod -l 'app.kubernetes.io/name=core-raycluster,ray.io/node-type=worker' --timeout=10m
+kubectl -n kw-multi-zone wait --for=condition=Ready pod -l "${SELECTOR}" --timeout=10m
 kubectl -n kw-multi-zone logs job/service-continuity-check
 ```
 
@@ -62,7 +63,6 @@ Apply unchanged intent to a two-zone test cluster. Affected Pods must remain Pen
 ```bash
 kubectl delete -k .
 kubectl -n kw-multi-zone get pvc
-kubectl delete clusterrolebinding/kw-multi-zone-availability-check clusterrole/kw-multi-zone-availability-check
 ```
 
 `RetainData` keeps PVCs. Delete retained storage only through an approved data-destruction procedure.

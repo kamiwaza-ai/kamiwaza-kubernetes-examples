@@ -21,11 +21,11 @@ References:
 
 ## Contract boundaries
 
-- One `A2ARoute` maps one stable path to one same-namespace `Extension` endpoint.
-- Route intent cannot name a Service, Pod, host, or implementation-native route.
+- One `A2ARoute` maps one stable hostname and path to one same-namespace `Extension` endpoint. Distinct hostnames preserve A2A's fixed `/.well-known/agent-card.json` discovery location.
+- Route intent cannot name a backend Service, Pod, cluster-local host, or implementation-native route.
 - Extension identity is authoritative. Agent Card text, skills, URLs, and signatures are untrusted descriptive input.
-- Public cards replace internal interface URLs with the governed HTTPS route and platform security scheme.
-- The decision service authorizes discovery, send, stream, get, subscribe, cancel, and notification operations before backend I/O.
+- Public Agent Cards replace internal interface URLs with the governed HTTPS route and platform security scheme. Public cards are sanitized discovery documents; authenticated extended cards, when supported, use the decision service.
+- The decision service authorizes message, task, stream, subscription, cancellation, and push-notification operations before backend I/O.
 - The operator keeps target endpoints namespace-local and generates NetworkPolicy that admits only protocol-plane workloads. Target endpoints are never published directly.
 - The target extension owns task state. The protocol plane owns transient transport state only.
 - Stream disconnect does not cancel work. Reconnect resumes the same task without duplicate execution.
@@ -45,6 +45,7 @@ References:
 - StorageClass `example-rwo` for each agent's retained task volume.
 - Operator configured to watch `kw-a2a` and allow extension packages from `example.invalid` for this lab.
 - Existing Secret `a2a-check-token` with key `token` for a short-lived principal granted the documented operations on both routes.
+- Public DNS and a Gateway listener certificate for `reviewer.a2a.example.invalid` and `researcher.a2a.example.invalid`.
 - `platform.yaml` carries one intentionally non-pullable, provider-neutral image pin only to satisfy the current CRD shape. Replace `spec.images.pinned` with the complete reviewed release inventory before apply.
 - Operator-projected ConfigMap `kamiwaza-trust-bundle` with key `ca-certificates.crt` for protocol-plane server verification.
 
@@ -68,11 +69,11 @@ kubectl -n kw-a2a wait --for=condition=Ready a2aroute/researcher --timeout=10m
 kubectl -n kw-a2a logs job/a2a-check
 ```
 
-The check requires public agent cards with governed URLs, a completed task, task lookup, one streamed result, explicit cancellation of a working task, stable task IDs, and rejection without authentication.
+The check requires unauthenticated public Agent Cards with governed URLs, a completed task, task lookup, one streamed result, explicit cancellation of a working task, stable task IDs, and rejection of an unauthenticated message.
 
 ## Failure and recovery
 
-Start a `hold` task, then pause only its target `Extension`. The route reports `TargetUnavailable`. Task identity and retained state remain. Other routes continue. Restore the extension to `running`, fetch the same task ID, and finish or cancel it without route changes.
+Start a `hold` task, then pause only its target `Extension`. The route reports `TargetUnavailable`. Task identity and retained state remain. Other routes continue. Restore the extension to `Running`, fetch the same task ID, and finish or cancel it without route changes.
 
 Drop a streaming connection after receiving an event ID. Reconnect or subscribe with the same authorized task identity. The target must not run the message twice, and the disconnect must not change task state to canceled.
 

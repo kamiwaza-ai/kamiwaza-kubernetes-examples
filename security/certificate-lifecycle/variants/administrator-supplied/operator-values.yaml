@@ -108,7 +108,7 @@ adminPolicy:
         clientAuthorityRef:
           name: supplied-client-authority
           key: ca.crt
-        identitySecretPrefix: supplied-identity-
+        identitySecretPrefix: supplied-identity
         expiryWarningBefore: 720h
       maintenanceWindows:
         - 0 2 * * 6

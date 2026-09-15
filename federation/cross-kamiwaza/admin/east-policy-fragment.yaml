@@ -5,10 +5,11 @@ adminPolicy:
     profiles:
       - name: west
         remoteClusterID: west
-        destinationClassRef: west-platform
+        destinationClass: west-platform
         workloadIdentity:
           trustDomain: west.kamiwaza.example
           bundleEndpoint: https://identity.west.kamiwaza.example/bundle
+          bundleDestinationClass: west-bundle
           endpointProfile: HttpsSpiffe
           acceptedIdentities:
             - spiffe://west.kamiwaza.example/ns/kw-federation-west/sa/kamiwaza-dataplane
@@ -22,6 +23,16 @@ adminPolicy:
         - CloudMetadata
         - PrivateRanges
       destinations:
+        - name: west-bundle
+          kind: PlatformInformation
+          hosts:
+            - identity.west.kamiwaza.example
+          ports:
+            - 443
+          transport: TLS
+          authentication:
+            type: None
+          enforcementMode: PolicyAwareDialer
         - name: west-platform
           kind: PlatformInformation
           hosts:
@@ -30,8 +41,10 @@ adminPolicy:
             - 443
           transport: MutualTLS
           authentication:
-            type: FederatedWorkloadIdentity
+            type: WorkloadIdentityX509
             maxConnectionAge: 15m
-            federatedWorkloadIdentity:
-              profileRef: west
+            workloadIdentityX509:
+              trustDomain: west.kamiwaza.example
+              acceptedIdentities:
+                - spiffe://west.kamiwaza.example/ns/kw-federation-west/sa/kamiwaza-dataplane
           enforcementMode: PolicyAwareDialer

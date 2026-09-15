@@ -5,10 +5,11 @@ adminPolicy:
     profiles:
       - name: east
         remoteClusterID: east
-        destinationClassRef: east-platform
+        destinationClass: east-platform
         workloadIdentity:
           trustDomain: east.kamiwaza.example
           bundleEndpoint: https://identity.east.kamiwaza.example/bundle
+          bundleDestinationClass: east-bundle
           endpointProfile: HttpsSpiffe
           acceptedIdentities:
             - spiffe://east.kamiwaza.example/ns/kw-federation-east/sa/kamiwaza-dataplane
@@ -22,6 +23,16 @@ adminPolicy:
         - CloudMetadata
         - PrivateRanges
       destinations:
+        - name: east-bundle
+          kind: PlatformInformation
+          hosts:
+            - identity.east.kamiwaza.example
+          ports:
+            - 443
+          transport: TLS
+          authentication:
+            type: None
+          enforcementMode: PolicyAwareDialer
         - name: east-platform
           kind: PlatformInformation
           hosts:
@@ -30,8 +41,10 @@ adminPolicy:
             - 443
           transport: MutualTLS
           authentication:
-            type: FederatedWorkloadIdentity
+            type: WorkloadIdentityX509
             maxConnectionAge: 15m
-            federatedWorkloadIdentity:
-              profileRef: east
+            workloadIdentityX509:
+              trustDomain: east.kamiwaza.example
+              acceptedIdentities:
+                - spiffe://east.kamiwaza.example/ns/kw-federation-east/sa/kamiwaza-dataplane
           enforcementMode: PolicyAwareDialer

@@ -332,19 +332,19 @@ adminPolicy:
             name: builtin-keycloak-client
             key: client-secret
       jitAdmission: Allowed
-      requiredClaims: &id001
+      requiredClaims: &sharedRequiredClaims
         - sub
         - roles
         - tenant_id
       authorizationProjection: ReBACOnly
       tenantContext: RequiredClaimThenReBAC
-      assurance: &id002
+      assurance: &sharedAssurance
         requiredACR:
           - urn:example:acr:multifactor
         requiredAMR:
           - pwd
           - otp
-      session: &id003
+      session: &sharedSession
         overallTimeout: 12h
         inactivityTimeout: 30m
         reauthentication: StepUpForSensitiveAction
@@ -376,11 +376,11 @@ adminPolicy:
           requiredACR:
             - urn:example:acr:multifactor
       jitAdmission: Allowed
-      requiredClaims: *id001
+      requiredClaims: *sharedRequiredClaims
       authorizationProjection: ReBACOnly
       tenantContext: RequiredClaimThenReBAC
-      assurance: *id002
-      session: *id003
+      assurance: *sharedAssurance
+      session: *sharedSession
       failureMode: FailClosed
     - name: saml
       methods:
@@ -404,11 +404,11 @@ adminPolicy:
             - tenant_id
           replayWindow: 5m
       jitAdmission: Allowed
-      requiredClaims: *id001
+      requiredClaims: *sharedRequiredClaims
       authorizationProjection: ReBACOnly
       tenantContext: RequiredClaimThenReBAC
-      assurance: *id002
-      session: *id003
+      assurance: *sharedAssurance
+      session: *sharedSession
       failureMode: FailClosed
     - name: ldap
       methods:
@@ -438,11 +438,11 @@ adminPolicy:
               source: memberOf
               target: groups
       jitAdmission: Allowed
-      requiredClaims: *id001
+      requiredClaims: *sharedRequiredClaims
       authorizationProjection: ReBACOnly
       tenantContext: RequiredClaimThenReBAC
-      assurance: *id002
-      session: *id003
+      assurance: *sharedAssurance
+      session: *sharedSession
       failureMode: FailClosed
     - name: cac
       methods:
@@ -492,9 +492,9 @@ adminPolicy:
           certificateChainHeader: Client-Cert-Chain
           maxHeaderBytes: 32768
       jitAdmission: Allowed
-      requiredClaims: *id001
+      requiredClaims: *sharedRequiredClaims
       authorizationProjection: ReBACOnly
       tenantContext: RequiredClaimThenReBAC
-      assurance: *id002
-      session: *id003
+      assurance: *sharedAssurance
+      session: *sharedSession
       failureMode: FailClosed

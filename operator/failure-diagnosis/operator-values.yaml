@@ -41,6 +41,7 @@ adminPolicy:
       - ghcr.io/authzed/
       - ghcr.io/agentgateway/
       - docker.io/hashicorp/
+      - ghcr.io/ggml-org/
     pullSecretNames:
       - registry-pull
   modelRegistry:
@@ -99,6 +100,32 @@ adminPolicy:
     allowedDomains:
       - failure.example.invalid
     allowedSuffixes: []
+  modelServing:
+    engines:
+      - name: LlamaCpp
+        profiles:
+          - name: image-pull-failure
+            image: ghcr.io/kamiwaza-internal/containers/images/not-a-model@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          - name: llamacpp-cpu
+            image: ghcr.io/kamiwaza-internal/containers/images/llamacpp-cpu@sha256:2cca4d9b2eda3088fb6cb28f00fb60ea8f71abfd8c5b1179d55df26476e3aeeb
+          - name: llamacpp-nvidia
+            acceleratorResourceName: nvidia.com/gpu
+            image: ghcr.io/ggml-org/llama.cpp@sha256:5268283a8d6510d167364f19aee93e98180d8eb0cac4b7edb20af7e3edf40c17
+            offloadLayers: All
+    artifactSources:
+      - name: huggingface
+        type: HuggingFace
+        destinationClass: huggingface-models
+  modelProviders:
+    profiles:
+      - name: openrouter
+        type: OpenRouter
+        destinationClass: openrouter-api
+      - name: malformed-provider
+        type: OpenAICompatible
+        destinationClass: malformed-provider-api
+        openAICompatible:
+          endpointURL: https://malformed-provider.failure.example.invalid/v1
   transport:
     issuance:
       mode: PlatformIssued
@@ -120,7 +147,11 @@ adminPolicy:
       maximumBundleBytes: 900000
       targetNamespaces:
         - kw-failure-diagnosis
-      additionalAuthorities: []
+      additionalAuthorities:
+        - name: malformed-provider-ca
+          configMapRef:
+            name: malformed-provider-trust
+            key: ca.crt
     floor:
       minimumTLSVersion: TLS1.2
       hostnameVerification: Required
@@ -192,6 +223,38 @@ adminPolicy:
         - CloudMetadata
         - PrivateRanges
       destinations:
+        - name: huggingface-models
+          kind: ModelArtifactRegistry
+          hosts:
+            - huggingface.co
+          ports:
+            - 443
+          transport: TLS
+          authentication:
+            type: None
+          enforcementMode: PolicyAwareDialer
+        - name: malformed-provider-api
+          kind: ModelProvider
+          hosts:
+            - malformed-provider.failure.example.invalid
+          ports:
+            - 443
+          transport: TLS
+          authentication:
+            type: None
+          requiredAuthorities:
+            - malformed-provider-ca
+          enforcementMode: PolicyAwareDialer
+        - name: openrouter-api
+          kind: ModelProvider
+          hosts:
+            - openrouter.ai
+          ports:
+            - 443
+          transport: TLS
+          authentication:
+            type: None
+          enforcementMode: PolicyAwareDialer
         - name: enterprise-idp
           kind: IdentityProvider
           hosts:
@@ -216,19 +279,19 @@ adminPolicy:
             name: builtin-keycloak-client
             key: client-secret
       jitAdmission: Allowed
-      requiredClaims: &id001
+      requiredClaims: &sharedRequiredClaims
         - sub
         - roles
         - tenant_id
       authorizationProjection: ReBACOnly
       tenantContext: RequiredClaimThenReBAC
-      assurance: &id002
+      assurance: &sharedAssurance
         requiredACR:
           - urn:example:acr:multifactor
         requiredAMR:
           - pwd
           - otp
-      session: &id003
+      session: &sharedSession
         overallTimeout: 12h
         inactivityTimeout: 30m
         reauthentication: StepUpForSensitiveAction
@@ -257,9 +320,9 @@ adminPolicy:
           requiredACR:
             - urn:example:acr:multifactor
       jitAdmission: Allowed
-      requiredClaims: *id001
+      requiredClaims: *sharedRequiredClaims
       authorizationProjection: ReBACOnly
       tenantContext: RequiredClaimThenReBAC
-      assurance: *id002
-      session: *id003
+      assurance: *sharedAssurance
+      session: *sharedSession
       failureMode: FailClosed

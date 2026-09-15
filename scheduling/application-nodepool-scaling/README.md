@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Set baseline delegated application capacity with `spec.replicas`, then let a Kubernetes `autoscaling/v2` HPA use the `KamiwazaNodePool` scale subresource. No platform mutation or fallback scaler.
+Set baseline application API capacity with `spec.replicas`, then let a Kubernetes `autoscaling/v2` HPA use the `KamiwazaNodePool` scale subresource. No platform mutation or fallback scaler.
 
 ## Grounded design
 
@@ -42,9 +42,9 @@ kubectl -n kw-nodepool-scale logs job/bounded-request-load
 kubectl -n kw-nodepool-scale get hpa/application-workers -o yaml
 ```
 
-Observed replicas must rise above `1`, remain within `4`, and return to `1` after the 300-second stabilization window. `Ready` must match the current NodePool generation. Core health must remain available within `maxUnavailable: 1`.
+Observed replicas must rise above `1`, remain within `4`, and return to `1` after the 300-second stabilization window. `Ready` must match the current NodePool generation. Voluntary disruption must keep the single-member baseline available under `maxUnavailable: 0`.
 
-The current operator must publish a scale selector that selects actual pool Pods. If `status.selector` names labels absent from Pod templates, HPA reports missing metrics and this scenario fails. Do not hide that contract defect with imperative `kubectl scale`, direct Deployment edits, or a custom poller.
+The operator must publish `status.labelSelector` with the immutable labels used by actual pool Pods. The scale subresource maps that value to `status.selector` for HPA. If the selector names labels absent from Pod templates, HPA reports missing metrics and this scenario fails. Do not hide that contract defect with imperative `kubectl scale`, direct Deployment edits, or a custom poller.
 
 ## Missing metrics
 

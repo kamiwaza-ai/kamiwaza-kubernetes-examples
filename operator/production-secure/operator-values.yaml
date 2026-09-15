@@ -127,7 +127,6 @@ adminPolicy:
     floor:
       minimumTLSVersion: TLS1.2
       hostnameVerification: Required
-      fipsApprovedOnly: false
     edge:
       listenerCertificate: PlatformIssued
       listenerCertificateSecretName: kamiwaza-gateway-tls

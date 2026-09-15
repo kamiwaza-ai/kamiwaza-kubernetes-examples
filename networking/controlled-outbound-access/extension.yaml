@@ -105,7 +105,7 @@ spec:
     repository: example.invalid/kamiwaza/extensions/outbound-client
     version: 1.0.0
     digest: sha256:406ea49e9072e9fcfb87c435ff6c004d62999a4b10fe44348e98a5a79551b867
-  state: running
+  state: Running
   secrets:
     existing:
       name: extension-egress

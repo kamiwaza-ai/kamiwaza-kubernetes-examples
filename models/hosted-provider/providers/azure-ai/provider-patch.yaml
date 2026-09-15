@@ -1,12 +1,11 @@
 - op: replace
-  path: /spec/modelId
+  path: /spec/modelID
   value: gpt-4o
 - op: replace
   path: /spec/external
   value:
-    provider: azure_ai
+    providerProfileRef:
+      name: azure-ai
     credentialSecretRef:
       name: model-provider-azure
       key: credential
-    endpointURL: https://replace.openai.azure.com
-    deployment: gpt-4o

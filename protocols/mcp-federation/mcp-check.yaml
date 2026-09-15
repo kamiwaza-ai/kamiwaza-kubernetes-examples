@@ -77,6 +77,13 @@ spec:
               assert result["protocolVersion"] == "2025-11-25"
               assert session
 
+              initialized_notification = request(
+                  "POST",
+                  {"jsonrpc": "2.0", "method": "notifications/initialized"},
+                  session,
+              )
+              assert initialized_notification.status == 202
+
               listed = request(
                   "POST",
                   {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},

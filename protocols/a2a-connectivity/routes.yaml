@@ -4,14 +4,16 @@ metadata:
   name: reviewer
   namespace: kw-a2a
 spec:
+  hostname: reviewer.a2a.example.invalid
   protocolVersion: "1.0"
-  path: /agents/reviewer
+  path: /
   bindings:
     - HTTP+JSON
-  target:
-    extensionRef:
-      name: reviewer
-      endpointName: a2a
+  targetRef:
+    group: extensions.kamiwaza.io
+    kind: Extension
+    name: reviewer
+    sectionName: a2a
 ---
 apiVersion: protocols.kamiwaza.io/v1alpha1
 kind: A2ARoute
@@ -19,11 +21,13 @@ metadata:
   name: researcher
   namespace: kw-a2a
 spec:
+  hostname: researcher.a2a.example.invalid
   protocolVersion: "1.0"
-  path: /agents/researcher
+  path: /
   bindings:
     - HTTP+JSON
-  target:
-    extensionRef:
-      name: researcher
-      endpointName: a2a
+  targetRef:
+    group: extensions.kamiwaza.io
+    kind: Extension
+    name: researcher
+    sectionName: a2a

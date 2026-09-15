@@ -7,11 +7,11 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: malformed-provider
+      app.kubernetes.io/name: malformed-provider
   template:
     metadata:
       labels:
-        app: malformed-provider
+        app.kubernetes.io/name: malformed-provider
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -101,11 +101,44 @@ metadata:
   namespace: kw-failure-diagnosis
 spec:
   selector:
-    app: malformed-provider
+    app.kubernetes.io/name: malformed-provider
   ports:
     - name: https
       port: 443
       targetPort: https
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: malformed-provider
+  namespace: kw-failure-diagnosis
+spec:
+  parentRefs:
+    - name: kamiwaza-gateway
+      sectionName: malformed-provider
+  hostnames:
+    - malformed-provider.failure.example.invalid
+  rules:
+    - backendRefs:
+        - name: malformed-provider
+          port: 443
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: BackendTLSPolicy
+metadata:
+  name: malformed-provider
+  namespace: kw-failure-diagnosis
+spec:
+  targetRefs:
+    - group: ""
+      kind: Service
+      name: malformed-provider
+  validation:
+    caCertificateRefs:
+      - group: ""
+        kind: ConfigMap
+        name: malformed-provider-trust
+    hostname: malformed-provider.kw-failure-diagnosis.svc.cluster.local
 ---
 apiVersion: serving.kamiwaza.io/v1alpha1
 kind: ModelDeployment
@@ -113,12 +146,12 @@ metadata:
   name: malformed-provider
   namespace: kw-failure-diagnosis
 spec:
-  deploymentId: malformed-provider
-  modelId: malformed-provider
-  state: running
+  deploymentID: malformed-provider
+  modelID: malformed-provider
+  state: Running
   external:
-    provider: openai_compatible
+    providerProfileRef:
+      name: malformed-provider
     credentialSecretRef:
       name: provider-credential
       key: credential
-    endpointURL: https://malformed-provider.kw-failure-diagnosis.svc.cluster.local/v1

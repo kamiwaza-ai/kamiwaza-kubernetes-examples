@@ -4,11 +4,12 @@ metadata:
   name: missing-secret-model
   namespace: kw-failure-diagnosis
 spec:
-  deploymentId: missing-secret-model
-  modelId: missing-secret-model
-  state: running
+  deploymentID: missing-secret-model
+  modelID: missing-secret-model
+  state: Running
   external:
-    provider: openrouter
+    providerProfileRef:
+      name: openrouter
     credentialSecretRef:
       name: absent-provider-credential
       key: credential

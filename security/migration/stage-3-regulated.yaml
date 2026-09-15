@@ -54,7 +54,6 @@ transport:
     # Required to be stated in a regulated profile, not merely defaulted.
     minimumTLSVersion: TLS1.2
     hostnameVerification: Required
-    fipsApprovedOnly: false
 
   internal:
     defaultTransport: PlatformTLS

@@ -9,10 +9,16 @@ spec:
   path: /mcp/team-tools
   sources:
     - name: records
-      extensionRef:
+      targetRef:
+        group: extensions.kamiwaza.io
+        kind: Extension
         name: records-tools
-        endpointName: mcp
+        sectionName: mcp
     - name: catalog
-      extensionRef:
+      targetRef:
+        group: extensions.kamiwaza.io
+        kind: Extension
         name: catalog-tools
-        endpointName: mcp
+        sectionName: mcp
+  toolNameCollisionPolicy: PrefixSource
+  sourceFailurePolicy: IsolateUnavailable

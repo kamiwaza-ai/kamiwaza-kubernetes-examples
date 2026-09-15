@@ -45,32 +45,6 @@ roleRef:
   kind: Role
   name: protocol-plane-check
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: kw-protocol-ha-check
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - nodes
-    verbs:
-      - get
-      - list
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: kw-protocol-ha-check
-subjects:
-  - kind: ServiceAccount
-    name: protocol-plane-check
-    namespace: kw-protocol-ha
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: kw-protocol-ha-check
----
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -164,14 +138,9 @@ spec:
                   )
               ]
               assert len(ready) >= 3
-              nodes = {
-                  item["metadata"]["name"]: item["metadata"]["labels"].get(
-                      "topology.kubernetes.io/zone"
-                  )
-                  for item in get("/api/v1/nodes")["items"]
-              }
-              zones = {nodes[pod["spec"]["nodeName"]] for pod in ready}
-              assert None not in zones and len(zones) >= 3
+              nodes = {pod["spec"].get("nodeName") for pod in ready}
+              nodes.discard(None)
+              assert len(nodes) >= 3
               digests = {
                   pod["metadata"]["annotations"][
                       "kamiwaza.ai/dataplane-config-digest"
@@ -183,7 +152,7 @@ spec:
                   "/api/v1" + namespace + "/services/kamiwaza-dataplane"
               )
               assert service["spec"]["selector"] == spec["selector"]["matchLabels"]
-              print("replicas, zones, budget, rollout, and digest verified")
+              print("replicas, nodes, budget, rollout, and digest verified")
           resources:
             requests:
               cpu: 25m

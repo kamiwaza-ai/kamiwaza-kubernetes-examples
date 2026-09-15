@@ -40,6 +40,7 @@ adminPolicy:
       - ghcr.io/kamiwaza-internal/
       - ghcr.io/authzed/
       - ghcr.io/agentgateway/
+      - ghcr.io/ggml-org/
     pullSecretNames:
       - registry-pull
   modelRegistry:
@@ -97,3 +98,53 @@ adminPolicy:
     allowedDomains:
       - models.example.invalid
     allowedSuffixes: []
+  modelServing:
+    engines:
+      - name: LlamaCpp
+        profiles:
+          - name: cpu
+            image: ghcr.io/kamiwaza-internal/containers/images/llamacpp-cpu@sha256:2cca4d9b2eda3088fb6cb28f00fb60ea8f71abfd8c5b1179d55df26476e3aeeb
+          - name: nvidia
+            acceleratorResourceName: nvidia.com/gpu
+            image: ghcr.io/ggml-org/llama.cpp@sha256:5268283a8d6510d167364f19aee93e98180d8eb0cac4b7edb20af7e3edf40c17
+            offloadLayers: All
+          - name: amd
+            acceleratorResourceName: amd.com/gpu
+            image: ghcr.io/ggml-org/llama.cpp@sha256:73e0930f80636792197a3faf95baf42a6e79d1aa9d600a0b3e8060de80a291e9
+            offloadLayers: All
+    artifactSources:
+      - name: huggingface
+        type: HuggingFace
+        destinationClass: huggingface-models
+  transport:
+    issuance:
+      mode: PlatformIssued
+    trust:
+      bundleConfigMapName: kamiwaza-trust-bundle
+      targetNamespaces:
+        - kw-local-models
+      publicRoots: Include
+      maximumBundleBytes: 900000
+    floor:
+      minimumTLSVersion: TLS1.2
+      hostnameVerification: Required
+    internal:
+      defaultTransport: PlatformTLS
+      workloadIngressFloor: true
+    clientIdentities: []
+    egress:
+      deniedNetworks:
+        - Loopback
+        - LinkLocal
+        - CloudMetadata
+        - PrivateRanges
+      destinations:
+        - name: huggingface-models
+          kind: ModelArtifactRegistry
+          hosts:
+            - huggingface.co
+          ports: [443]
+          transport: TLS
+          authentication: { type: None }
+          enforcementMode: PolicyAwareDialer
+      proxies: []

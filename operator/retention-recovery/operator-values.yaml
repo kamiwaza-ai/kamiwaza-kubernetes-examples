@@ -99,3 +99,45 @@ adminPolicy:
     allowedDomains:
       - retention.example.invalid
     allowedSuffixes: []
+  modelServing:
+    engines:
+      - name: LlamaCpp
+        profiles:
+          - name: cpu
+            image: ghcr.io/kamiwaza-internal/containers/images/llamacpp-cpu@sha256:2cca4d9b2eda3088fb6cb28f00fb60ea8f71abfd8c5b1179d55df26476e3aeeb
+    artifactSources:
+      - name: huggingface
+        type: HuggingFace
+        destinationClass: huggingface-models
+  transport:
+    issuance:
+      mode: PlatformIssued
+    trust:
+      bundleConfigMapName: kamiwaza-trust-bundle
+      targetNamespaces:
+        - kw-retention-recovery
+      publicRoots: Include
+      maximumBundleBytes: 900000
+    floor:
+      minimumTLSVersion: TLS1.2
+      hostnameVerification: Required
+    internal:
+      defaultTransport: PlatformTLS
+      workloadIngressFloor: true
+    clientIdentities: []
+    egress:
+      deniedNetworks:
+        - Loopback
+        - LinkLocal
+        - CloudMetadata
+        - PrivateRanges
+      destinations:
+        - name: huggingface-models
+          kind: ModelArtifactRegistry
+          hosts:
+            - huggingface.co
+          ports: [443]
+          transport: TLS
+          authentication: { type: None }
+          enforcementMode: PolicyAwareDialer
+      proxies: []

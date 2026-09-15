@@ -31,10 +31,7 @@ spec:
               import urllib.error
               import urllib.request
 
-              root = (
-                  "https://kamiwaza-dataplane.kw-a2a.svc.cluster.local"
-                  + ":8080/agents"
-              )
+              root = "https://kamiwaza-dataplane.kw-a2a.svc.cluster.local:8080"
               token = os.environ["A2A_CHECK_TOKEN"]
               context = ssl.create_default_context(
                   cafile="/etc/kamiwaza/trust/ca-certificates.crt"
@@ -42,6 +39,7 @@ spec:
 
               def request(agent, method, path, payload=None, authenticate=True):
                   headers = {"Accept": "application/json, text/event-stream"}
+                  headers["Host"] = agent + ".a2a.example.invalid"
                   if authenticate:
                       headers["Authorization"] = "Bearer " + token
                   data = None
@@ -49,7 +47,7 @@ spec:
                       data = json.dumps(payload).encode()
                       headers["Content-Type"] = "application/json"
                   item = urllib.request.Request(
-                      root + "/" + agent + path,
+                      root + path,
                       data=data,
                       headers=headers,
                       method=method,
@@ -60,14 +58,14 @@ spec:
 
               for agent, skill in (("reviewer", "review"), ("researcher", "research")):
                   response = request(
-                      agent, "GET", "/.well-known/agent-card.json"
+                      agent, "GET", "/.well-known/agent-card.json", authenticate=False
                   )
                   card = json.load(response)
                   assert card["name"] == agent
                   assert card["skills"][0]["id"] == skill
                   interface = card["supportedInterfaces"][0]
                   assert interface == {
-                      "url": "https://a2a.example.invalid/agents/" + agent,
+                      "url": "https://" + agent + ".a2a.example.invalid",
                       "protocolBinding": "HTTP+JSON",
                       "protocolVersion": "1.0",
                   }
@@ -137,14 +135,15 @@ spec:
               try:
                   request(
                       "reviewer",
-                      "GET",
-                      "/.well-known/agent-card.json",
+                      "POST",
+                      "/message:send",
+                      message,
                       authenticate=False,
                   )
               except urllib.error.HTTPError as error:
                   assert error.code == 401
               else:
-                  raise AssertionError("unauthenticated agent discovery was accepted")
+                  raise AssertionError("unauthenticated message was accepted")
               print("A2A cards, tasks, stream, cancellation, and authentication verified")
           env:
             - name: A2A_CHECK_TOKEN

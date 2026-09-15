@@ -13,5 +13,8 @@ adminPolicy:
       identitySource: ExtensionIdentity
       rewritePublicInterfaceURLs: Required
       targetFailurePolicy: PreserveTask
+      allowedHostnames:
+        - reviewer.a2a.example.invalid
+        - researcher.a2a.example.invalid
       streamDisconnectPolicy: PreserveTask
       decisionFailurePolicy: Deny

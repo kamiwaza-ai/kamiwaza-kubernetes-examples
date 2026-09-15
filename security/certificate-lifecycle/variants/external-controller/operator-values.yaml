@@ -124,7 +124,7 @@ adminPolicy:
       minimumTLSVersion: TLS1.2
       hostnameVerification: Required
     edge:
-      listenerCertificate: ControllerIssued
+      listenerCertificate: AdministratorSupplied
       listenerCertificateSecretName: kamiwaza-gateway-tls
       httpsRedirect: RequireWhenSupported
       backendTLS: RequireWhenSupported

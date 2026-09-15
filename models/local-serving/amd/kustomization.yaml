@@ -10,17 +10,7 @@ patches:
       name: smollm2
     patch: |-
       - op: add
-        path: /spec/gpuCount
-        value: 1
-      - op: add
-        path: /spec/requiredVendor
-        value: amd
-      - op: replace
-        path: /spec/carriedPodTemplate/spec/containers/0/image
-        value: ghcr.io/ggml-org/llama.cpp@sha256:73e0930f80636792197a3faf95baf42a6e79d1aa9d600a0b3e8060de80a291e9
-      - op: add
-        path: /spec/carriedPodTemplate/spec/containers/0/args/-
-        value: --n-gpu-layers
-      - op: add
-        path: /spec/carriedPodTemplate/spec/containers/0/args/-
-        value: "-1"
+        path: /spec/accelerator
+        value:
+          resourceName: amd.com/gpu
+          count: 1

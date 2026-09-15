@@ -124,7 +124,7 @@ spec:
     repository: example.invalid/kamiwaza/extensions/http-webhook-connector
     version: 1.0.0
     digest: sha256:28ea0799d44ed85c05179cfb53cfed95938e8ae3a521b1e3f4c2b81d64d5f4ca
-  state: running
+  state: Running
   secrets:
     existing:
       name: webhook-signing

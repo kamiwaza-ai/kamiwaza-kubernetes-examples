@@ -2,23 +2,23 @@
 
 ## Purpose
 
-Declare Bedrock, Azure AI, Google Vertex, OpenRouter, or an OpenAI-compatible endpoint through the same external `ModelDeployment` contract. Provider-specific addressing never enters `KamiwazaPlatform`.
+Declare Bedrock, Azure AI, Google Vertex, OpenRouter, or an OpenAI-compatible endpoint through one provider-neutral `ModelDeployment` contract. Provider-specific addressing and adapter selection stay in immutable administrator policy, never tenant platform or model intent.
 
 ## Grounded design
 
-Confluent's [connector examples](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/connectors) separate a common resource contract from connector-specific configuration. Kamiwaza uses the same small-overlay pattern, but credentials remain exact-name Secret references and hosted models create no local Pod, PVC, or accelerator request.
+Confluent's [connector examples](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/connectors) separate a common resource contract from connector-specific configuration. Kamiwaza keeps the same boundary: tenant intent selects a named provider profile and local Secret reference, while administrator policy owns the typed adapter, destination class, endpoint, and provider settings. Hosted models create no local Pod, PVC, or accelerator request.
 
 ## Provider lanes
 
-| Directory                     | Required Secret key                           | Required public fields      |
-| ----------------------------- | --------------------------------------------- | --------------------------- |
-| `providers/bedrock`           | `model-provider-bedrock/credential`           | `region`                    |
-| `providers/azure-ai`          | `model-provider-azure/credential`             | `endpointURL`, `deployment` |
-| `providers/google-vertex`     | `model-provider-vertex/credential`            | `project`, `location`       |
-| `providers/openrouter`        | `model-provider-openrouter/credential`        | none                        |
-| `providers/openai-compatible` | `model-provider-openai-compatible/credential` | `endpointURL`               |
+| Directory                     | Provider profile    | Required Secret key                           | Administrator-owned settings               |
+| ----------------------------- | ------------------- | --------------------------------------------- | ------------------------------------------ |
+| `providers/bedrock`           | `bedrock`           | `model-provider-bedrock/credential`           | adapter, region, destination               |
+| `providers/azure-ai`          | `azure-ai`          | `model-provider-azure/credential`             | adapter, endpoint, deployment, destination |
+| `providers/google-vertex`     | `google-vertex`     | `model-provider-vertex/credential`            | adapter, project, location, destination    |
+| `providers/openrouter`        | `openrouter`        | `model-provider-openrouter/credential`        | adapter and destination                    |
+| `providers/openai-compatible` | `openai-compatible` | `model-provider-openai-compatible/credential` | adapter, endpoint, destination             |
 
-Create the provider Secret and `hosted-check-client/token` outside Git. Configure DNS and `kamiwaza-gateway-tls` for `hosted-models.example.invalid`. Replace placeholder project, deployment, endpoint, and model identifiers. Apply one lane:
+Create the provider Secret and `hosted-check-client/token` outside Git. Configure each selected administrator profile and destination class, DNS, and `kamiwaza-gateway-tls`. Replace placeholder project, deployment, endpoint, and model identifiers. Apply one lane:
 
 ```bash
 kubectl diff --server-side --field-manager=model-owner -k providers/bedrock
@@ -32,7 +32,7 @@ The last command must return no local serving workload or claim. The Job retries
 
 ## Validation gap exposed by this scenario
 
-Current `ModelDeployment` reconciliation reports `Ready=True`, reason `HostedByProvider`, after checking only that the referenced Secret key exists. It does not call the provider or classify malformed responses, authentication refusal, throttling, or outages. Therefore Ready status alone does not satisfy this scenario; the end-to-end Job is the acceptance gate. Do not add a local fallback or imperative provider registration to hide that gap.
+Current `ModelDeployment` accepts provider-specific fields directly and reports `Ready=True`, reason `HostedByProvider`, after checking only that the referenced Secret key exists. This contract replaces that surface with `external.providerProfileRef`; the operator must resolve the immutable profile, verify its destination class before loading credentials, and classify real provider readiness. Ready status alone does not satisfy this scenario; the end-to-end Job remains the acceptance gate. Do not add a local fallback or imperative provider registration to hide that gap.
 
 ## Cleanup
 

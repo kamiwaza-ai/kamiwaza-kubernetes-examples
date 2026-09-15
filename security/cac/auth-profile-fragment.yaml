@@ -86,7 +86,9 @@ profiles:
     assurance:
       minimumAAL: AAL3
       minimumFAL: FAL2
-      fipsRequired: true
+      evidenceRef:
+        name: cac-assurance-evidence
+        key: evidence.json
     session:
       overallTimeout: 8h
       inactivityTimeout: 15m

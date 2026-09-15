@@ -1,11 +1,11 @@
 - op: replace
-  path: /spec/modelId
+  path: /spec/modelID
   value: anthropic.claude-3-5-sonnet-20241022-v2:0
 - op: replace
   path: /spec/external
   value:
-    provider: bedrock
+    providerProfileRef:
+      name: bedrock
     credentialSecretRef:
       name: model-provider-bedrock
       key: credential
-    region: us-east-1

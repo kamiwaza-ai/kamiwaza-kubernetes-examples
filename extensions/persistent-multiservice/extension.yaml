@@ -180,7 +180,7 @@ spec:
     repository: example.invalid/kamiwaza/extensions/persistent-workflow
     version: 1.0.0
     digest: sha256:7f68eaaf130f3c322da5f4c578ad785d62736f14583b6393aa8c9928fbf68348
-  state: running
+  state: Running
   secrets:
     existing:
       name: workflow-signing

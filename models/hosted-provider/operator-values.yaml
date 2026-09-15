@@ -97,3 +97,94 @@ adminPolicy:
     allowedDomains:
       - hosted-models.example.invalid
     allowedSuffixes: []
+  modelProviders:
+    profiles:
+      - name: bedrock
+        type: AWSBedrock
+        destinationClass: bedrock-api
+        awsBedrock:
+          region: us-east-1
+      - name: azure-ai
+        type: AzureAI
+        destinationClass: azure-ai-api
+        azureAI:
+          endpointURL: https://replace.openai.azure.com
+          deployment: gpt-4o
+      - name: google-vertex
+        type: GoogleVertex
+        destinationClass: google-vertex-api
+        googleVertex:
+          project: replace-project
+          location: us-central1
+      - name: openrouter
+        type: OpenRouter
+        destinationClass: openrouter-api
+      - name: openai-compatible
+        type: OpenAICompatible
+        destinationClass: openai-compatible-api
+        openAICompatible:
+          endpointURL: https://api.example.invalid/v1
+  transport:
+    issuance:
+      mode: PlatformIssued
+    trust:
+      bundleConfigMapName: kamiwaza-trust-bundle
+      targetNamespaces:
+        - kw-hosted-models
+      publicRoots: Include
+      maximumBundleBytes: 900000
+    floor:
+      minimumTLSVersion: TLS1.2
+      hostnameVerification: Required
+    internal:
+      defaultTransport: PlatformTLS
+      workloadIngressFloor: true
+    clientIdentities: []
+    egress:
+      deniedNetworks:
+        - Loopback
+        - LinkLocal
+        - CloudMetadata
+        - PrivateRanges
+      destinations:
+        - name: bedrock-api
+          kind: ModelProvider
+          hosts:
+            - bedrock-runtime.us-east-1.amazonaws.com
+          ports: [443]
+          transport: TLS
+          authentication: { type: None }
+          enforcementMode: PolicyAwareDialer
+        - name: azure-ai-api
+          kind: ModelProvider
+          hosts:
+            - replace.openai.azure.com
+          ports: [443]
+          transport: TLS
+          authentication: { type: None }
+          enforcementMode: PolicyAwareDialer
+        - name: google-vertex-api
+          kind: ModelProvider
+          hosts:
+            - us-central1-aiplatform.googleapis.com
+          ports: [443]
+          transport: TLS
+          authentication: { type: None }
+          enforcementMode: PolicyAwareDialer
+        - name: openrouter-api
+          kind: ModelProvider
+          hosts:
+            - openrouter.ai
+          ports: [443]
+          transport: TLS
+          authentication: { type: None }
+          enforcementMode: PolicyAwareDialer
+        - name: openai-compatible-api
+          kind: ModelProvider
+          hosts:
+            - api.example.invalid
+          ports: [443]
+          transport: TLS
+          authentication: { type: None }
+          enforcementMode: PolicyAwareDialer
+      proxies: []

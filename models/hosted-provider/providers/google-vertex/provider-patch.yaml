@@ -1,12 +1,11 @@
 - op: replace
-  path: /spec/modelId
+  path: /spec/modelID
   value: gemini-2.5-flash
 - op: replace
   path: /spec/external
   value:
-    provider: google_vertex
+    providerProfileRef:
+      name: google-vertex
     credentialSecretRef:
       name: model-provider-vertex
       key: credential
-    project: replace-project
-    location: us-central1

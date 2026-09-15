@@ -24,7 +24,7 @@ References:
 ## Boundaries
 
 - Tenant `FederationLink` contains only desired state and an administrator profile reference.
-- Administrator profile binds remote cluster ID, destination class, trust domain, bundle endpoint, and exact accepted workload identities. The destination class is the sole owner of the remote protocol host and port.
+- Administrator profile binds remote cluster ID, protocol destination class, trust domain, bundle endpoint, bundle destination class, and exact accepted workload identities. Each destination class solely owns its reviewed host and port.
 - Remote membership grants no resource access. Configure a narrow resource-owner grant for `federation-contract-model` before running the check.
 - Bundle refresh uses the last verified bundle for at most `maximumBundleStaleness`. New remote authentication fails after that bound.
 - Decision-service failure denies before remote backend I/O.
@@ -71,8 +71,8 @@ Expected status includes `TrustBundleReady`, `RemoteIdentityVerified`, `Transpor
 
 1. Block one bundle endpoint. Existing verified connections may finish within their bound. Status becomes degraded. New remote authentication fails after `15m`.
 2. Restore the endpoint. Bundle refresh and traffic recover without editing either link.
-3. Set east `FederationLink.spec.state` to `suspended`. East-to-west traffic stops. West-to-east remains governed by west's independent link.
-4. Restore `active`. Reconciliation reuses the same profile and does not recreate remote state.
+3. Set east `FederationLink.spec.state` to `Suspended`. East-to-west traffic stops. West-to-east remains governed by west's independent link.
+4. Restore `Active`. Reconciliation reuses the same profile and does not recreate remote state.
 5. Rotate a foreign bundle with an overlap window. Both accepted generations work during overlap; the retired key fails after overlap.
 
 ## Cleanup

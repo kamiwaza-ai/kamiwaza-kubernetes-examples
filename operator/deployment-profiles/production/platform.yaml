@@ -18,14 +18,12 @@ spec:
       required: true
   components:
     durableData:
-      placement: &id001
+      placement: &highAvailabilityPlacement
         topologySpreadConstraints:
           - maxSkew: 1
+            minDomains: 3
             topologyKey: topology.kubernetes.io/zone
             whenUnsatisfiable: DoNotSchedule
-            labelSelector:
-              matchLabels:
-                app.kubernetes.io/instance: kamiwaza
       disruption:
         maxUnavailable: 1
     identityAndAccess:
@@ -36,24 +34,24 @@ spec:
         enabled: true
         allowCommunityFallback: false
         backend: spicedb
-      placement: *id001
+      placement: *highAvailabilityPlacement
       disruption:
         maxUnavailable: 1
     objectStorage:
-      placement: *id001
+      placement: *highAvailabilityPlacement
       disruption:
         maxUnavailable: 1
     metadataCatalog:
       enabled: true
-      placement: *id001
+      placement: *highAvailabilityPlacement
       disruption:
         maxUnavailable: 1
     applicationAPI:
-      placement: *id001
+      placement: *highAvailabilityPlacement
       disruption:
         maxUnavailable: 1
     webInterface:
-      placement: *id001
+      placement: *highAvailabilityPlacement
       disruption:
         maxUnavailable: 1
     protocolDataPlane:

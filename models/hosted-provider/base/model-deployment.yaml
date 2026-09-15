@@ -11,11 +11,12 @@ metadata:
   name: hosted-model
   namespace: kw-hosted-models
 spec:
-  deploymentId: hosted-model
-  modelId: openai/gpt-4o-mini
-  state: running
+  deploymentID: hosted-model
+  modelID: openai/gpt-4o-mini
+  state: Running
   external:
-    provider: openrouter
+    providerProfileRef:
+      name: openrouter
     credentialSecretRef:
       name: model-provider-openrouter
       key: credential

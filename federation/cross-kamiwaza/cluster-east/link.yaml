@@ -4,6 +4,6 @@ metadata:
   name: west
   namespace: kw-federation-east
 spec:
-  state: active
+  state: Active
   profileRef:
     name: west

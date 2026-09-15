@@ -445,7 +445,7 @@ spec:
     repository: example.invalid/kamiwaza/extensions/reviewer
     version: 1.0.0
     digest: sha256:2d5c91c6fff671469b997b850882595037fa2f59374cb02d5d6f4c87e1f1e6d1
-  state: running
+  state: Running
   config:
     protocol: A2A
     protocolVersion: "1.0"
@@ -463,7 +463,7 @@ spec:
     repository: example.invalid/kamiwaza/extensions/researcher
     version: 1.0.0
     digest: sha256:3cad86850c3317e92a1683d8b6ad2d6d6e20fd66a602f800ef7515e6d991edeb
-  state: running
+  state: Running
   config:
     protocol: A2A
     protocolVersion: "1.0"

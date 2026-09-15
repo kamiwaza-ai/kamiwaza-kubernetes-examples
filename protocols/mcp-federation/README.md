@@ -66,13 +66,13 @@ kubectl -n kw-mcp-federation wait --for=condition=Ready mcpfederation/team-tools
 kubectl -n kw-mcp-federation logs job/mcp-check
 ```
 
-The check requires protocol `2025-11-25`, a session ID, exactly four authorized source-prefixed tools, correct call attribution, a denied restricted tool, rejected origin, and explicit session deletion.
+The check requires protocol `2025-11-25`, an initialized notification, a session ID, exactly four authorized source-prefixed tools, correct call attribution, a denied restricted tool, rejected origin, and explicit session deletion.
 
 ## Failure and recovery
 
 Pause only `records-tools`. `MCPFederation` reports that source unavailable, removes `records.*` from discovery, and continues serving `catalog.*`. Existing calls to the unavailable source fail with a bounded protocol error. Authorization denials stay denials.
 
-Pause both sources. The endpoint remains addressable but returns a protocol-level unavailable error. Restore each `Extension.spec.state` to `running`. The same route returns without a new path, grant, or federation object.
+Pause both sources. The endpoint remains addressable but returns a protocol-level unavailable error. Restore each `Extension.spec.state` to `Running`. The same route returns without a new path, grant, or federation object.
 
 A configuration change updates `status.configurationDigest`. A source catalog change updates `status.catalogDigest`. Reapplying identical intent changes neither digest nor workload template.
 

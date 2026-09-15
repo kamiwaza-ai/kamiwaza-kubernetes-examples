@@ -183,7 +183,7 @@ spec:
     repository: example.invalid/kamiwaza/extensions/isolated-tool
     version: 1.0.0
     digest: sha256:aa34b90b32414bb3c612bd70af540e201cc32afa52287246d604966a86f6fc29
-  state: running
+  state: Running
   config:
     kind: Tool
     sandboxRequired: true
