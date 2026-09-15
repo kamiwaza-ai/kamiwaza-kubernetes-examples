@@ -12,6 +12,7 @@ This registry is external substrate. It has no `KamiwazaPlatform` owner referenc
 - A dynamic RWO StorageClass and at least `100Gi` of capacity.
 - Access to the release-pinned registry image.
 - `htpasswd` for the lab credential procedure below.
+- `skopeo` and one approved, locally available probe image.
 
 Copy the manifest and replace `example-rwo` with the approved StorageClass:
 
@@ -74,14 +75,52 @@ kubectl -n kamiwaza-examples get pvc registry-data
 kubectl -n kamiwaza-examples port-forward service/registry 5000:5000
 ```
 
-From another terminal, the unauthenticated probe should return HTTP `401`:
+From another terminal, the unauthenticated probe must return HTTP `401`:
 
 ```bash
 curl --silent --output /dev/null --write-out '%{http_code}\n' \
   http://127.0.0.1:5000/v2/
 ```
 
-That response proves transport reachability but not credentials. Perform an authenticated push/pull with the approved client before using the registry for model artifacts.
+That response proves transport reachability but not credentials. Set
+`REGISTRY_PROBE_SOURCE` to an approved image already present in the local
+container runtime. Then push and pull it with a temporary auth file:
+
+```bash
+export REGISTRY_PROBE_SOURCE="docker-daemon:registry.example.com/approved/probe:release-test"
+REGISTRY_VERIFY_DIR="$(mktemp -d)"
+chmod 0700 "${REGISTRY_VERIFY_DIR}"
+trap 'rm -rf "${REGISTRY_VERIFY_DIR}"; unset REGISTRY_USERNAME' EXIT
+REGISTRY_AUTH_FILE="${REGISTRY_VERIFY_DIR}/auth.json"
+REGISTRY_USERNAME="$(kubectl -n kamiwaza-examples get secret \
+  kamiwaza-registry-credentials -o jsonpath='{.data.username}' | base64 --decode)"
+kubectl -n kamiwaza-examples get secret kamiwaza-registry-credentials \
+  -o jsonpath='{.data.password}' | base64 --decode | \
+  skopeo login --tls-verify=false \
+    --authfile "${REGISTRY_AUTH_FILE}" \
+    --username "${REGISTRY_USERNAME}" \
+    --password-stdin 127.0.0.1:5000
+
+skopeo copy --dest-tls-verify=false \
+  --authfile "${REGISTRY_AUTH_FILE}" \
+  "${REGISTRY_PROBE_SOURCE}" \
+  docker://127.0.0.1:5000/examples/registry-probe:verification
+skopeo copy --src-tls-verify=false \
+  --authfile "${REGISTRY_AUTH_FILE}" \
+  docker://127.0.0.1:5000/examples/registry-probe:verification \
+  "oci:${REGISTRY_VERIFY_DIR}/pulled:verification"
+PUSHED_LAYERS="$(skopeo inspect --tls-verify=false \
+  --authfile "${REGISTRY_AUTH_FILE}" \
+  --format '{{json .Layers}}' \
+  docker://127.0.0.1:5000/examples/registry-probe:verification)"
+PULLED_LAYERS="$(skopeo inspect --format '{{json .Layers}}' \
+  "oci:${REGISTRY_VERIFY_DIR}/pulled:verification")"
+test "${PUSHED_LAYERS}" = "${PULLED_LAYERS}"
+
+rm -rf "${REGISTRY_VERIFY_DIR}"
+unset REGISTRY_USERNAME
+trap - EXIT
+```
 
 ## Connect immutable policy
 
