@@ -111,13 +111,17 @@ kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
   -o jsonpath='{range .spec.images.pinned[*]}{.capability}{"/"}{.role}{"\t"}{.reference}{"\n"}{end}'
 
 kubectl -n kamiwaza-examples get pods \
+  --selector='app.kubernetes.io/managed-by=kamiwaza-platform-operator' \
+  --field-selector=status.phase=Running \
   -o jsonpath='{range .items[*].spec.containers[*]}{.image}{"\n"}{end}' \
   | sort -u
 ```
 
-Compare the declared pins, observed Pod images, and signed release inventory.
-All three must identify the reviewed digests. Image names or tags alone do not
-prove that match.
+Compare declared pins, active operator-managed Pod images, and signed release
+inventory. Every observed platform image must identify its reviewed digest. A
+pin for an on-demand role need not appear until its workload exists. External
+prerequisites and completed migration Jobs are outside this active set; retain
+their release evidence separately.
 
 For a FIPS-qualified release, retain the release's exact-image scan,
 attestation, and runtime evidence with the installation record. The operator
