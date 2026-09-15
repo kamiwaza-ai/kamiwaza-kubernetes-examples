@@ -1,9 +1,12 @@
-# Complete Helm values that are refused on purpose. The document is valid, but
-# ControlPlaneToProtocolDataPlane has no authenticated lifetime bound. An enabled
-# plane therefore reports ConfigChannelUnauthenticated before any plane resource
-# is created or changed.
+# Complete Helm values for the governed protocol data plane. Apply this file
+# with --reuse-values so the chart keeps the selected manager image, watch
+# scope, storage class, and registry settings.
+#
+# The Core workload hops are included because a Helm values file replaces the
+# entire hop list. The protocol data-plane hops add a bounded, authenticated
+# configuration channel and independently authenticated backend connections.
 adminPolicy:
-  revision: examples-protocol-data-plane-unbounded-r1
+  revision: examples-protocol-data-plane-r1
   transport:
     issuance:
       mode: PlatformIssued
@@ -64,11 +67,16 @@ adminPolicy:
               trustDomain: kamiwaza-examples.example.com
               acceptedIdentities:
                 - "spiffe://kamiwaza-examples.example.com/ns/kamiwaza-examples/sa/core-ray"
-        # Deliberate defect: no writer authentication and no lifetime bound.
+        # This bound is the maximum lifetime of an admitted configuration.
+        # The plane closes protected routes after 30 minutes without a fresh,
+        # authenticated commit.
         - name: ControlPlaneToProtocolDataPlane
           transport: PlatformTLS
           authentication:
-            type: None
+            type: MutualTLS
+            maxConnectionAge: 30m
+            mutualTLS:
+              clientIdentityRef: control-plane-channel
         - name: ProtocolDataPlaneToDecisionService
           transport: PlatformTLS
           authentication:
@@ -125,6 +133,12 @@ adminPolicy:
         secretRef:
           name: kamiwaza-core-client
         commonName: core-client
+        validity: 2160h
+        renewBefore: 360h
+      - name: control-plane-channel
+        secretRef:
+          name: kamiwaza-control-plane-channel
+        commonName: control-plane-channel
         validity: 2160h
         renewBefore: 360h
       - name: dataplane-state

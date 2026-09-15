@@ -20,7 +20,7 @@
 # the reviewed release data names no digest for its image, when any plane-side
 # authority surface is requested, or when the replica count contradicts the
 # profile. The transport policy has to bound the configuration channel first;
-# see transport-policy-fragment.yaml in this directory.
+# see transport-policy-values.yaml in this directory.
 apiVersion: platform.kamiwaza.io/v1alpha1
 kind: KamiwazaPlatform
 metadata:
