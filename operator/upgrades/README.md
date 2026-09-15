@@ -9,12 +9,14 @@ The current operator release converges to `1.3.0`. It supports a `1.1.0` source 
 The commands use `kamiwaza-examples` for an isolated rehearsal. Replace it only
 after selecting and recording the reviewed production namespace.
 
+This scenario does not start from the operator quickstart, which is already at `1.3.0`. Without the exact supported `1.1.0` source and completed handoff, the target-version patch is only an idempotence check; it does not exercise the migration edge.
+
 ## Prerequisites
 
 - Adoption of the supported source is complete or the source installation already satisfies the published ownership contract.
 - A current backup exists outside the cluster, including recovery credentials.
 - The maintenance window covers the forward-only migration boundary.
-- The cluster administrator has upgraded all three CRDs before rolling out a manager that requires them.
+- The cluster administrator has upgraded every CRD in `dist/kamiwaza-apis.yaml` before rolling out a manager that requires them. Withheld APIs use the separate explicit ownership-transfer procedure.
 - The immutable policy explicitly allows `1.3.0` in `operations.approvedForwardOnlyUpgradeTargets`.
 
 An available image tag is not upgrade evidence. Use only the source/target edge and migration digest in the installed release compatibility artifact.
@@ -24,7 +26,9 @@ An available image tag is not upgrade evidence. Use only the source/target edge 
 ```bash
 cat "${OPERATOR_RELEASE_DIR}/dist/compatibility.json"
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
-  -o custom-columns=DESIRED:.spec.version,CURRENT:.status.currentVersion,PHASE:.status.phase,TRANSITION:.status.activeTransition.type
+  -o custom-columns=DESIRED:.spec.version,CURRENT:.status.currentVersion,GENERATION:.metadata.generation,OBSERVED:.status.observedGeneration
+kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
+  -o jsonpath='{range .status.conditions[*]}{.type}{"\t"}{.status}{"\t"}{.reason}{"\t"}{.message}{"\n"}{end}'
 kubectl -n kamiwaza-examples get deployment extension-operator kuberay-operator \
   --ignore-not-found
 ```
@@ -40,7 +44,7 @@ KUBECONFIG="${KUBECONFIG:?Set the reviewed target context}" \
   "${OPERATOR_RELEASE_DIR}/scripts/upgrade-crds.sh"
 ```
 
-Wait for all three CRDs to be Established and verify `v1alpha1` remains served and stored before rolling out the manager.
+Wait for every CRD named by `dist/kamiwaza-apis.yaml` to be Established and verify `v1alpha1` remains served and stored before rolling out the manager.
 
 ## 3. Approve the forward target
 
@@ -87,7 +91,7 @@ kubectl -n kamiwaza-examples wait \
   kamiwazaplatform/kamiwaza \
   --timeout=45m
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
-  -o custom-columns=DESIRED:.status.desiredVersion,CURRENT:.status.currentVersion,PHASE:.status.phase,GENERATION:.metadata.generation,OBSERVED:.status.observedGeneration
+  -o custom-columns=DESIRED:.status.desiredVersion,CURRENT:.status.currentVersion,GENERATION:.metadata.generation,OBSERVED:.status.observedGeneration
 ```
 
 Success requires both desired and current versions to be `1.3.0`, Ready true, observed generation current, platform smoke passing, and the pre-upgrade PVC/Secret/endpoint identities preserved.
