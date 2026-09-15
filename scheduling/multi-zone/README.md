@@ -13,6 +13,9 @@ Native topology and disruption APIs express placement. The operator applies them
 - Three schedulable domains labeled `topology.kubernetes.io/zone`.
 - Storage class `example-rwo` with topology-aware provisioning.
 - Permission to create the namespaced verification `Role` and `RoleBinding`.
+- Permission to create the get-only Node `ClusterRole` and `ClusterRoleBinding`
+  used to verify the selected workers' zone labels. The verifier cannot list or
+  watch Nodes and cannot read other cluster-scoped resources.
 
 Verify labels without changing them:
 

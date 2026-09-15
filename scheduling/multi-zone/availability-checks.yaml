@@ -38,6 +38,31 @@ roleRef:
   kind: Role
   name: availability-check
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kw-multi-zone-zone-placement-check
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kw-multi-zone-zone-placement-check
+subjects:
+  - kind: ServiceAccount
+    name: availability-check
+    namespace: kw-multi-zone
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kw-multi-zone-zone-placement-check
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -104,11 +129,22 @@ spec:
                       for condition in pod.get("status", {}).get("conditions", [])
                   )
               ]
+              assert len(ready) >= 3, f"only {len(ready)} ready workers"
               nodes = {pod["spec"].get("nodeName") for pod in ready}
               nodes.discard(None)
-              assert len(ready) >= 3, f"only {len(ready)} ready workers"
               assert len(nodes) >= 3, f"workers occupy only {sorted(nodes)}"
-              print("three ready workers occupy distinct nodes under hard zone spread")
+              zones = set()
+              for node_name in nodes:
+                  node = get(
+                      "/api/v1/nodes/" + urllib.parse.quote(node_name, safe="")
+                  )
+                  zone = node["metadata"].get("labels", {}).get(
+                      "topology.kubernetes.io/zone"
+                  )
+                  assert zone, f"{node_name} has no topology.kubernetes.io/zone label"
+                  zones.add(zone)
+              assert len(zones) >= 3, f"workers occupy only zones {sorted(zones)}"
+              print("three ready workers occupy distinct zones under hard zone spread")
           resources:
             requests:
               cpu: 25m
