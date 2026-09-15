@@ -19,6 +19,7 @@ The manager never installs CRDs, StorageClasses, ingress controllers, certificat
 | Scenario                                              | Start here when                                                        | Destructive                                                     |
 | ----------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------- |
 | [Quickstart](quickstart/)                             | Installing one fresh `1.3.0` platform in a bounded namespace           | No                                                              |
+| [Production profile](deployment-profiles/production/) | Declaring three-zone application compute with fixed capacity           | No                                                              |
 | [Reviewed image inventory](reviewed-image-inventory/) | Applying release-reviewed image digests to platform intent             | No                                                              |
 | [Namespace scopes](namespace-scopes/)                 | Choosing manager placement and watch authority                         | No                                                              |
 | [Transport scopes](transport-scopes/)                 | Pairing transport policy with the manager's watch scope                | No                                                              |

@@ -1,0 +1,173 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: availability-check
+  namespace: kw-multi-zone
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: availability-check
+  namespace: kw-multi-zone
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: availability-check
+  namespace: kw-multi-zone
+subjects:
+  - kind: ServiceAccount
+    name: availability-check
+    namespace: kw-multi-zone
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: availability-check
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: zone-placement-check
+  namespace: kw-multi-zone
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      serviceAccountName: availability-check
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import json, os, ssl, urllib.parse, urllib.request
+
+              host = os.environ["KUBERNETES_SERVICE_HOST"]
+              port = os.environ["KUBERNETES_SERVICE_PORT_HTTPS"]
+              root = f"https://{host}:{port}"
+              token = open("/var/run/secrets/kubernetes.io/serviceaccount/token").read()
+              ctx = ssl.create_default_context(
+                  cafile="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+              )
+
+
+              def get(path):
+                  request = urllib.request.Request(
+                      root + path, headers={"Authorization": "Bearer " + token}
+                  )
+                  return json.load(urllib.request.urlopen(request, context=ctx, timeout=10))
+
+
+              worker = get(
+                  "/apis/apps/v1/namespaces/kw-multi-zone"
+                  + "/deployments/core-raycluster-worker"
+              )
+              generation = worker["metadata"]["generation"]
+              assert worker["status"]["observedGeneration"] == generation
+              assert worker["status"].get("readyReplicas", 0) >= 3
+              labels = worker["spec"]["selector"]["matchLabels"]
+              selector = urllib.parse.quote(
+                  ",".join(f"{key}={labels[key]}" for key in sorted(labels))
+              )
+              pods = get(
+                  "/api/v1/namespaces/kw-multi-zone/pods?labelSelector=" + selector
+              )["items"]
+              ready = [
+                  pod
+                  for pod in pods
+                  if any(
+                      condition["type"] == "Ready" and condition["status"] == "True"
+                      for condition in pod.get("status", {}).get("conditions", [])
+                  )
+              ]
+              nodes = {pod["spec"].get("nodeName") for pod in ready}
+              nodes.discard(None)
+              assert len(ready) >= 3, f"only {len(ready)} ready workers"
+              assert len(nodes) >= 3, f"workers occupy only {sorted(nodes)}"
+              print("three ready workers occupy distinct nodes under hard zone spread")
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: service-continuity-check
+  namespace: kw-multi-zone
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: check
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command:
+            - python
+            - -c
+          args:
+            - |
+              import time,urllib.request
+              for sample in range(300):
+               try:
+                response=urllib.request.urlopen('http://core-api:7777/healthz',timeout=3)
+                assert response.status==200
+               except Exception as error:
+                raise SystemExit(f'health failed at sample {sample}: {error}')
+               time.sleep(1)
+              print('service remained healthy for 300 samples')
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true

@@ -50,6 +50,7 @@ Use your organization’s fork or this copy when vendored inside the Deploy mono
 Category indexes:
 
 - **Platform operator:** [operator/README.md](operator/README.md)
+- **Scheduling:** [application compute scaling](scheduling/application-compute-scaling/) and [multi-zone placement](scheduling/multi-zone/)
 - **Deployment:** [deployment/README.md](deployment/README.md)
 - **Multi-tenancy:** [multi-tenancy/README.md](multi-tenancy/README.md)
 - **Monitoring:** [monitoring/README.md](monitoring/README.md)
@@ -61,6 +62,9 @@ Category indexes:
 | Scenario                                               | Path                                                                                                                                   | Tags                                                        |
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | Fresh operator installation                            | [operator/quickstart](operator/quickstart)                                                                                             | #operator #quickstart #fresh-install                        |
+| Production operator profile                            | [operator/deployment-profiles/production](operator/deployment-profiles/production)                                                     | #operator #production #availability                         |
+| Application compute scaling                            | [scheduling/application-compute-scaling](scheduling/application-compute-scaling)                                                       | #operator #autoscaling #hpa                                 |
+| Multi-zone application compute                         | [scheduling/multi-zone](scheduling/multi-zone)                                                                                         | #operator #scheduling #availability                         |
 | Reviewed image inventory for platform intent           | [operator/reviewed-image-inventory](operator/reviewed-image-inventory)                                                                 | #operator #images #supply-chain #fips                       |
 | Operator namespace scopes                              | [operator/namespace-scopes](operator/namespace-scopes)                                                                                 | #operator #rbac #multi-tenant                               |
 | Operator Helm chart upgrade                            | [operator/chart-upgrades](operator/chart-upgrades)                                                                                     | #operator #helm #crd                                        |
