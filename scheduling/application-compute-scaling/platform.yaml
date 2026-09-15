@@ -53,7 +53,7 @@ spec:
         reference: ghcr.io/kamiwaza-internal/containers/images/etcd@sha256:b4ff089698e65ac95749f7404c7c33f82ad26cab1abc2536b8021104abf27873
       - capability: identityAndAccess
         role: application
-        reference: ghcr.io/kamiwaza-internal/containers/images/keycloak@sha256:ed907de15e7f7afe2db5fd9f6ea41f86fac0d8dfda7c6a17c1bfcf4d37a8571a
+        reference: ghcr.io/kamiwaza-internal/containers/images/keycloak@sha256:5b3b537c9d7960c9cb42ed50c801d5c4a1448e62d0e767a7a6fe74084af2db2b
       - capability: identityAndAccess
         role: init
         reference: ghcr.io/kamiwaza-internal/kamiwaza/images/init-keycloak-users@sha256:e2572c22171abb9fccbf5e2eae53385259a2db0e414d00cd2bc2b92636e95b73
