@@ -81,7 +81,7 @@ spec:
         reference: ghcr.io/authzed/spicedb@sha256:0efcb5fddb59f9e35618da84b02a0a752fc6f71b002661c2362e1903d0380a90
       - capability: applicationAPI
         role: application
-        reference: ghcr.io/kamiwaza-internal/kamiwaza/images/core@sha256:8d3e5dfc799c8b6bf7fd66ed95cb78ab3f75a2345fbd0e78be46d4996ea3a291
+        reference: ghcr.io/kamiwaza-internal/kamiwaza/images/core@sha256:0ff762770351079689a97849743ff7875d4455f405ac82c24909c25e887db1af
       - capability: applicationAPI
         role: inference
         reference: ghcr.io/kamiwaza-internal/containers/images/llamacpp-cpu@sha256:2cca4d9b2eda3088fb6cb28f00fb60ea8f71abfd8c5b1179d55df26476e3aeeb
