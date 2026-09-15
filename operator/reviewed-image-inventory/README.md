@@ -111,7 +111,6 @@ kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
   -o jsonpath='{range .spec.images.pinned[*]}{.capability}{"/"}{.role}{"\t"}{.reference}{"\n"}{end}'
 
 kubectl -n kamiwaza-examples get pods \
-  --selector='app.kubernetes.io/managed-by=kamiwaza-platform-operator' \
   --field-selector=status.phase=Running \
   -o jsonpath='{range .items[*].spec.containers[*]}{.image}{"\n"}{end}' \
   | sort -u
