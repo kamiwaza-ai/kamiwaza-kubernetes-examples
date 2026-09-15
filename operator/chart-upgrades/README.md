@@ -28,6 +28,9 @@ kubectl -n kamiwaza-examples-system get deployment kamiwaza-platform-operator \
 kubectl get crd \
   kamiwazaplatforms.platform.kamiwaza.io \
   kamiwazaextensions.extensions.kamiwaza.io \
+  extensions.extensions.kamiwaza.io \
+  extensionruntimes.extensions.kamiwaza.io \
+  sandboxpools.extensions.kamiwaza.io \
   modeldeployments.serving.kamiwaza.io \
   -o custom-columns=NAME:.metadata.name,STORED_VERSIONS:.status.storedVersions
 ```
@@ -56,14 +59,21 @@ Review the rendered ServiceAccount, manager Deployment, policy, Roles, RoleBindi
 
 ## 3. Upgrade CRDs first when APIs change
 
-Helm installs files from `crds/` on initial installation but does not upgrade or delete existing CRDs. If the target release changes an API, run its administrator-owned CRD procedure before the chart upgrade:
+The chart ships its selected CRDs as kept release templates. Helm upgrades
+their schemas with the manager and retains the CRDs and custom resources when
+the release is removed.
+
+If the target release changes a served or storage version, run its
+administrator-owned CRD procedure before the chart upgrade:
 
 ```bash
 KUBECONFIG="${KUBECONFIG:?Set the reviewed target context}" \
   "${OPERATOR_RELEASE_DIR}/scripts/upgrade-crds.sh"
 ```
 
-Require all three CRDs to be Established with the target served and stored versions. Resolve field-ownership conflicts explicitly; never grant CRD mutation to the manager.
+Require all selected CRDs to be Established with the target served and stored
+versions. Resolve field-ownership conflicts explicitly. Never grant CRD
+mutation to the manager.
 
 ## 4. Upgrade atomically
 
@@ -77,7 +87,7 @@ helm upgrade kamiwaza-platform-operator "${OPERATOR_CHART}" \
   --timeout=10m
 ```
 
-`--atomic` waits and rolls back the Helm-managed release objects when the upgrade fails. It does not roll back CRDs or reverse application migrations.
+`--atomic` waits and rolls back Helm-managed release objects when the upgrade fails. It does not reverse Kubernetes storage-version or application migrations. Follow the target release's rollback notes before a CRD-changing upgrade.
 
 ## 5. Verify
 
@@ -93,7 +103,7 @@ kubectl -n kamiwaza-examples get kamiwazaplatform,kamiwazaextension
 kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io
 ```
 
-Require one manager Deployment, the expected digest-pinned image, healthy manager probes, all three controllers registered, unchanged immutable watch authority, and no unrelated platform, extension, or model rollout.
+Require one manager Deployment, the expected digest-pinned image, healthy manager probes, registered platform, extension, and model-serving controller domains, unchanged immutable watch authority, and no unrelated platform, extension, or model rollout.
 
 ## Rollback
 
