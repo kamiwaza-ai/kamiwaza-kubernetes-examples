@@ -8,9 +8,9 @@ compliance mode.
 **Tags:** #operator #images #supply-chain #fips
 
 This example does not decide whether an image is approved or FIPS-qualified.
-That decision belongs to signed release evidence. The helper validates the
-published inventory shape and refuses tags, duplicate roles, unknown
-capabilities, and non-resolving placeholder digests.
+That decision belongs to signed release evidence. The helper validates selected
+inventory entries and refuses tags, duplicate roles, unknown capabilities, and
+non-resolving placeholder digests.
 
 ## Prerequisites
 
@@ -36,15 +36,15 @@ python3 -m json.tool "${RELEASE_METADATA}" >/dev/null
 
 Pass each capability enabled by the platform manifest. The quickstart uses:
 
-| Capability | Include when |
-|---|---|
-| `durableData` | Always for the quickstart |
+| Capability          | Include when                                          |
+| ------------------- | ----------------------------------------------------- |
+| `durableData`       | Always for the quickstart                             |
 | `identityAndAccess` | `spec.components.identityAndAccess.enabled` is `true` |
-| `relationshipStore` | ReBAC is enabled |
-| `applicationAPI` | Always for the quickstart |
-| `webInterface` | Always for the quickstart |
-| `objectStorage` | Always for the quickstart |
-| `metadataCatalog` | `spec.components.metadataCatalog.enabled` is `true` |
+| `relationshipStore` | ReBAC is enabled                                      |
+| `applicationAPI`    | Always for the quickstart                             |
+| `webInterface`      | Always for the quickstart                             |
+| `objectStorage`     | Always for the quickstart                             |
+| `metadataCatalog`   | `spec.components.metadataCatalog.enabled` is `true`   |
 | `protocolDataPlane` | `spec.components.protocolDataPlane.enabled` is `true` |
 
 Do not select `platformTransport`. The certificate signer, workload identity

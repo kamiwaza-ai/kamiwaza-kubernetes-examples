@@ -53,12 +53,15 @@ class RenderPlatformImagesTest(unittest.TestCase):
         )
         duplicate = json.loads(json.dumps(self.metadata))
         duplicate["reviewedImages"].append(dict(duplicate["reviewedImages"][0]))
+        malformed = json.loads(json.dumps(self.metadata))
+        malformed["reviewedImages"].append("not-an-image")
         cases = [
             ("unknown capability", self.metadata, ["missing"]),
             ("operator infrastructure", self.metadata, ["platformTransport"]),
             ("mutable tag", tagged, ["durableData"]),
             ("placeholder digest", placeholder, ["durableData"]),
             ("duplicate role", duplicate, ["durableData"]),
+            ("malformed image", malformed, ["durableData"]),
         ]
         for name, metadata, selection in cases:
             with self.subTest(name=name), self.assertRaises(ValueError):

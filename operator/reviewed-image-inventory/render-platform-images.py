@@ -46,6 +46,10 @@ def release_inventory(metadata):
     require(bool(platform_version), "release metadata must name platformVersion")
     images = metadata.get("reviewedImages")
     require(isinstance(images, list), "release metadata must contain reviewedImages")
+    require(
+        all(isinstance(image, dict) for image in images),
+        "reviewedImages entries must be objects",
+    )
     return platform_version, images
 
 
@@ -78,8 +82,6 @@ def checked_reference(capability, role, reference):
 
 
 def reviewed_pin(image, selected, seen):
-    if not isinstance(image, dict):
-        return None
     capability = image.get("capability")
     if capability not in selected:
         return None
