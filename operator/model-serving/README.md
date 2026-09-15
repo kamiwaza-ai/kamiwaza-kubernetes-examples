@@ -34,8 +34,21 @@ The platform's own component outcome for this is `modelServing`, with reason `Mo
 ## Prerequisites
 
 - The [quickstart](../quickstart/) platform is Ready.
-- At least one `ModelDeployment` exists in the namespace, created by the application when a model was deployed through it. This example observes and stresses what exists; it does not author one.
+- A release-supported model is available through an application model hub or is already present in application storage.
 - The administrator-owned model registry and its local credential Secret match immutable policy.
+
+## Request the model through the application
+
+Sign in as the platform administrator. In the application's Models workflow,
+select the reviewed model, download the required files, choose the Kubernetes
+deployment target, and request deployment. The application must create the
+`ModelDeployment`; do not translate the form into a hand-written Pod template.
+
+Continue after this command shows at least one request:
+
+```bash
+kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io
+```
 
 ## Observe what is requested and what is serving
 
@@ -44,10 +57,10 @@ kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io \
   -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,DEPLOYMENT_ID:.spec.deploymentId,MODEL:.spec.modelId,ENGINE:.spec.engineName,PHASE:.status.phase,READY:.status.readyReplicas
 
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
-  -o jsonpath='{range .status.components[?(@.name=="models")]}{.name}{"\t"}{.phase}{"\t"}{.reason}{"\t"}{.message}{"\n"}{end}'
+  -o jsonpath='{range .status.components[?(@.name=="modelServing")]}{.name}{"\t"}{.state}{"\t"}{.reason}{"\t"}{.message}{"\n"}{end}'
 ```
 
-An empty list is a complete answer: it means nothing has requested a served model, not that serving is broken.
+An empty list means the application has not created the request. Return to the previous step; the recovery checks below require a real deployment.
 
 Wait for every requested deployment to report Ready:
 
@@ -92,8 +105,31 @@ The serving controller must recreate the Deployment under the same `ModelDeploym
 ```bash
 kubectl -n kamiwaza-examples patch modeldeployments.serving.kamiwaza.io "${MODEL_DEPLOYMENT}" \
   --type=merge --patch '{"spec":{"state":"stopped"}}'
+
+kubectl -n kamiwaza-examples wait \
+  --for=jsonpath='{.status.phase}'=Stopped \
+  "modeldeployments.serving.kamiwaza.io/${MODEL_DEPLOYMENT}" \
+  --timeout=5m
+
+kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io "${MODEL_DEPLOYMENT}" \
+  -o custom-columns=UID:.metadata.uid,DEPLOYMENT_ID:.spec.deploymentId,STATE:.spec.state,PHASE:.status.phase
+
+kubectl -n kamiwaza-examples get deployment "${MODEL_DEPLOYMENT}" \
+  -o custom-columns=DESIRED:.spec.replicas,AVAILABLE:.status.availableReplicas
 ```
 
-`running`, `paused`, and `stopped` are the values this release serves. An unrecognised value is treated as unsupported rather than defaulted to `running`, because guessing would start a workload somebody asked to stop.
+The UID and deployment ID must remain unchanged, while the child Deployment reports zero desired replicas. `running`, `paused`, and `stopped` are the values this release serves. An unrecognised value is treated as unsupported rather than defaulted to `running`, because guessing would start a workload somebody asked to stop.
+
+Resume the same deployment if another scenario will use it:
+
+```bash
+kubectl -n kamiwaza-examples patch modeldeployments.serving.kamiwaza.io "${MODEL_DEPLOYMENT}" \
+  --type=merge --patch '{"spec":{"state":"running"}}'
+
+kubectl -n kamiwaza-examples wait \
+  --for=condition=Ready \
+  "modeldeployments.serving.kamiwaza.io/${MODEL_DEPLOYMENT}" \
+  --timeout=30m
+```
 
 Deleting the `ModelDeployment` is how a deployment goes away. That is a separate decision from stopping it, and it is the application's decision to make where the application created the object.
