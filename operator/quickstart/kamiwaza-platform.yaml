@@ -35,6 +35,8 @@ metadata:
   namespace: kamiwaza-examples
 spec:
   version: 1.3.0
+  # Stable across root recreation so RetainData recovery can identify this installation.
+  clusterID: kamiwaza-examples
   profile: Full
   domain: kamiwaza-examples.example.com
   storage:

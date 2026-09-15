@@ -23,35 +23,31 @@ after selecting and recording the intended platform namespace.
 
 ```bash
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
-  -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,POLICY:.spec.deletionPolicy,PHASE:.status.phase
+  -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,POLICY:.spec.deletionPolicy,CURRENT:.status.currentVersion
 PLATFORM_UID="$(kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza -o jsonpath='{.metadata.uid}')"
 test -n "${PLATFORM_UID}"
 kubectl -n kamiwaza-examples get pvc,secret \
   -l "platform.kamiwaza.io/uid=${PLATFORM_UID}" \
   -o custom-columns=KIND:.kind,NAME:.metadata.name,UID:.metadata.uid
+kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
+  -o jsonpath='{range .status.retainedResources[*]}{.identity.kind}{"\t"}{.identity.namespace}{"\t"}{.identity.name}{"\t"}{.reason}{"\t"}{.ownership}{"\n"}{end}'
 kubectl -n kamiwaza-examples get kamiwazaextensions.extensions.kamiwaza.io
 ```
 
-Require `spec.deletionPolicy` to be `RetainData` or omitted. Capture PVC UIDs and Secret content hashes through an approved non-printing procedure.
+Require `spec.deletionPolicy` to be `RetainData` or omitted. The retained-resource status must name every labeled PVC and Secret before deletion starts. Capture PVC UIDs and Secret content hashes through an approved non-printing procedure.
 
 ## 2. Start deletion
 
-Do not uninstall the manager first. It must process the platform finalizer and report retained identities.
+Keep the manager installed. It continues reconciling independent extension and model roots and preserves the operator diagnostics used during verification.
 
 ```bash
 kubectl -n kamiwaza-examples delete kamiwazaplatform kamiwaza --wait=false
-kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza -w
-```
-
-While the root is finalizing, inspect `status.retainedResources` and Events in another terminal:
-
-```bash
-kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
-  -o jsonpath='{range .status.retainedResources[*]}{.kind}{"\t"}{.namespace}{"\t"}{.name}{"\t"}{.reason}{"\n"}{end}'
 kubectl -n kamiwaza-examples get events --sort-by=.metadata.creationTimestamp
 ```
 
-Do not remove the finalizer manually.
+`RetainData` deliberately carries no deletion finalizer: ordinary children use Kubernetes garbage collection, while retained PVCs and Secrets have no platform owner reference. The root can disappear immediately, so review and save `status.retainedResources` before issuing the delete command.
+
+Do not remove a finalizer manually if another policy or external cleanup keeps the root present.
 
 ## 3. Verify retention and isolation
 
@@ -64,14 +60,39 @@ kubectl -n kamiwaza-examples wait \
 kubectl -n kamiwaza-examples get pvc,secret \
   -l "platform.kamiwaza.io/uid=${PLATFORM_UID}" \
   -o custom-columns=KIND:.kind,NAME:.metadata.name,UID:.metadata.uid
+kubectl -n kamiwaza-examples get deployment,statefulset,job \
+  -l "platform.kamiwaza.io/uid=${PLATFORM_UID}"
 kubectl -n kamiwaza-examples get kamiwazaextensions.extensions.kamiwaza.io
 ```
 
-Require retained PVC and Secret identities to match the baseline. Extension roots and extension-owned children must remain. Ordinary platform-owned stateless resources may be garbage-collected.
+Require retained PVC and Secret identities to match the baseline. Extension
+roots and extension-owned children must remain. No ordinary platform-owned
+workload may remain under the deleted platform UID.
 
 ## Recovery
 
-Create a compatible replacement root in the same namespace and reference retained identities through supported existing-Secret and storage fields. Run [adoption Preview](../adoption/) before transferring compatible unowned resources. Verify PVC UIDs, Secret hashes, database identity, and endpoints before Explicit adoption.
+Reapply a compatible platform manifest with the same non-empty `spec.clusterID`.
+The operator treats that stable identity as proof that retained PVCs and
+operator-created Secrets belong to the same installation. It changes their
+owner UID to the replacement root without changing PVC UIDs or Secret data:
+
+```bash
+kubectl apply --server-side \
+  --field-manager=platform-operator-user \
+  -f ../quickstart/kamiwaza-platform.local.yaml
+kubectl -n kamiwaza-examples wait \
+  --for=condition=Ready kamiwazaplatform/kamiwaza \
+  --timeout=15m
+NEW_PLATFORM_UID="$(kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza -o jsonpath='{.metadata.uid}')"
+kubectl -n kamiwaza-examples get pvc,secret \
+  -l "platform.kamiwaza.io/uid=${NEW_PLATFORM_UID}" \
+  -o custom-columns=KIND:.kind,NAME:.metadata.name,UID:.metadata.uid
+```
+
+Require the same PVC UIDs and Secret content hashes captured before deletion.
+Verify database identity and endpoints. A resource without the matching stable
+cluster identity is not rebound automatically; use [adoption
+Preview](../adoption/) before any explicit transfer.
 
 ## About `DeleteAll`
 

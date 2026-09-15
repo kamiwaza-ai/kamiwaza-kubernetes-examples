@@ -48,6 +48,11 @@ sed -i "s/kamiwaza-examples.example.com/${KAMIWAZA_DOMAIN}/g" \
 
 Review the resulting files. The platform StorageClass and domain must be allowed by the immutable policy in `operator-values.local.yaml`.
 
+Keep `spec.clusterID` stable for this installation. The operator uses it to
+recognize retained PVCs and operator-created Secrets after a `RetainData`
+delete and root recreation. Never reuse it for a different installation in
+the same namespace.
+
 ## 2. Verify administrator-owned prerequisites
 
 The example policy selects cert-manager-managed trust and a Gateway the administrator owns. The operator observes or accepts administrator attestations for these dependencies; it does not install them. The platform resource names no ingress or mesh implementation: `spec.dependencies` covers `certManager`, `trustManager`, and `gatewayAPI` only, and routing is expressed through standard Gateway API objects, so the implementation behind the Gateway is the administrator's choice and not platform intent.
