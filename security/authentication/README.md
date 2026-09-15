@@ -6,7 +6,7 @@ Run five independent authentication profiles: built-in Keycloak, brokered OIDC, 
 
 ## Grounded design
 
-Confluent's [authentication examples](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/security) separate identity-provider prerequisites from application custom resources. Kamiwaza strengthens that split: issuer, destination, audience, assurance, session, edge evidence, and Secret or ConfigMap references live in immutable administrator policy. Tenant manifests contain no provider endpoint, credential, certificate, or claim-mapping override.
+Identity-provider prerequisites stay outside application custom resources. Immutable administrator policy owns issuer, destination, audience, assurance, session, edge evidence, and Secret or ConfigMap references.
 
 ## Variant matrix
 
@@ -24,7 +24,7 @@ Built-in initialization seeds only `identity-bootstrap-admin` and `default-platf
 
 ## Install and run one variant
 
-Install one operator release with `operator-values.yaml`. It watches five explicit namespaces so each entry point remains standalone.
+Reuse one [shared operator installation](../../operator/quickstart/) with this scenario's `operator-values.yaml`. It watches five explicit namespaces so each entry point remains standalone.
 
 ```bash
 VARIANT=oidc

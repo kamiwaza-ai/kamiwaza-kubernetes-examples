@@ -14,6 +14,15 @@ The operator is under release verification. Use these workflows on disposable or
 
 The manager never installs CRDs, StorageClasses, ingress controllers, certificate controllers, device plugins, or registries during reconciliation.
 
+## One shared installation
+
+Install the manager once through the [quickstart](quickstart/#4-install-the-shared-manager).
+All other scenarios reuse that Helm release. A scenario-specific
+`operator-values.yaml` is administrator policy for the same release, not
+instructions to install another operator. Apply policy changes through the
+[chart upgrade workflow](chart-upgrades/) and wait for the manager rollout
+before applying namespaced scenario resources.
+
 ## Scenario index
 
 | Scenario                                              | Start here when                                                        | Destructive                                                     |

@@ -6,13 +6,13 @@ Run a two-component extension. API depends on worker. Worker writes idempotent r
 
 ## Grounded design
 
-Confluent's [connector examples](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/connectors) distinguish controller-owned Kubernetes lifecycle from connector business logic. Kamiwaza goes further: API/worker graph and workflow code live in a digest-verified artifact, while `Extension` names only artifact, state, existing credentials, and pass-through configuration. Operator owns Deployments, Services, NetworkPolicies, dependency ordering, readiness, and status—not workflow semantics.
+API and worker graphs plus workflow code live in digest-verified artifacts. `Extension` names only artifact, state, existing credentials, and pass-through configuration. The operator owns Kubernetes lifecycle and status, not workflow semantics.
 
 ## Prerequisites
 
 - StorageClass `example-rwo` supports durable `ReadWriteOnce` volumes.
 - Existing Secret `workflow-signing` in `kw-persistent-extension`. Its required keys belong to the reviewed image contract; never commit values.
-- Operator installed with `operator-values.yaml` and access to pinned images.
+- Shared manager installed through the [operator quickstart](../../operator/quickstart/) with this scenario's `operator-values.yaml` and access to pinned images.
 
 ## Apply and check
 

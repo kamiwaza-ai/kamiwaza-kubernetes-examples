@@ -6,11 +6,11 @@ Publish web, API, model, identity-discovery, and enabled catalog routes through 
 
 ## Grounded design
 
-Confluent's [external LoadBalancer example](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/networking/external-access-load-balancer-deploy) separates cluster resources from client checks. Kamiwaza keeps that separation but uses only Kubernetes Gateway API. No `Ingress`, provider CRD, vendor annotation, routing adapter, or controller install appears here.
+Cluster resources and client checks remain separate. Kamiwaza uses only Kubernetes Gateway API. No `Ingress`, provider CRD, vendor annotation, routing adapter, or controller installation appears here.
 
 ## Ownership and prerequisites
 
-The cluster administrator owns `gateway.yaml`, `kamiwaza-gateway-tls`, DNS, and the conformant Gateway controller. Replace `replace-with-conformant-class`, `gateway-access.example.invalid`, and `example-rwo`. Install the operator with `operator-values.yaml`; create required image-pull and registry Secrets without committing values. The platform owner applies `platform.yaml` and `access-checks.yaml`.
+The cluster administrator owns `gateway.yaml`, `kamiwaza-gateway-tls`, DNS, and the conformant Gateway controller. Replace `replace-with-conformant-class`, `gateway-access.example.invalid`, and `example-rwo`. Reuse the [shared operator installation](../../operator/quickstart/) with this scenario's `operator-values.yaml`; create required image-pull and registry Secrets without committing values.
 
 The Gateway must report `Accepted=True`, `Programmed=True`, and `ResolvedRefs=True` at its current generation. Each generated `HTTPRoute` must report `Accepted=True` and `ResolvedRefs=True`. A stale condition does not prove routing.
 

@@ -6,7 +6,7 @@ Declare Bedrock, Azure AI, Google Vertex, OpenRouter, or an OpenAI-compatible en
 
 ## Grounded design
 
-Confluent's [connector examples](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/connectors) separate a common resource contract from connector-specific configuration. Kamiwaza keeps the same boundary: tenant intent selects a named provider profile and local Secret reference, while administrator policy owns the typed adapter, destination class, endpoint, and provider settings. Hosted models create no local Pod, PVC, or accelerator request.
+Tenant intent selects a named provider profile and local Secret reference. Administrator policy owns the typed adapter, destination class, endpoint, and provider settings. Hosted models create no local Pod, PVC, or accelerator request.
 
 ## Provider lanes
 

@@ -6,12 +6,12 @@ Introduce one declarative fault at a time. Diagnose from API validation, root co
 
 ## Grounded design
 
-Confluent's [CFK troubleshooting guide](https://docs.confluent.io/operator/current/co-troubleshooting.html) starts with custom-resource status, Kubernetes resources, Events, and logs. Kamiwaza keeps that evidence order but uses capability-specific conditions, observed generations, upstream Kubernetes reasons, and explicit terminal or transient classification. Product-specific imperative recovery commands are unnecessary.
+Diagnosis starts with custom-resource status, Kubernetes resources, Events, and logs. Conditions include observed generations, upstream Kubernetes reasons, and explicit terminal or transient classification.
 
 ## Prerequisites
 
 - Fresh disposable namespace for each case.
-- Operator installed from `operator-values.yaml`.
+- Shared manager installed through the [operator quickstart](../quickstart/) with this scenario's `operator-values.yaml`.
 - Existing platform Secrets named by `base/platform.yaml`, `provider-credential`, `enterprise-oidc-client`, `failure-client`, `kamiwaza-gateway-tls`, `malformed-provider-gateway-tls`, and `malformed-provider-tls`. The gateway certificate covers `malformed-provider.failure.example.invalid`; the backend certificate covers the Service DNS SAN. Create administrator trust ConfigMap `malformed-provider-trust` with the matching CA certificate under `ca.crt`.
 - StorageClass `example-rwo`, public DNS for both failure hostnames, a conformant Gateway API controller with `BackendTLSPolicy` support, and a real class substituted for `replace-with-conformant-class`.
 - OIDC failure case requires `idp-failure.example.invalid` to be deliberately unavailable through the approved destination class.

@@ -48,7 +48,7 @@ kubectl kustomize cluster-west
 
 ## Apply after operator support exists
 
-Merge each policy fragment into that cluster's operator values and restart only that operator installation. Create the existing `federation-check-token` Secret in each namespace from a short-lived token for a principal with the documented remote grant; do not commit the token.
+Merge each policy fragment into the corresponding cluster's [shared operator installation](../../operator/quickstart/) and update that release through the chart upgrade workflow. Create the existing `federation-check-token` Secret in each namespace from a short-lived token for a principal with the documented remote grant; do not commit the token.
 
 Each `platform.yaml` carries one intentionally non-pullable, provider-neutral image pin only to satisfy the current CRD shape. Replace `spec.images.pinned` with the complete reviewed release inventory and replace `example-rwo` before apply.
 

@@ -6,7 +6,7 @@ Allow one extension to reach one administrator-approved destination class throug
 
 ## Grounded design
 
-Confluent's [networking examples](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/networking) make network infrastructure an explicit prerequisite. Kamiwaza does not install or configure a proxy, mesh, CNI, or DNS policy. Administrator transport policy owns hosts, ports, trust, proxy authority, and conformance evidence. Tenant intent selects only `reviewed-echo`.
+Network infrastructure is an explicit prerequisite. The operator never installs or configures a proxy, mesh, CNI, or DNS policy. Administrator policy owns hosts, ports, trust, proxy authority, and conformance evidence.
 
 ## Prerequisites
 

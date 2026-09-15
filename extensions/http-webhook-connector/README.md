@@ -6,11 +6,11 @@ Receive a signed webhook, queue it durably, deliver it to a bounded receiver, an
 
 ## Grounded design
 
-Confluent's [connector examples](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/connectors) pair a connector declaration with a real source or sink. This example keeps that executable check but moves the component graph into a SHA-256-verified artifact. Tenant intent cannot redefine images, routes, service graphs, storage classes, or platform identity.
+Connector behavior lives in a SHA-256-verified artifact. Tenant intent cannot redefine images, routes, service graphs, storage classes, or platform identity.
 
 ## Prerequisites
 
-- Current extension CRDs and manager, installed with `operator-values.yaml`.
+- Shared manager installed through the [operator quickstart](../../operator/quickstart/) with this scenario's `operator-values.yaml` applied as administrator policy.
 - Dynamic `example-rwo` StorageClass, administrator Gateway for `webhook.example.invalid`, Gateway namespace `gateway-system`, and TLS Secret `kamiwaza-gateway-tls`.
 - Existing Secret `webhook-signing` with key `WEBHOOK_SECRET`; never commit its value.
 - Published trust bundle plus the administrator-owned enforcing proxy and conformance evidence named in values. The operator does not install that proxy.

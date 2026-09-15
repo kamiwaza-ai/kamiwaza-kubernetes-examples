@@ -6,13 +6,13 @@ Send one real tool request through an `Extension`. Its component creates an upst
 
 ## Grounded design
 
-Confluent's [connector examples](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/connectors) keep plugin logic in reviewed images while the operator manages workload lifecycle. Kamiwaza applies that boundary to tools: component graph and request logic live in the digest-verified artifact; `SandboxPool` only projects capacity into the upstream agent-sandbox API.
+Tool logic lives in reviewed images while the operator manages workload lifecycle. The artifact owns request behavior; `SandboxPool` only projects capacity into the upstream sandbox API.
 
 ## Prerequisites
 
 - Administrator-installed upstream agent-sandbox CRDs and controller.
 - Existing `RuntimeClass/gvisor` plus nodes that support it.
-- Operator installed with `operator-values.yaml`; sandbox RBAC overlay enabled only for `kw-tool-sandbox`.
+- Shared manager installed through the [operator quickstart](../../operator/quickstart/) with this scenario's `operator-values.yaml` and sandbox RBAC enabled only for `kw-tool-sandbox`.
 - Reviewed image mirrors for the two pinned images.
 
 The operator must not install or configure the upstream controller, RuntimeClass, node runtime, image mirror, or network implementation.

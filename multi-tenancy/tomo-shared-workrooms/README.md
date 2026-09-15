@@ -8,16 +8,17 @@ The current catalog identifier is `kaizen`; the displayed product name may be To
 
 ## Architecture
 
-- One `KamiwazaPlatform` provides authentication, ReBAC, the model catalog, and model serving.
+- One `KamiwazaPlatform` provides authentication, ReBAC, and shared platform capabilities.
+- Independent `ModelDeployment` resources publish serving inventory.
 - One catalog-deployed Tomo application serves all authorized users.
-- Tenant identity comes from the authenticated `tenant_id` and `tenant` claims.
+- Tenant identity comes from authenticated `tenant_id` and `tenant` claims.
 - Workroom membership controls shared Tomo resources inside a tenant.
-- Kubernetes contains the real generated `KamiwazaExtension` and subordinate `ModelDeployment` resources; users do not hand-author either object for this workflow.
+- Kubernetes contains the operator-managed `Extension` and `ModelDeployment` resources; users do not manage generated children directly.
 
 ## Prerequisites
 
-1. A Full, auth-enabled platform with ReBAC enabled and community fallback disabled. The [operator quickstart](../../operator/quickstart/) provides this posture.
-2. At least one Ready model published through `KamiwazaPlatform.spec.models`. The quickstart publishes `tinyllama`; production environments should use the release-approved model set.
+1. A Ready platform with ReBAC enabled and community fallback disabled. Start with the [operator quickstart](../../operator/quickstart/), then apply the selected [authentication profile](../../security/authentication/).
+2. At least one Ready `ModelDeployment`. The quickstart intentionally declares none; use a release-approved local or hosted model contract before this workflow.
 3. Tomo present in the application catalog for the selected release.
 4. Three test identities:
    - Tenant A owner
@@ -153,4 +154,4 @@ The evidence must show one healthy main platform, the real Tomo extension Runnin
 
 ## Cleanup
 
-Delete test workrooms, agents, conversations, and files through Tomo first. Remove the Tomo catalog deployment through App Garden only when no other user depends on it. Let the extension finalizer complete; do not delete generated Deployments, PVCs, or the `KamiwazaExtension` directly as a shortcut.
+Delete test workrooms, agents, conversations, and files through Tomo first. Remove the Tomo catalog deployment through App Garden only when no other user depends on it. Let the extension finalizer complete; do not delete generated Deployments, PVCs, or the `Extension` directly as a shortcut.

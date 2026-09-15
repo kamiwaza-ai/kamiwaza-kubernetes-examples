@@ -6,7 +6,7 @@ Enable the provider-neutral Metadata Catalog capability, ingest one deterministi
 
 ## Grounded design
 
-Confluent's [complete platform examples](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/quickstart-deploy/kraft-quickstart) make optional subsystems explicit in desired state. Kamiwaza exposes only `components.metadataCatalog.enabled`. Administrator policy selects the reviewed implementation. Provider products, event transport, search store, relational store, and lifecycle jobs stay internal and replaceable.
+Optional subsystems remain explicit in desired state. `components.metadataCatalog.enabled` selects the capability; administrator policy chooses its reviewed implementation and keeps provider products and lifecycle jobs internal.
 
 The default adapter uses the reviewed search-backed graph. No Neo4j workload, PVC, Secret, permission, route, field, status identity, or migration object belongs in this scenario.
 
@@ -15,7 +15,7 @@ The default adapter uses the reviewed search-backed graph. No Neo4j workload, PV
 - StorageClass `example-rwo` and existing platform credential Secrets named in `base/platform.yaml`.
 - Existing `catalog-client` bearer-token Secret for the check Jobs.
 - Gateway certificate Secret `kamiwaza-gateway-tls`.
-- Operator installed with `operator-values.yaml`.
+- Shared manager installed through the [operator quickstart](../quickstart/) with this scenario's `operator-values.yaml`.
 
 Replace `catalog.example.invalid` and all environment-specific names. Runtime entities, lineage, identities, and grants are application data. Do not model them as Kubernetes custom resources.
 

@@ -6,7 +6,7 @@ Run one immutable SmolLM2 artifact through the same `ModelDeployment` API on CPU
 
 ## Grounded design
 
-Confluent's [pod scheduling examples](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/scheduling/pod-scheduling) make hardware and placement choices explicit. Kamiwaza keeps native extended-resource names and improves lifecycle ownership: a persistent `ModelDeployment` is the sole model intent, immutable artifact identity is checked before start, and missing hardware stays an actionable scheduling condition instead of triggering a controller-side fallback. Tenant intent cannot inject a Pod template, image, command, or unreviewed artifact endpoint.
+`ModelDeployment` is the sole model intent. It uses native extended resources, verifies immutable artifact identity before start, and reports missing hardware instead of selecting an undeclared fallback.
 
 ## Choose one lane
 

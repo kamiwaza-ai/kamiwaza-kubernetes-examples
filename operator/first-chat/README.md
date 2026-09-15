@@ -6,7 +6,7 @@ Create one fresh platform and one small local `ModelDeployment`, then prove one 
 
 ## Grounded design
 
-Confluent's [KRaft quickstart](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/quickstart-deploy/kraft-quickstart) uses one scenario directory, ordered apply steps, and a real producer/consumer check. This example keeps that executable shape. Kamiwaza improves authority boundaries: administrator policy owns namespace, registry, trust, Gateway, artifact source, and digest-pinned runtime image choices; tenant YAML owns platform and typed model intent; the operator continuously reconciles both.
+One scenario directory contains ordered apply steps and a real chat check. Administrator policy owns namespace, registry, trust, Gateway, artifact source, and runtime images; tenant YAML owns typed platform and model intent.
 
 ## Prerequisites
 
@@ -16,7 +16,7 @@ Confluent's [KRaft quickstart](https://github.com/confluentinc/confluent-kuberne
 - Existing pull Secrets `registry-pull` and `kamiwaza-registry-credentials` in `kw-first-chat`.
 - Existing Secret `first-chat-client` in `kw-first-chat` with one short-lived bearer token under key `token`. Never commit it.
 
-Install the operator with the reviewed chart and `operator-values.yaml` before applying tenant resources. Replace every example domain and registry endpoint first.
+Reuse the [shared operator installation](../quickstart/) with this scenario's `operator-values.yaml` before applying tenant resources. Replace every example domain and registry endpoint first.
 
 ## Apply
 

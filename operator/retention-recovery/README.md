@@ -6,14 +6,14 @@ Exercise `RetainData`, `RetainAll`, guarded `DeleteAll`, and same-namespace reco
 
 ## Grounded design
 
-Confluent's [data durability examples](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/data-durability) retain stateful data across custom-resource lifecycle changes. Kamiwaza separates ordinary Kubernetes garbage collection, retained data, independently owned extension and model roots, and explicitly authorized destructive cleanup. No Helm keep annotation, hook state, or manual finalizer removal participates.
+Stateful data survives ordinary lifecycle changes. Kamiwaza separates Kubernetes garbage collection, retained data, independent extension and model roots, and explicitly authorized destructive cleanup.
 
 ## Prerequisites
 
 - Disposable namespace for `DeleteAll`; never use production data.
 - Existing Secrets from `platform.yaml`, `workflow-signing`, and `retention-client` (`token`).
 - StorageClass `example-rwo`, Gateway API front door, certificate Secret `kamiwaza-gateway-tls`, and model-download egress.
-- Operator installed from `operator-values.yaml`.
+- Shared manager installed through the [operator quickstart](../quickstart/) with this scenario's `operator-values.yaml`.
 
 ## Establish proof data
 

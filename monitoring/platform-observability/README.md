@@ -6,11 +6,11 @@ Send platform OTLP logs, metrics, and traces to one administrator-approved sink 
 
 ## Grounded design
 
-Confluent's [monitoring example](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/monitoring) makes metrics infrastructure an explicit deployment choice. Kamiwaza keeps monitoring external: the operator only resolves a stable `sinkRef`, configures reviewed workloads, and reports the capability. It never installs, upgrades, credentials, or deletes a production collector or dashboard service.
+Monitoring remains external. The operator resolves a stable `sinkRef`, configures reviewed workloads, and reports the capability. It never installs, upgrades, credentials, or deletes a production collector or dashboard service.
 
 ## Prerequisites and apply
 
-Replace `example-rwo` and `observability.example.invalid`. Install the operator with `operator-values.yaml`. That policy allows `External` mode and approves `scenario-collector`; tenant intent only selects the name.
+Replace `example-rwo` and `observability.example.invalid`. Reuse the [shared operator installation](../../operator/quickstart/) with this scenario's `operator-values.yaml`; it allows `External` mode and approves `scenario-collector`.
 
 ```bash
 kubectl diff --server-side --field-manager=platform-operator-user -k .

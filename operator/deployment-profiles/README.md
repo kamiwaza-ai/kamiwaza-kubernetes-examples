@@ -6,7 +6,7 @@ Compare three complete desired states for one organization. Directory names are 
 
 ## Grounded design
 
-Confluent's [blueprints](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/blueprints) group deployable postures as reviewable manifests. Kamiwaza keeps each tenant resource small and moves infrastructure trust, routing, registries, image policy, namespace scope, destructive actions, and external telemetry approval into immutable administrator values. No shell condition chooses a posture at runtime.
+Each posture is a reviewable manifest. Tenant intent stays small; immutable administrator values own infrastructure trust, routing, registries, image policy, namespace scope, destructive actions, and external telemetry approval.
 
 ## Comparison
 
@@ -32,7 +32,7 @@ Treat that as a failed profile-isolation requirement. Do not compensate with sep
 
 ## Apply and verify
 
-Replace domains, storage classes, registry references, existing Secret objects, and the external telemetry endpoint. Then install the operator with `operator-values.yaml` and apply exactly one complete entry point:
+Replace domains, storage classes, registry references, existing Secret objects, and the external telemetry endpoint. Reuse the [shared operator installation](../quickstart/) with `operator-values.yaml`, then apply exactly one complete entry point:
 
 ```bash
 PROFILE=production

@@ -6,13 +6,13 @@ Declare a production-shaped platform with immutable images, existing Secret refe
 
 ## Grounded design
 
-Confluent's [production secure deployment](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/security/production-secure-deploy-auto-gen-certs) demonstrates an end-to-end secure topology. That example also stores sample credentials and private CA material beside manifests. Kamiwaza keeps the end-to-end contract but improves ownership: this directory contains no credential or certificate value, platform owners can only select administrator-approved profiles, and the operator issues workload identities without an admission webhook, node agent, or routing-provider dependency.
+This end-to-end security contract contains no credential or certificate value. Platform owners select only administrator-approved profiles, and the operator issues or references short-lived identities without exposing key material.
 
 ## Prerequisites
 
 Replace all `example.invalid` values and `example-rwo`. Provide every exact-name Secret referenced by `platform.yaml`, plus `registry-pull` and `kamiwaza-registry-credentials`, through your secret-management system. Install a conformant Gateway API implementation and the administrator-owned Gateway named by policy. Configure the real TLS-protected `production-otel` sink. Nodes must carry `topology.kubernetes.io/zone`.
 
-Install the reviewed operator chart with `operator-values.yaml`. Keep administrator values in a separately protected source; tenant users receive only namespaced CR permissions.
+Reuse the [shared operator installation](../quickstart/) with this scenario's `operator-values.yaml`. Keep administrator values in a separately protected source; tenant users receive only namespaced custom-resource permissions.
 
 ## Apply and observe
 

@@ -1,6 +1,6 @@
 # Kamiwaza Kubernetes examples
 
-Scenario workflows for running **[Kamiwaza](https://kamiwaza.ai)** on Kubernetes with the Kamiwaza Platform Operator or the supported Kamiwaza Deploy Helmfile lifecycle. Each use case has explicit prerequisites, ordered steps, manifests, and verification.
+Scenario workflows for running **[Kamiwaza](https://kamiwaza.ai)** on Kubernetes through the Kamiwaza Platform Operator. Each use case defines prerequisites, ordered steps, manifests, and verification.
 
 **These examples do not define release support.** Use the versions, image digests, compatibility artifact, and security requirements shipped with your Kamiwaza release. Lab defaults must be replaced before production use.
 
@@ -13,35 +13,30 @@ Scenario workflows for running **[Kamiwaza](https://kamiwaza.ai)** on Kubernetes
 
 ---
 
-## Prerequisites (typical workflow)
+## Prerequisites
 
 Assumed for most scenarios unless stated otherwise:
 
-| Requirement          | Notes                                                                                                               |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Kubernetes cluster   | Use a version supported by the selected lifecycle. The current operator chart accepts `1.34` through `1.36`.        |
-| `kubectl`            | Configured for an explicitly reviewed cluster context.                                                              |
-| Helm 3               | Installs the operator chart and supports existing Deploy Helmfile scenarios.                                        |
-| Kustomize            | Available through `kubectl apply -k` for Kustomize scenarios.                                                       |
-| Namespace `kamiwaza` | Created by the cluster administrator or the selected legacy workflow. The operator never creates target namespaces. |
+| Requirement        | Notes                                                                                                      |
+| ------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Kubernetes cluster | Use a version supported by the selected operator release. The current chart accepts `1.34` through `1.36`. |
+| `kubectl`          | Configure it for an explicitly reviewed cluster context.                                                   |
+| Helm 3             | Required only for the canonical operator installation and operator upgrades.                               |
+| Kustomize          | Available through `kubectl apply -k` for scenario resources.                                               |
 
-Operator examples also require a signed, version-pinned chart or a reviewed
-local chart checkout. Existing Helmfile deployments remain Helmfile-managed
-until the explicit operator adoption workflow completes.
+Install the shared manager once through the
+[operator quickstart](operator/quickstart/#4-install-the-shared-manager).
+Every other scenario reuses that release and identifies any administrator
+policy that must be applied before its namespaced resources.
 
-```bash
-kubectl create namespace kamiwaza --dry-run=client -o yaml | kubectl apply -f -
-kubectl config set-context --current --namespace=kamiwaza
-```
-
-**Clone this repository** (standalone or next to Deploy):
+**Clone this repository:**
 
 ```bash
 git clone <YOUR_GIT_REMOTE>/kamiwaza-kubernetes-examples.git
 cd kamiwaza-kubernetes-examples
 ```
 
-Use your organization’s fork or this copy when vendored inside the Deploy monorepo.
+Use your organization’s fork when changes require separate review.
 
 ---
 
@@ -50,7 +45,6 @@ Use your organization’s fork or this copy when vendored inside the Deploy mono
 Category indexes:
 
 - **Platform operator:** [operator/README.md](operator/README.md)
-- **Deployment:** [deployment/README.md](deployment/README.md)
 - **Federation:** [federation/README.md](federation/README.md)
 - **Multi-tenancy:** [multi-tenancy/README.md](multi-tenancy/README.md)
 - **Monitoring:** [monitoring/README.md](monitoring/README.md)
@@ -80,8 +74,6 @@ Category indexes:
 | MCP federation                                         | [protocols/mcp-federation](protocols/mcp-federation)                                                                                   | #protocols #mcp #tools #authorization                       |
 | A2A connectivity                                       | [protocols/a2a-connectivity](protocols/a2a-connectivity)                                                                               | #protocols #a2a #agents #tasks                              |
 | Tomo shared-workroom tenant isolation                  | [multi-tenancy/tomo-shared-workrooms](multi-tenancy/tomo-shared-workrooms)                                                             | #multi-tenancy #tomo #rebac #models                         |
-| Environment profile matrix (lite/full/dev/dev-full)    | [deployment/env-profile-matrix](deployment/env-profile-matrix)                                                                         | #deployment #topology #helmfile                             |
-| Offline bundle download (Keygen)                       | [deployment/offline-bundle-download](deployment/offline-bundle-download)                                                               | #deployment #offline #bundle #keygen                        |
 | Grafana + Prometheus monitoring                        | [monitoring/grafana-prometheus](monitoring/grafana-prometheus)                                                                         | #monitoring #prometheus #grafana #loki                      |
 | Service access patterns                                | [networking/external-access](networking/external-access)                                                                               | #networking #port-forward #ingress                          |
 | Backup and restore                                     | [operations/backup-restore](operations/backup-restore)                                                                                 | #operations #backup #postgres #etcd                         |
@@ -106,8 +98,7 @@ Category indexes:
 
 - **One scenario = one directory** with a `README.md` (goal, prerequisites, steps, verification).
 - **Kustomize** for ConfigMaps built from files (keeps large blobs out of hand-edited YAML).
-- **Optional values snippets** (`*-snippet.yaml`) to merge into Deploy `cluster/values/overrides.yaml` rather than forking charts.
-- **Lab defaults** clearly labeled: demo passwords, `*.kamiwaza.test`, `dc=kamiwaza,dc=local` (aligned with stock Kind / Kamiwaza Deploy dev install).
+- **Lab defaults** are clearly labeled and must be replaced before use outside a disposable cluster.
 - **Helm releases** are version-pinned; local chart examples require a commit-pinned checkout. Render or lint values before install, use atomic installs, and follow the release CRD-upgrade procedure because Helm does not upgrade or delete CRDs.
 - **Kubernetes resources** use `kubectl diff` before server-side apply with an explicit field manager. Do not force field conflicts outside a reviewed adoption transfer.
 - **Secrets stay out of Git, custom resources, command output, and status.** Examples create only Secret references or interactive lab inputs.
@@ -122,5 +113,4 @@ Add a subdirectory with `README.md` plus manifests or scripts. Prefer small, com
 
 **Lint and format** ([pre-commit](https://pre-commit.com)):
 
-- **Inside the Deploy repo** (git root = deploy): `make pre-commit-install` then hooks run on commit for paths under `kamiwaza-kubernetes-examples/`; `make lint-pre-commit` runs all hooks once.
-- **Standalone clone** (git root = this tree): `pre-commit install` from the repository root, then `pre-commit run --all-files`.
+- Run `pre-commit install` from the repository root, then `pre-commit run --all-files`.

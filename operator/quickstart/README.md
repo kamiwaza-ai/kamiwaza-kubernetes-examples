@@ -104,6 +104,15 @@ For a local chart directory, run `helm lint "${OPERATOR_CHART}" --values operato
 
 The platform user applies the same namespaced resource regardless of manager placement. Preview the server-side apply before changing live state:
 
+`--field-manager=platform-operator-user` gives this apply workflow a stable
+Server-Side Apply ownership name. The API server records its fields in
+`metadata.managedFields` and reports conflicts when another manager owns a
+changed field.
+
+The name grants no identity, authentication, or RBAC permission, and it does
+not configure the operator. Keep it stable for the same owner. Use
+`--force-conflicts` only during an explicitly reviewed ownership transfer.
+
 ```bash
 kubectl diff --server-side \
   --field-manager=platform-operator-user \
@@ -114,7 +123,7 @@ kubectl apply --server-side \
   -f kamiwaza-platform.local.yaml
 ```
 
-This platform declares no model, and there is no field on the resource for one. `ModelDeployment` in `serving.kamiwaza.io` is the only surface that deploys a served model, and the platform CRD carries no model intent by design so that declaring a platform cannot deploy a model by default. A `ModelDeployment` also carries an engine-authored Pod template, which the application writes when a model is deployed through it, so this quickstart applies none by hand: a template that has never served a request would be a guess rather than an example. Image pulls still require the registries and outbound access approved for the cluster.
+This platform declares no model. `ModelDeployment` is the only served-model surface and carries typed engine, artifact, storage, resource, replica, and accelerator intent—not a Pod template. This quickstart applies no model; the local and hosted model scenarios cover that independent lifecycle.
 
 ## 6. Observe convergence
 

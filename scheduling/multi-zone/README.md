@@ -6,7 +6,7 @@ Require three standard Kubernetes failure domains for platform workloads and app
 
 ## Grounded design
 
-Confluent's [pod-scheduling examples](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/scheduling/pod-scheduling) expose native Kubernetes placement and PodDisruptionBudget controls. Kamiwaza keeps that strong boundary but applies it to durable capabilities and explicit `KamiwazaNodePool` capacity. The operator reports unsatisfied placement; it never rewrites constraints, node labels, PVC ownership, or node names.
+Native topology and disruption APIs express placement. The operator applies them to durable capabilities and `KamiwazaNodePool` capacity, reports unsatisfied constraints, and never rewrites labels, PVC ownership, or node names.
 
 ## Prerequisites
 

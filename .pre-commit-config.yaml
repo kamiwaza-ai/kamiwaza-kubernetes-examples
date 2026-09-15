@@ -22,17 +22,17 @@ repos:
     rev: v6.0.0
     hooks:
       - id: end-of-file-fixer
-        files: ^(kamiwaza-kubernetes-examples/)?(README\.md|security/|operator/|multi-tenancy/|deployment/|networking/|federation/|protocols/|extensions/|models/|monitoring/|scheduling/)
+        files: ^(kamiwaza-kubernetes-examples/)?(README\.md|security/|operator/|multi-tenancy/|networking/|federation/|protocols/|extensions/|models/|monitoring/|scheduling/)
       - id: trailing-whitespace
         exclude_types: [markdown]
-        files: ^(kamiwaza-kubernetes-examples/)?(README\.md|security/|operator/|multi-tenancy/|deployment/|networking/|federation/|protocols/|extensions/|models/|monitoring/|scheduling/)
+        files: ^(kamiwaza-kubernetes-examples/)?(README\.md|security/|operator/|multi-tenancy/|networking/|federation/|protocols/|extensions/|models/|monitoring/|scheduling/)
       - id: mixed-line-ending
         args: [--fix=lf]
-        files: ^(kamiwaza-kubernetes-examples/)?(README\.md|security/|operator/|multi-tenancy/|deployment/|networking/|federation/|protocols/|extensions/|models/|monitoring/|scheduling/)
+        files: ^(kamiwaza-kubernetes-examples/)?(README\.md|security/|operator/|multi-tenancy/|networking/|federation/|protocols/|extensions/|models/|monitoring/|scheduling/)
       - id: check-merge-conflict
-        files: ^(kamiwaza-kubernetes-examples/)?(README\.md|security/|operator/|multi-tenancy/|deployment/|networking/|federation/|protocols/|extensions/|models/|monitoring/|scheduling/)
+        files: ^(kamiwaza-kubernetes-examples/)?(README\.md|security/|operator/|multi-tenancy/|networking/|federation/|protocols/|extensions/|models/|monitoring/|scheduling/)
       - id: detect-private-key
-        files: ^(kamiwaza-kubernetes-examples/)?(security|operator|multi-tenancy|deployment|networking|federation|protocols|extensions|models|monitoring|scheduling)/
+        files: ^(kamiwaza-kubernetes-examples/)?(security|operator|multi-tenancy|networking|federation|protocols|extensions|models|monitoring|scheduling)/
         # The tls-trust example deliberately ships a FAKE, throwaway demo PKI
         # (root+intermediate+leaf keys) so its manifests apply with zero local
         # generation. This material is regenerable via demo-pki/generate.sh and
@@ -41,10 +41,10 @@ repos:
         exclude: ^(kamiwaza-kubernetes-examples/)?security/tls-trust/demo-pki/
       - id: check-added-large-files
         args: [--maxkb=800]
-        files: ^(kamiwaza-kubernetes-examples/)?(security|operator|multi-tenancy|deployment|networking|federation|protocols|extensions|models|monitoring|scheduling)/
+        files: ^(kamiwaza-kubernetes-examples/)?(security|operator|multi-tenancy|networking|federation|protocols|extensions|models|monitoring|scheduling)/
       - id: check-yaml
         args: [--allow-multiple-documents]
-        files: ^(kamiwaza-kubernetes-examples/)?(security|operator|multi-tenancy|deployment|networking|federation|protocols|extensions|models|monitoring|scheduling)/.*\.ya?ml$
+        files: ^(kamiwaza-kubernetes-examples/)?(security|operator|multi-tenancy|networking|federation|protocols|extensions|models|monitoring|scheduling)/.*\.ya?ml$
 
   - repo: local
     hooks:
@@ -62,25 +62,25 @@ repos:
             exec yamllint -c "$CFG" "$@"
           - bash
         types: [yaml]
-        files: ^(kamiwaza-kubernetes-examples/)?(security|operator|multi-tenancy|deployment|networking|federation|protocols|extensions|models|monitoring|scheduling)/.*\.ya?ml$
+        files: ^(kamiwaza-kubernetes-examples/)?(security|operator|multi-tenancy|networking|federation|protocols|extensions|models|monitoring|scheduling)/.*\.ya?ml$
 
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v3.1.0
     hooks:
       - id: prettier
         types_or: [yaml, markdown]
-        files: ^(kamiwaza-kubernetes-examples/)?(README\.md|security/|operator/|multi-tenancy/|deployment/|networking/|federation/|protocols/|extensions/|models/|monitoring/|scheduling/)
+        files: ^(kamiwaza-kubernetes-examples/)?(README\.md|security/|operator/|multi-tenancy/|networking/|federation/|protocols|extensions|models|monitoring|scheduling/)
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
         args: [-e, SC1091, -S, error]
-        files: ^(kamiwaza-kubernetes-examples/)?(security|operator|multi-tenancy|deployment|networking|federation|protocols|extensions|models|monitoring|scheduling)/.*\.sh$
+        files: ^(kamiwaza-kubernetes-examples/)?(security|operator|multi-tenancy|networking|federation|protocols|extensions|models|monitoring|scheduling)/.*\.sh$
 
   - repo: https://github.com/scop/pre-commit-shfmt
     rev: v3.9.0-1
     hooks:
       - id: shfmt
         args: [-w, -s, -i, "2"]
-        files: ^(kamiwaza-kubernetes-examples/)?(security|operator|multi-tenancy|deployment|networking|federation|protocols|extensions|models|monitoring|scheduling)/.*\.sh$
+        files: ^(kamiwaza-kubernetes-examples/)?(security|operator|multi-tenancy|networking|federation|protocols|extensions|models|monitoring|scheduling)/.*\.sh$

@@ -16,25 +16,15 @@ Choose where the shared manager runs and which namespaces it can watch. Placemen
 
 Watch scope is only half of the decision. Where the trust distribution is published, and which workload identities are accepted, is transport policy, and it has to agree with the scope chosen here: a namespace the manager can see but the policy does not name gets no distribution, and a `BackendTLSPolicy` authority reference is namespace-local so it cannot borrow another namespace's copy. The paired transport policy for each scope is in [transport-scopes](../transport-scopes/).
 
-Pin `OPERATOR_CHART_VERSION` for a repository or OCI chart reference. For a
-reviewed local chart directory, record the checkout commit and omit
-`--version`. Render the selected values with `helm template` before install.
-
-Set `OPERATOR_IMAGE_DIGEST` to the release-published `sha256:` digest. Every
-install below passes it with `--set-string image.digest`.
+Use the [canonical operator installation](../quickstart/#4-install-the-shared-manager)
+with exactly one values file below. On an existing release, apply the selected
+scope through the [chart upgrade workflow](../chart-upgrades/) and wait for the
+manager rollout. Never install a second manager to change watch scope.
 
 ## Same-namespace manager
 
-```bash
-helm upgrade --install kamiwaza-platform-operator "${OPERATOR_CHART}" \
-  --namespace kamiwaza-examples \
-  --create-namespace \
-  --version "${OPERATOR_CHART_VERSION}" \
-  --values same-namespace-values.yaml \
-  --set-string image.digest="${OPERATOR_IMAGE_DIGEST}" \
-  --atomic \
-  --timeout=10m
-```
+Select `same-namespace-values.yaml` during the canonical installation or a
+reviewed chart upgrade.
 
 Platform namespace users who can modify Deployments, ServiceAccounts, Roles, RoleBindings, ConfigMaps, or Leases may also be able to alter manager authority. Use separate placement when tenant users must not administer the operator.
 
@@ -45,16 +35,10 @@ The cluster administrator creates every target namespace first:
 ```bash
 kubectl create namespace kamiwaza-examples --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace kamiwaza-examples-tenant --dry-run=client -o yaml | kubectl apply -f -
-
-helm upgrade --install kamiwaza-platform-operator "${OPERATOR_CHART}" \
-  --namespace kamiwaza-examples-system \
-  --create-namespace \
-  --version "${OPERATOR_CHART_VERSION}" \
-  --values bounded-values.yaml \
-  --set-string image.digest="${OPERATOR_IMAGE_DIGEST}" \
-  --atomic \
-  --timeout=10m
 ```
+
+Update the shared release with `bounded-values.yaml` through the chart upgrade
+workflow.
 
 The chart creates one RoleBinding in each watched namespace. The manager has no wildcard or cluster-scoped target permissions in this mode.
 
@@ -62,16 +46,8 @@ The chart creates one RoleBinding in each watched namespace. The manager has no 
 
 Use only after reviewing the expanded read authority:
 
-```bash
-helm upgrade --install kamiwaza-platform-operator "${OPERATOR_CHART}" \
-  --namespace kamiwaza-examples-system \
-  --create-namespace \
-  --version "${OPERATOR_CHART_VERSION}" \
-  --values all-namespaces-values.yaml \
-  --set-string image.digest="${OPERATOR_IMAGE_DIGEST}" \
-  --atomic \
-  --timeout=10m
-```
+Update the shared release with `all-namespaces-values.yaml` through the chart
+upgrade workflow.
 
 This mode uses a cluster-wide cache and a non-sensitive ClusterRole. Secret mutation remains namespaced and limited to approved targets. It is not a fallback for a missing RoleBinding in bounded mode.
 

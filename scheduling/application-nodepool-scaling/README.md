@@ -6,7 +6,7 @@ Set baseline application API capacity with `spec.replicas`, then let a Kubernete
 
 ## Grounded design
 
-Confluent's [pod scheduling examples](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/scheduling/pod-scheduling) keep workload placement in Kubernetes APIs. Kamiwaza also makes capacity a first-class namespaced resource. Native HPA owns replica demand; the operator only projects desired and observed scale. This avoids a second autoscaling controller inside the platform operator.
+Workload placement stays in Kubernetes APIs, and capacity is a namespaced resource. Native HPA owns replica demand; the operator projects desired and observed scale instead of implementing another autoscaler.
 
 ## Prerequisites
 
@@ -16,7 +16,7 @@ Confluent's [pod scheduling examples](https://github.com/confluentinc/confluent-
 
 ## Baseline and apply
 
-Install the operator with `operator-values.yaml`, replace `example-rwo` and `scale.example.invalid`, then apply:
+Reuse the [shared operator installation](../../operator/quickstart/) with this scenario's `operator-values.yaml`. Replace `example-rwo` and `scale.example.invalid`, then apply:
 
 ```bash
 kubectl apply --server-side --field-manager=platform-operator-user -k .

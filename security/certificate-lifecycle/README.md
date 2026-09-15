@@ -6,7 +6,7 @@ Validate three certificate authorities without moving ownership between them: pl
 
 ## Grounded design
 
-Confluent's [cert-manager example](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/security/using-cert-manager) demonstrates external certificate-controller integration. Kamiwaza keeps that option but does not make it mandatory. One administrator policy selects one authority. Tenant intent cannot choose an issuer, subject, SAN, key algorithm, or Secret name.
+External certificate controllers remain optional. One administrator policy selects one authority; tenant intent cannot choose an issuer, subject, SAN, key algorithm, or Secret name.
 
 ## Ownership matrix
 
@@ -16,15 +16,12 @@ Confluent's [cert-manager example](https://github.com/confluentinc/confluent-kub
 | `ControllerIssued`      | operator creates namespaced intent | approved external controller | controller-owned Secret     | operator observes and publishes  | controller/issuer policy          |
 | `AdministratorSupplied` | administrator                      | administrator PKI            | exact administrator Secrets | operator validates and publishes | administrator only                |
 
-Each `variants/*` directory is independent and carries its own `operator-values.yaml`. Choose one before installing the operator. Never combine modes. Replace `example-rwo` and `example.invalid`. Never commit private keys, certificate payloads, passwords, private endpoints, generated Secrets, or exported Kubernetes objects containing `data`.
+Each `variants/*` directory is independent. Use one values file with the [shared operator installation](../../operator/quickstart/#4-install-the-shared-manager), or update that release through the chart upgrade workflow. Never combine modes or install another manager. Replace `example-rwo` and `example.invalid`. Never commit private keys, certificate payloads, passwords, private endpoints, generated Secrets, or exported Kubernetes objects containing `data`.
 
 ## Apply and verify
 
 ```bash
 MODE=platform-issued
-helm upgrade --install kamiwaza-platform-operator ../../charts/kamiwaza-platform-operator \
-  --namespace kamiwaza-platform-system --create-namespace \
-  --values variants/${MODE}/operator-values.yaml
 kubectl apply --server-side --field-manager=platform-operator-user -k variants/${MODE}
 kubectl -n kw-cert-platform wait --for=condition=Ready kamiwazaplatform/kamiwaza --timeout=30m
 kubectl -n kw-cert-platform logs job/certificate-check

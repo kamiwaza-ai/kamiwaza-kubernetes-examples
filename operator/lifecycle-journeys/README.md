@@ -6,13 +6,13 @@ Validate revision-bound adoption and the sole published forward upgrade into pla
 
 ## Grounded design
 
-Confluent documents [CFK upgrades](https://docs.confluent.io/operator/current/co-upgrade.html) as reviewed changes to operator and component versions, with health checks before and after each boundary. Kamiwaza adds a fail-closed compatibility matrix, immutable administrator target approval, read-only adoption Preview, revision-bound Explicit transfer, Kubernetes Jobs for migrations, and public transition conditions. Chart history never becomes runtime state.
+Upgrades are reviewed changes with health checks before and after each boundary. Kamiwaza adds a compatibility matrix, target approval, adoption preview, revision-bound transfer, deterministic migration Jobs, and public conditions.
 
 ## Adoption fixture
 
 `adoption/` is a small ownership-contract fixture, not a replacement for full source-release conformance. It reproduces the supported `1.1.0` request selector and retirement tombstone boundary at source revision `0bd9c641fbf990e347dc7b875db7b5425aa51ec7`. Full release certification must use an installation produced by that exact source revision.
 
-Install operator with `adoption/operator-values.yaml`. Apply fixture with its source field manager, then prove service before platform intent:
+Reuse the [shared operator installation](../quickstart/) with `adoption/operator-values.yaml`. Apply the fixture with its source field manager, then prove service before platform intent:
 
 ```bash
 kubectl apply --server-side --field-manager=legacy-helmfile -k adoption
