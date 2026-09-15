@@ -10,6 +10,8 @@ The commands use `kamiwaza-examples` so a rehearsal cannot target a default
 `kamiwaza` installation accidentally. Replace it only after selecting and
 recording the reviewed source namespace.
 
+This scenario does not start from the operator quickstart. Do not enable adoption or apply the patch to a platform that the operator already owns. Without a qualifying Helmfile-managed `1.1.0` source, validate only the patch shape with `--dry-run=server`; there is no real handoff to perform.
+
 ## Safety boundary
 
 Preview is read-only. Explicit transfer requires all of these controls:
