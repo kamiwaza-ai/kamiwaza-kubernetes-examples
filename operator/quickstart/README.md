@@ -152,4 +152,8 @@ Use the [deletion and retention](../deletion/) workflow. Do not uninstall the op
 | [kamiwaza-platform.yaml](kamiwaza-platform.yaml) | `kubectl apply --dry-run=server --validate=strict`, with the namespace substituted for one that exists on the validating cluster — accepted. The previous version of this file was rejected by the same command as `unknown field "spec.auth", unknown field "spec.dependencies.istio", unknown field "spec.images.pullSecrets", unknown field "spec.images.requireDigests", unknown field "spec.models", unknown field "spec.topology"`, which is why it was rewritten. |
 | [operator-values.yaml](operator-values.yaml)     | `helm template` against the operator chart — renders. The policy document it produces was then loaded through the manager's own policy loader, including its cross-reference rules — accepted, with the pull-secret name and the three approved repository prefixes present. The control, the same document with `requireDigests: false`, was refused as `managed images must require digests`.                                                                          |
 
-Every digest in `kamiwaza-platform.yaml` is copied from the operator release's own reviewed-image record. Replace them with the digests your release publishes, and never with tags.
+Every digest in `kamiwaza-platform.yaml` is copied from the operator release's
+own reviewed-image record. Before applying the example, use the
+[reviewed image inventory workflow](../reviewed-image-inventory/) to replace
+the complete pin set from your signed release metadata. Never substitute tags
+or hand-edit one digest without the related release roles.
