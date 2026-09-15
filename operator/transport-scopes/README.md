@@ -1,6 +1,6 @@
 # Transport under a strict and a relaxed scope
 
-**Scenario:** the same transport contract on two installations that differ only in how much the manager may see — one namespace, or the whole cluster. Namespace scope and transport policy are separate decisions that have to agree, and this directory is where they meet.
+**Scenario:** the same transport contract on two installations that differ only in how much the manager may see: one namespace or two explicitly approved namespaces. Namespace scope and transport policy are separate decisions that have to agree, and this directory is where they meet.
 
 **Tags:** #operator #transport #namespaces #rbac #trust-distribution
 
@@ -39,9 +39,39 @@ The signer's objects are qualified by the platform's namespace and name — `kam
 
 | File                                                                             | Purpose                                                                    |
 | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| [strict-single-namespace-transport.yaml](strict-single-namespace-transport.yaml) | transport policy for one watched namespace, publishing into exactly it     |
-| [relaxed-manager-scope-transport.yaml](relaxed-manager-scope-transport.yaml)     | transport policy for a separately placed manager with two approved targets |
+| [strict-single-namespace-transport.yaml](strict-single-namespace-transport.yaml) | Helm values for one watched namespace, publishing into exactly it          |
+| [relaxed-manager-scope-transport.yaml](relaxed-manager-scope-transport.yaml)     | Helm values for a separately placed manager with two approved targets      |
 | [scope-conflict-refused-values.yaml](scope-conflict-refused-values.yaml)         | refused on purpose, by the chart's own gate: both scopes asked for at once |
+
+## Apply one scope
+
+Complete the [fresh install](../fresh-install/) first. Keep its image, storage,
+registry, and profile values. Then apply one namespace policy and its matching
+transport policy:
+
+```bash
+export OPERATOR_CHART=../../kamiwaza-platform-operator/charts/kamiwaza-platform-operator
+
+# Strict: manager and platform share one watched namespace.
+helm upgrade kamiwaza-platform-operator "${OPERATOR_CHART}" \
+  --namespace kamiwaza-examples-system \
+  --reuse-values \
+  --values operator/namespace-scopes/same-namespace-values.yaml \
+  --values operator/transport-scopes/strict-single-namespace-transport.yaml \
+  --wait --timeout 5m
+
+# Relaxed: separately placed manager watches two approved namespaces.
+helm upgrade kamiwaza-platform-operator "${OPERATOR_CHART}" \
+  --namespace kamiwaza-examples-system \
+  --reuse-values \
+  --values operator/namespace-scopes/bounded-values.yaml \
+  --values operator/transport-scopes/relaxed-manager-scope-transport.yaml \
+  --wait --timeout 5m
+```
+
+Apply only one command for the scope you want. Each command sets one policy
+revision and matching target list. The chart rejects a transport target outside
+the selected watch and mutation boundaries.
 
 ## The refusal
 
@@ -64,37 +94,47 @@ The chart refuses rather than picking one, because either choice would be an aut
 ## Verification
 
 ```bash
-# Which scope the platform believes it is in, and which policy revision said so.
+# Read controller placement, cluster-wide watch, policy revision, and readiness.
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
-  -o jsonpath='{.status.controllerNamespace}{"\t"}{.status.watchAnyNamespace}{"\t"}{.status.adminPolicyRevision}{"\n"}'
+  -o go-template='{{.status.controllerNamespace}}{{"\t"}}{{if .status.watchAnyNamespace}}true{{else}}false{{end}}{{"\t"}}{{.status.adminPolicyRevision}}{{"\t"}}{{range .status.conditions}}{{if eq .type "Ready"}}{{.status}}{{end}}{{end}}{{"\n"}}'
 
-# One distribution per approved namespace, under one name, with the digest and
-# revision that produced it.
+# Strict scope publishes only to `kamiwaza-examples`.
+kubectl -n kamiwaza-examples get configmap kamiwaza-trust-bundle \
+  -o jsonpath='{.metadata.namespace}{"\t"}{.metadata.labels.transport\.kamiwaza\.io/bundle-digest}{"\t"}{.metadata.annotations.transport\.kamiwaza\.io/policy-revision}{"\n"}'
+kubectl -n kamiwaza-examples-tenant get configmap kamiwaza-trust-bundle
+
+# Relaxed scope publishes the same digest and revision to both approved
+# namespaces.
 for namespace in kamiwaza-examples kamiwaza-examples-tenant; do
   kubectl -n "${namespace}" get configmap kamiwaza-trust-bundle \
-    -o jsonpath='{.metadata.namespace}{"\t"}{.metadata.labels.transport\.kamiwaza\.io/bundle-digest}{"\t"}{.metadata.annotations.transport\.kamiwaza\.io/policy-revision}{"\n"}' 2>/dev/null
+    -o jsonpath='{.metadata.namespace}{"\t"}{.metadata.labels.transport\.kamiwaza\.io/bundle-digest}{"\t"}{.metadata.annotations.transport\.kamiwaza\.io/policy-revision}{"\n"}'
 done
 
-# The authority keys are not in a target namespace. Both of these must fail.
+# Target-namespace workloads cannot read either authority key. Both commands
+# must print `no`.
 kubectl auth can-i --as=system:serviceaccount:kamiwaza-examples:default \
-  get secrets -n kamiwaza-security
-kubectl -n kamiwaza-examples get secrets | grep -i authority
+  get secret kamiwaza-kamiwaza-examples-kamiwaza-client-authority \
+  -n kamiwaza-examples-system
+kubectl auth can-i --as=system:serviceaccount:kamiwaza-examples:default \
+  get secret kamiwaza-kamiwaza-examples-kamiwaza-server-authority \
+  -n kamiwaza-examples-system
 
-# The signer lives in the security namespace, named for its platform.
-kubectl -n kamiwaza-security get deployment,service \
-  -l app.kubernetes.io/name=kamiwaza-transport-signer
+# Signer runs in controller namespace and is named for its platform.
+kubectl -n kamiwaza-examples-system get \
+  deployment/kamiwaza-kamiwaza-examples-kamiwaza-transport-signer \
+  service/kamiwaza-kamiwaza-examples-kamiwaza-transport-signer
 ```
 
 ## On an installation that has not migrated
 
-Nothing here changes it. The scope decision already exists on every installation — it is how the manager was installed — and the transport side of it only exists once a `transport` section is merged. An installation with no such section publishes no distribution into any namespace, so there is nothing for the two decisions to disagree about.
+Nothing here changes it. Scope already exists on every installation because manager installation selects it. Transport only exists after the matching Helm values are applied. An installation with no `adminPolicy.transport` publishes no distribution into any namespace.
 
 ## How this example was validated
 
-| File                                     | Validated with                                                                                                                                                                                                                                                         |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `strict-single-namespace-transport.yaml` | The operator's own loader, `adminpolicy.LoadTransportPolicy`, then `Policy.ValidateCrossReferences` — accepted in the Full and regulated profiles. Also `transport-security.schema.yaml` (`jsonschema`, Draft 2020-12) — valid.                                        |
-| `relaxed-manager-scope-transport.yaml`   | Same loader and rules — accepted in both profiles. Same schema — valid.                                                                                                                                                                                                |
-| `scope-conflict-refused-values.yaml`     | `helm template` against the operator chart — **refused on purpose** with the message quoted above. The control, `../namespace-scopes/same-namespace-values.yaml` through the same command, renders completely, so the refusal is this file's and not the chart's mood. |
+| File                                     | Validated with                                                                                                                                                                                                  |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `strict-single-namespace-transport.yaml` | `helm lint` and `helm template` with `same-namespace-values.yaml`; live strict-scope reconciliation; signer readiness; one trust distribution; target-ServiceAccount denial for exact authority Secret names.   |
+| `relaxed-manager-scope-transport.yaml`   | `helm lint` and `helm template` with `bounded-values.yaml`; live bounded reconciliation; matching trust-distribution digests in both approved namespaces; authority keys retained only in controller namespace. |
+| `scope-conflict-refused-values.yaml`     | `helm template` against the operator chart; refused on purpose with the message above. A valid single-scope control renders successfully.                                                                       |
 
-The two transport fragments are policy fragments rather than Kubernetes objects, so neither was checked with `kubectl`. What a fragment cannot prove on its own is that its `targetNamespaces` match the chart's approved list on your installation — that pairing is yours to keep, and step 1 of the verification above is how you read it back.
+These files are Helm values, not Kubernetes objects. `helm lint` and `helm template` validate their structure before reconciliation. Live checks prove the target list agrees with installed read and mutation boundaries.
