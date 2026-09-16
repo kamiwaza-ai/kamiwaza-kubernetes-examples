@@ -15,11 +15,11 @@ patch an operator-managed Deployment to copy this procedure.
 
 ## Files
 
-| File | Purpose |
-| --- | --- |
-| `kustomization.yaml` | Builds `ConfigMap/consent-configmap` from the HTML fragment. |
-| `consent.html` | Contains the consent modal body. |
-| `core-values-snippet.yaml` | Adds the mount and enables the Deploy chart settings. |
+| File                       | Purpose                                                      |
+| -------------------------- | ------------------------------------------------------------ |
+| `kustomization.yaml`       | Builds `ConfigMap/consent-configmap` from the HTML fragment. |
+| `consent.html`             | Contains the consent modal body.                             |
+| `core-values-snippet.yaml` | Adds the mount and enables the Deploy chart settings.        |
 
 ## Prerequisites
 

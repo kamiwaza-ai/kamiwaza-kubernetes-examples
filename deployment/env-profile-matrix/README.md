@@ -7,12 +7,12 @@ environments.
 
 ## Matrix
 
-| Profile      | Typical command     | Helmfile env | Auth               | Metadata catalog        | Hot reload            | Expected platform shape                     |
-| ------------ | ------------------- | ------------ | ------------------ | ----------------------- | --------------------- | ------------------------------------------- |
-| **lite**     | `make install-lite` | `lite`       | Disabled           | Built-in (no DataHub)   | No                    | Core + Frontend + Network                    |
-| **full**     | `make install`      | `full`       | Enabled (Keycloak) | Built-in (no DataHub)   | No                    | Full platform with Keycloak                 |
-| **dev**      | `make dev`          | `dev`        | Disabled           | Built-in (no DataHub)   | Yes (core + frontend) | Lite services with hot-reload mounts        |
-| **dev-full** | `make dev-full`     | `dev-full`   | Enabled (Keycloak) | Built-in (no DataHub)   | Yes (core + frontend) | Full platform + Keycloak + hot reload       |
+| Profile      | Typical command     | Helmfile env | Auth               | Metadata catalog      | Hot reload            | Expected platform shape               |
+| ------------ | ------------------- | ------------ | ------------------ | --------------------- | --------------------- | ------------------------------------- |
+| **lite**     | `make install-lite` | `lite`       | Disabled           | Built-in (no DataHub) | No                    | Core + Frontend + Network             |
+| **full**     | `make install`      | `full`       | Enabled (Keycloak) | Built-in (no DataHub) | No                    | Full platform with Keycloak           |
+| **dev**      | `make dev`          | `dev`        | Disabled           | Built-in (no DataHub) | Yes (core + frontend) | Lite services with hot-reload mounts  |
+| **dev-full** | `make dev-full`     | `dev-full`   | Enabled (Keycloak) | Built-in (no DataHub) | Yes (core + frontend) | Full platform + Keycloak + hot reload |
 
 ## Expected values layering
 
@@ -23,7 +23,7 @@ These profiles map to Helmfile values composition in Deploy:
 | **lite**     | `kamiwaza-base.yaml` + `kamiwaza-lite.yaml`                                 |
 | **full**     | `kamiwaza-base.yaml`                                                        |
 | **dev**      | `kamiwaza-base.yaml` + `kamiwaza-lite.yaml` + `kamiwaza-hotreload-k0s.yaml` |
-| **dev-full** | `kamiwaza-base.yaml` + `kamiwaza-hotreload-k0s.yaml`                         |
+| **dev-full** | `kamiwaza-base.yaml` + `kamiwaza-hotreload-k0s.yaml`                        |
 
 See Deploy `cluster/helmfile.yaml.gotmpl` for the authoritative environment-to-values mapping.
 

@@ -50,7 +50,7 @@ A `failureThreshold: 1` startup probe with a short delay kills the container on 
 
 ## Step 2 — reproduce the probe by hand (the decisive step)
 
-Probes run *inside* the container. Reproduce the exact check during a `Running` window.
+Probes run _inside_ the container. Reproduce the exact check during a `Running` window.
 If the pod is in a 5-minute backoff, force a fresh start first:
 
 ```bash
@@ -80,7 +80,7 @@ app doesn't serve.
 
 ---
 
-## Step 3 — find what the app *does* serve
+## Step 3 — find what the app _does_ serve
 
 Probe the likely real endpoints to find the one that returns `2xx`:
 
@@ -100,10 +100,10 @@ done
 
 ## The two failure classes and their fixes
 
-| Class | Tell | Fix surface |
-| --- | --- | --- |
-| **Wrong target** (path/port/scheme) | hand-run probe returns 404/refused; a different path returns 200 | point the probe at the correct path/port |
-| **Too aggressive** (cold start) | hand-run probe returns 200 when run late, but the app needs > the probe's grace to first respond | raise `failureThreshold` / `initialDelaySeconds` / add `startPeriod` |
+| Class                               | Tell                                                                                             | Fix surface                                                          |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| **Wrong target** (path/port/scheme) | hand-run probe returns 404/refused; a different path returns 200                                 | point the probe at the correct path/port                             |
+| **Too aggressive** (cold start)     | hand-run probe returns 200 when run late, but the app needs > the probe's grace to first respond | raise `failureThreshold` / `initialDelaySeconds` / add `startPeriod` |
 
 ---
 
