@@ -2,7 +2,7 @@
 
 **Scenario:** rotate a platform authority without dropping a request, and know before you start which workloads restart, which reload in place, and which drain their connections. The cost is a property of the consuming workload, not of the platform, so the platform publishes the matrix rather than assuming.
 
-**Tags:** #security #transport #rotation #drain #reload-class
+Tags: #security #transport #rotation #drain #reload-class.
 
 ## Three reload classes, one downgrade
 
@@ -12,7 +12,7 @@
 | `Rollout`          | the process reads material at start                                     | the platform rolls it exactly once per content digest change; an unchanged digest rolls nothing                                                             |
 | `ConnectionScoped` | established connections keep the material they were established with    | the consumer enforces a maximum connection age no greater than the remaining credential lifetime, and drains or reauthenticates before expiry or revocation |
 
-The downgrade is the whole reason the classes are declared rather than inferred: **an unproven `Reload` claim is treated as `Rollout`**, and so is an unrecognised or absent one. A class the platform cannot enforce would otherwise leave a process running on retired material. Verified against the platform's own function:
+Reload classes are declared, not inferred. An unproven, absent, or unrecognized `Reload` claim becomes `Rollout`. Without this downgrade, a process can continue to use retired material. The platform function produces:
 
 ```text
 Reload declared, proven      -> Reload
@@ -34,23 +34,25 @@ Two numbers bound a connection-scoped consumer: the connection age its policy de
 | `ConnectionScoped` | 30m          | expired                   | 0                    | 0           |
 | `Rollout`          | 30m          | 1h30m                     | 0 (not applicable)   | 0           |
 
-Read the second row: a certificate near expiry shortens the connections it authenticated, not the other way round. Read the fourth: when the credential has expired or its deadline cannot be observed, nothing is held and whatever remains drains now. A declared grace shorter than the window is honoured; a longer one is clamped, because a grace beyond the window would keep a request running on an expired credential, and a zero grace would cut off a request that could still have finished inside the credential's remaining life.
+Read the second row: credential expiry shortens authenticated connection life. Read the fourth row: an expired credential drains connections immediately. A short declared grace is accepted. A long grace is clamped to the window. A zero grace cuts off requests that can still finish safely.
 
 Policy has to agree with itself for any of this to hold, which is why a connection age longer than its client identity's validity is refused at policy load rather than at handshake time.
 
 ## Rotation is a protocol, selected by one field
 
-**`RenewCertificate`** reissues the authority certificate over the existing key. Existing leaves still verify, so: publish the new authority certificate, republish the distribution, roll the `Rollout`-class consumers. **One rollout.**
+`RenewCertificate` reissues the authority certificate over the existing key. Existing leaves still verify. Publish the new certificate, republish distribution, then roll `Rollout` consumers once.
 
-**`ReplaceKey`** means a new authority key, so every leaf must be reissued and the old anchor must stay trusted until that is done. Three phases, and the order is not optional:
+`ReplaceKey` creates a new authority key. Every leaf must be reissued, and the old anchor stays trusted until completion. The protocol has three ordered phases:
 
-1. **Trust the new anchor.** The distribution carries the retiring and the replacement anchor at once, and consumers roll or reload until every one of them trusts both. The platform's own client identity is not rotated in this phase, so the operator cannot lock itself out of the workloads it manages.
-2. **Issue under the new key.** Leaves are reissued and consumers pick them up.
-3. **Drop the retired anchor.** Only after every consumer is _observed_ on the new generation.
+1. Trust the new anchor. Distribution contains the retiring and replacement anchors. Consumers roll or reload until all consumers trust both. The platform client identity does not rotate in this phase.
+2. Issue under the new key. Leaves are reissued, and consumers load them.
+3. Drop the retired anchor only after every consumer is observed on the new generation.
 
 Phase 3 requires proof and is never run on a timer. Rotation state is derived from observed per-workload generation rather than an in-memory step counter, so a manager that restarts mid-rotation resumes from what it observes instead of restarting the protocol. While phase 3 is withheld, the reason is `AuthorityAnchorRetentionRequired` and it names the consumers that are not yet proven.
 
-**Rotation is not revocation.** A certificate issued under the retiring client authority stays valid until it expires or until phase 3 drops the anchor. Where revocation is actually required it is an authority-side action _plus_ phase 3.
+### Rotation is not revocation
+
+A certificate from the retiring client authority stays valid until expiry or phase 3 anchor removal. Revocation requires an authority action and phase 3.
 
 Automatic renewal, manual rotation, and the rollouts they cause are all confined to `maintenanceWindows` when set. A window shorter than the reconcile interval slips the work to the next window rather than skipping it.
 
@@ -115,3 +117,5 @@ Nothing here changes it. With no `transport` section there are no platform autho
 | `rotate-authority-request.yaml`  | `kubectl apply --dry-run=server --validate=strict` against a live cluster, merged into a complete platform object, with the namespace substituted for one that exists — accepted. The control, the same object with one unknown field, was rejected. |
 
 Every number in the drain table above was recomputed from `trust.MaximumConnectionAge`, `trust.BoundedDrainGrace`, and `trust.EffectiveReloadClass` rather than transcribed, and the reload-class rows are that function's own output.
+
+The exact policy and request were also applied on the clean cluster. The request arrived outside its Saturday maintenance window, so status reported `AuthorityRotationPhase` with the next window. The server-authority certificate hash and trust-bundle digest remained unchanged. Removing both request annotations cleared the deferred request, and Helm rollback restored the original policy and platform readiness.
