@@ -6,6 +6,21 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 LOKI_VALUES = ROOT / "monitoring" / "grafana-prometheus" / "loki-values.yaml"
+PROMETHEUS_VALUES = (
+    ROOT
+    / "monitoring"
+    / "grafana-prometheus"
+    / "kube-prometheus-stack-values.yaml"
+)
+
+
+class KubePrometheusValuesTest(unittest.TestCase):
+    def test_does_not_require_runtime_dashboard_downloads(self):
+        values = yaml.safe_load(PROMETHEUS_VALUES.read_text())
+
+        self.assertFalse(values["grafana"].get("dashboards"))
+
+
 
 
 class LokiValuesTest(unittest.TestCase):
