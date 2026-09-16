@@ -48,7 +48,7 @@ Those live in [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.p
 | [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.py)           | **Kaizen-specific remediation the webhook does not do:** re-asserts the secure verify-on flags, fixes the internal-`KAMIWAZA_API_URL` mismatch, and opens egress / injects a proxy on the declared backend CR. The mount + CA env is the webhook's job now, so run this **only** for that remediation.      |
 | [`verify-kaizen.sh`](verify-kaizen.sh)                                         | Kaizen verifier: checks declared-backend trust wiring **and** whether the spawned sandbox inherited it (including the live TLS probe — the only real proof of corporate-CA trust).                                                                                                                          |
 | [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/)     | Unsupported historical notice for the retired `0.13.0` live catalog mutation. Do not use it on an operator-managed platform.                                                                                                                                       |
-| [`kaizen-offline-frontend-font-hotfix/`](kaizen-offline-frontend-font-hotfix/) | Offline image-tar hotfix for `0.13.0` Kaizen frontend startup rebuilds that fail on `next/font/google` / Google Fonts access.                                                                                                                                                                               |
+| [`kaizen-offline-frontend-font-hotfix/`](kaizen-offline-frontend-font-hotfix/) | Unsupported historical notice for the retired `0.13.0` mutable image-tar replacement. Do not use it on an operator-managed platform.                                                                                                                             |
 
 ## Apply order
 
@@ -102,9 +102,8 @@ Those live in [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.p
 6. Do not run the retired `0.13.0` catalog livepatch on an operator-managed
    platform. See the unsupported historical notice in
    [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/).
-7. If it is a fully disconnected `0.13.0` install and the Kaizen
-   frontend fails its startup rebuild while trying to fetch Google Fonts, patch
-   the bundled frontend image tar with
+7. Do not run the retired `0.13.0` image-tar hotfix on an operator-managed
+   platform. See the unsupported historical notice in
    [`kaizen-offline-frontend-font-hotfix/`](kaizen-offline-frontend-font-hotfix/).
 8. Verify:
 
