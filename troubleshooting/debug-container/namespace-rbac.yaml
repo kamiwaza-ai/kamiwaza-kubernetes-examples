@@ -1,12 +1,10 @@
 # =============================================================================
 # Kamiwaza Debug — Namespace + RBAC
 # -----------------------------------------------------------------------------
-# Apply once per cluster. The ClusterRole is intentionally broad (read-all +
-# exec/portforward/logs) for SRE triage. For hardened-enclave deployments,
-# bind it only to short-TTL ServiceAccounts gated by your IdP (Keycloak / AWS SSO).
-#
-# RBAC is the only authorization boundary for this image. Anything an LLM or
-# human can do via `kubectl exec` into the jump pod is bounded by this role.
+# Apply once per cluster. The ClusterRole is intentionally broad for SRE
+# triage. It can read Secret data and open exec sessions in every namespace.
+# An exec session can change workload state without a Kubernetes API mutation.
+# Bind this role only to a short-lived, administrator-controlled identity.
 # =============================================================================
 ---
 apiVersion: v1
@@ -16,79 +14,46 @@ metadata:
   labels:
     app.kubernetes.io/name: kamiwaza-debug
     app.kubernetes.io/part-of: kamiwaza-platform
-    # The DaemonSet (separate manifest) needs privileged PSA. If you only
-    # deploy the jump pod, you can downgrade these to `baseline`.
-    pod-security.kubernetes.io/enforce: privileged
-    pod-security.kubernetes.io/audit: privileged
-    pod-security.kubernetes.io/warn: privileged
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-ingress
+  namespace: kamiwaza-debug
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kamiwaza-debug
+  policyTypes:
+    - Ingress
+  ingress: []
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: kamiwaza-debug
   namespace: kamiwaza-debug
-# Pre-wired imagePullSecret reference so the jump-pod and node-debug
-# DaemonSet manifests pull cleanly when the GHCR package is private
-# (the default for org-owned packages).
-#
-# Operators create the `ghcr-pull` Secret per the Pre-flight section of
-# container/manifests/README.md. The kubelet behavior is:
-#   * Secret exists → kubelet uses it for the GHCR pull. Private package
-#     resolves cleanly.
-#   * Secret missing → kubelet logs a warning and falls through to
-#     anonymous pull. Public package: still works. Private package:
-#     ImagePullBackOff with a "no such secret" event line — no worse
-#     than the previous unwired state, and the event line is the actual
-#     diagnostic operators need.
-#   * Image mirrored to a private registry (manifests edited): the
-#     reference is ignored against a registry the secret doesn't cover.
-#
-# Net effect: manifest is zero-edit for the documented private-GHCR
-# path AND zero-edit for public packages. Mirrored deployments edit
-# `image:` anyway and may drop or replace this reference there.
-imagePullSecrets:
-  - name: ghcr-pull
----
-# Patch the namespace's auto-created `default` ServiceAccount with the
-# same `ghcr-pull` imagePullSecret. `kubectl debug node` creates fresh
-# debugger pods WITHOUT setting spec.serviceAccountName — they run as
-# the namespace's default SA, NOT `kamiwaza-debug`. Without this patch
-# the documented break-glass workflow (`kubectl debug node
-# --profile=sysadmin --image=ghcr.io/kamiwaza-internal/kamiwaza-debug:
-# main`) ImagePullBackOffs on the documented private-GHCR setup.
-#
-# kubectl apply's strategic-merge semantics for ServiceAccount append
-# our entry to the existing `imagePullSecrets` array; the
-# kube-controller-manager creates the default SA when the namespace
-# is created and does not strip imagePullSecrets it didn't add, so
-# this patch survives across SA churn.
-#
-# Same kubelet fall-through semantics apply as for the kamiwaza-debug
-# SA above: missing secret → ImagePullBackOff with a clear event;
-# public package → anonymous pull works regardless; mirrored
-# registry → operators edit image: fields and this reference is
-# ignored against a registry the secret doesn't cover.
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: default
-  namespace: kamiwaza-debug
-imagePullSecrets:
-  - name: ghcr-pull
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: kamiwaza-debug
   # ----- explicit, accepted RBAC exceptions -----
-  # The wildcard read + scoped exec/log/portforward verbs are the explicit
-  # SRE-triage contract. There is NO mutation verb (no create/update/patch
-  # on resources, only on pods/{exec,portforward}/log subresources).
-  # For hardened-enclave deployments: bind this ClusterRole only to short-TTL
-  # ServiceAccounts gated by your IdP (Keycloak / AWS SSO).
+  # The wildcard read and scoped exec, log, and port-forward verbs form the
+  # explicit SRE triage contract. Read access includes Secret contents.
+  # Exec access can change workload state without a Kubernetes API mutation.
+  # Bind this ClusterRole only to short-lived identities gated by your IdP.
   annotations:
-    ignore-check.kube-linter.io/cluster-admin-role-binding: "Not cluster-admin: read-only wildcard plus scoped exec/portforward/logs. No resource mutation verbs anywhere."
-    ignore-check.kube-linter.io/wildcard-in-rules: "Wildcard verbs are deliberately limited to get/list/watch; the mutation surface (pods/exec etc.) is enumerated explicitly so it remains auditable."
+    ignore-check.kube-linter.io/cluster-admin-role-binding: >-
+      Not cluster-admin: wildcard read plus scoped exec, port-forward, attach,
+      and log access. Workload resources have no create, update, patch, or
+      delete verb.
+    ignore-check.kube-linter.io/wildcard-in-rules: >-
+      Wildcard verbs are limited to get, list, and watch. Exec, port-forward,
+      attach, and log access are enumerated for audit.
 rules:
   # Read everything — k9s, kubectl get, stern
   - apiGroups: ["*"]
@@ -115,7 +80,6 @@ roleRef:
   kind: ClusterRole
   name: kamiwaza-debug
   apiGroup: rbac.authorization.k8s.io
-
 # NOTE: the namespace-scoped Role granting `pods:create / pods:delete`
 # (required for `kubectl debug node --profile=sysadmin`) is intentionally
 # NOT defined in this file. The Role lives in `node-debug-role.yaml`
