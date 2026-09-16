@@ -2,9 +2,9 @@
 
 **Scenario:** read the transport plane's failure surface before you meet it in production. Every dependency the platform does not own — an external PKI, a certificate controller, the signer, the decision service, an enforcing proxy, a Gateway — has a named outcome, a retry class, and an owner.
 
-**Tags:** #security #transport #failure #fail-closed #reasons
+Tags: #security #transport #failure #fail-closed #reasons.
 
-Three refused documents are published here alongside a loadable one, because the refusals are the part that teaches. Every value is a placeholder; no credential or certificate body appears in any file.
+Two refused documents are published here with one loadable document because the refusals teach the important behavior. Every value is a placeholder. No file contains credentials or certificate data.
 
 ## The two kinds of failure, and why they are not the same
 
@@ -14,7 +14,9 @@ Three refused documents are published here alongside a loadable one, because the
 
 Getting this backwards is expensive in both directions. A terminal failure retried forever hides a decision somebody has to make; a transient failure marked terminal turns a thirty-second outage into a manual recovery. An X.509 verification failure is terminal. A dial failure to the same endpoint is transient.
 
-**One dependency's outage does not abort the rest of the reconcile.** A later independent step still runs, so a Core API blip does not silently skip provisioning that had nothing to do with it.
+### Independent work continues
+
+A dependency outage does not stop later independent reconciliation steps. A Core API outage does not skip unrelated provisioning.
 
 ## The failure surface, by dependency
 
@@ -36,7 +38,7 @@ There is no unauthenticated fallback anywhere in that table. Every one of these 
 
 ## What cannot be shown from a repository
 
-A dependency outage is a runtime condition. Nothing in this directory can make a signer time out or a proxy disappear, and a file claiming to demonstrate one would be a claim rather than a demonstration. What is published here is the half that _is_ checkable without a cluster: the documents the platform refuses at policy load, before anything is written.
+A dependency outage is a runtime condition. Repository files cannot make a signer time out or a proxy disappear. Files here show policy-load refusals before the operator writes resources.
 
 The runtime half is proven in the operator's own conformance suite, which exercises unavailable, timeout, and malformed-response paths against fakes and interceptors rather than a live provider. Read the reason table above, and expect the reason rather than a stack trace.
 
@@ -79,10 +81,10 @@ Nothing here changes it. None of these reasons can be reported by an installatio
 
 ## How this example was validated
 
-| File                                       | Validated with                                                                                                                                                                                                                      |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `administrator-supplied-fragment.yaml`     | The operator's own loader, `adminpolicy.LoadTransportPolicy`, then `Policy.ValidateCrossReferences` — accepted. Also `transport-security.schema.yaml` (`jsonschema`, Draft 2020-12) — valid.                                        |
-| `unresolved-authority-refused.yaml`        | Same loader — shape accepted. Same cross-reference rules — **refused on purpose**: `authority "enterprise-root-2028" is not declared` (`EgressAuthorityMissing`). Same schema — valid.                                              |
-| `plaintext-without-exemption-refused.yaml` | Same loader — **refused at load**: `transport.internal.hops[0].exemption: plaintext transport requires an exemption (PlaintextDenied)`. Same schema — invalid at `transport/internal/hops/0`, `'exemption' is a required property`. |
+| File                                       | Validated with                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `administrator-supplied-fragment.yaml`     | The operator loader and cross-reference checks accepted the file in Full and Regulated profiles. Draft 2020-12 schema validation also passed. A live policy rollout then reported `SuppliedMaterialInvalid` for the absent exact-name Secret. The original policy recovered to `TransportReady` after rollback. |
+| `unresolved-authority-refused.yaml`        | Same loader — shape accepted. Same cross-reference rules — **refused on purpose**: `authority "enterprise-root-2028" is not declared` (`EgressAuthorityMissing`). Same schema — valid.                                                                                                                          |
+| `plaintext-without-exemption-refused.yaml` | Same loader — **refused at load**: `transport.internal.hops[0].exemption: plaintext transport requires an exemption (PlaintextDenied)`. Same schema — invalid at `transport/internal/hops/0`, `'exemption' is a required property`.                                                                             |
 
-The loader and the schema disagree usefully on the first two files: both are schema-valid and both are refused by the cross-reference rules, because a rule that needs two sections of one document at once is not expressible in the schema. Where a claim rests on one of them, the table says which.
+The schema accepts the unresolved authority shape because the rule compares two sections. Cross-reference validation then refuses it. Both schema and loader refuse the missing plaintext exemption.
