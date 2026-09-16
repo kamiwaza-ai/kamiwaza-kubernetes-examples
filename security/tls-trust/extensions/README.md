@@ -47,7 +47,7 @@ Those live in [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.p
 | [`extension-trust-webhook/`](extension-trust-webhook/)                         | **The mechanism (recommended).** Mutating admission webhook that injects the `kamiwaza-trust-bundle` mount + CA env into **every** declared extension pod **and** spawned sandbox pod, automatically and across redeploys — no per-extension patching, no controller overlay, no new image. Validated live. |
 | [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.py)           | **Kaizen-specific remediation the webhook does not do:** re-asserts the secure verify-on flags, fixes the internal-`KAMIWAZA_API_URL` mismatch, and opens egress / injects a proxy on the declared backend CR. The mount + CA env is the webhook's job now, so run this **only** for that remediation.      |
 | [`verify-kaizen.sh`](verify-kaizen.sh)                                         | Kaizen verifier: checks declared-backend trust wiring **and** whether the spawned sandbox inherited it (including the live TLS probe — the only real proof of corporate-CA trust).                                                                                                                          |
-| [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/)     | Offline / local-catalog livepatch for future Kaizen launches: 30-day lifetime / retention plus selected `0.13.1` startup and memory fixes. Unrelated to CA trust.                                                                                                                                           |
+| [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/)     | Unsupported historical notice for the retired `0.13.0` live catalog mutation. Do not use it on an operator-managed platform.                                                                                                                                       |
 | [`kaizen-offline-frontend-font-hotfix/`](kaizen-offline-frontend-font-hotfix/) | Offline image-tar hotfix for `0.13.0` Kaizen frontend startup rebuilds that fail on `next/font/google` / Google Fonts access.                                                                                                                                                                               |
 
 ## Apply order
@@ -99,8 +99,8 @@ Those live in [`apply-kaizen-extension-trust.py`](apply-kaizen-extension-trust.p
 5. For Kaizen, open or **resume** a conversation so the sandbox-controller spawns a fresh
    agent pod in `kamiwaza-sandboxes`. The webhook mutates pods at **CREATE**, so this must
    come after the webhook is deployed.
-6. If the install is offline / on local catalog `0.13.0` and future Kaizen launches also
-   need the selected `0.13.1` template fixes, run
+6. Do not run the retired `0.13.0` catalog livepatch on an operator-managed
+   platform. See the unsupported historical notice in
    [`kaizen-offline-template-livepatch/`](kaizen-offline-template-livepatch/).
 7. If it is a fully disconnected `0.13.0` install and the Kaizen
    frontend fails its startup rebuild while trying to fetch Google Fonts, patch
