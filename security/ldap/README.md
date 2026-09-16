@@ -6,20 +6,21 @@
 
 ## What this example restricts itself to
 
-- **Read-only federation.** `editMode: READ_ONLY` and `syncRegistrations: false`: the platform reads accounts and group membership and writes nothing back. The directory belongs to whoever owns it, and a federation that can write to it is a federation that can lock out its users.
-- **A referenced bind credential.** The federation binds as `cn=federation-reader,ou=services,…`, not as the directory manager, and its credential comes from Secret `openldap-secret` key `federation-bind-password`. Directory access control grants that account read on the user and group branches, nothing on password hashes, and no write anywhere. The bootstrap Job proves it: the Job fails rather than report a read-only federation it does not have.
-- **Pinned images.** Every image is `docker.io/osixia/openldap:1.5.0@sha256:18742e9c449c9c1afe129d3f2f3ee15fb34cc43e5f940a20f3399728f41d7c28`. The tag is there to read; the digest is what runs.
-- **A closed mapper vocabulary.** Mappers project directory attributes and directory group membership onto reviewed claims. Nothing manufactures a group, a role, or a tenant the directory does not state; group membership becomes a realm role, and authorization past that point is ReBAC.
-- **No credential in Git.** Every password is generated locally into `local-secrets/`, which Git ignores. No sample LDIF, ConfigMap, or Secret manifest in this directory carries a password or a hash.
+- Read-only federation. `editMode: READ_ONLY` and `syncRegistrations: false`: the platform reads accounts and group membership and writes nothing back. The directory owner retains control. A writable federation can lock out directory users.
+- Referenced bind credential. The federation uses `cn=federation-reader,ou=services,…`, not the directory manager. Secret `openldap-secret` key `federation-bind-password` supplies its credential. Directory access control permits user and group reads only. The bootstrap Job fails if it cannot prove read-only access.
+- Pinned images. Every image is `docker.io/osixia/openldap:1.5.0@sha256:18742e9c449c9c1afe129d3f2f3ee15fb34cc43e5f940a20f3399728f41d7c28`. The tag identifies the release. The digest selects the image.
+- Closed mapper vocabulary. Mappers project directory attributes and group membership onto reviewed claims. They do not invent groups, roles, or tenants. Directory group membership becomes a realm role. ReBAC controls later authorization.
+- No credential in Git. Git ignores all passwords in `local-secrets/`. No sample LDIF, ConfigMap, or Secret manifest contains a password or hash.
 
 ## What is not here any more
 
-- **The directory web UI.** It bound as the directory manager and existed to write to the directory, which is the opposite of what this example now demonstrates. It also pulled an unpinned third-party image and patched it at container start.
-- **The in-cluster federation Job.** It installed packages from the internet at run time, so nothing about it could be pinned. The same declarative bundle runs from a workstation instead, which is where an administrator applying identity configuration is anyway.
+- Directory web UI. It used the directory manager account and had write access to the directory. It also used an unpinned image and patched that image at container start.
+- In-cluster federation Job. It installed internet packages at run time. Its dependencies were not pinned. The same declarative bundle now runs from an administrator workstation.
 
 ## Prerequisites
 
 - Kamiwaza deployed with Keycloak from your **pinned release chart** (or merge `values-snippet.yaml` and re-sync first). This example pins its own images; it selects no chart version, because the Keycloak your platform runs comes from your release.
+- StorageClass `local-path` is installed. Change both PVC manifests before applying when the cluster uses another reviewed class.
 - Secret `keycloak-admin` in namespace `kamiwaza`.
 - `kubectl` with kustomize support, plus `curl` and `jq` on the workstation that applies the federation.
 
@@ -29,7 +30,7 @@
 # 1) generate the lab credentials (Git ignores local-secrets/)
 mkdir -p security/ldap/local-secrets
 for name in admin-password config-password federation-bind-password demo-user-password; do
-  openssl rand -hex 32 > "security/ldap/local-secrets/${name}"
+  openssl rand -hex 32 | tr -d '\n' > "security/ldap/local-secrets/${name}"
 done
 
 # 2) apply the directory, its content, and the read-only bind account
@@ -44,7 +45,7 @@ cd security/ldap/keycloak-federation
 ./validate-keycloak-ldap.sh
 ```
 
-Hex rather than base64: these values are written into LDIF, where a value beginning with a space or a colon has to be base64-encoded to be read back correctly.
+Use hexadecimal values without trailing newline characters. LDIF requires base64 encoding when a value starts with a space or colon.
 
 ## Layout
 
@@ -62,7 +63,13 @@ Hex rather than base64: these values are written into LDIF, where a value beginn
 
 The directory in `openldap/` serves plaintext LDAP on the cluster network. That is a teaching directory: it is enough to exercise federation, and it does **not** satisfy the transport a real federation requires.
 
-[auth-profile-fragment.yaml](auth-profile-fragment.yaml) is the shape administrator policy takes for a directory you actually own: `ldaps://`, or `ldap://` with `startTlsRequired: true`, because a plaintext bind puts the credential on the network before any upgrade; a declared `Directory` egress destination the platform's policy-aware dialer reaches it through; and the same read-only edit mode, referenced bind credential, closed mapper vocabulary, and bounded synchronization this lab uses.
+Administrator policy for a customer-owned directory must:
+
+- require `ldaps://` or `ldap://` with `startTlsRequired: true`;
+- declare the directory as an allowed `Directory` egress destination;
+- use the same read-only mode, referenced bind credential, mapper vocabulary, and bounded synchronization as this lab.
+
+These requirements prevent a plaintext bind from exposing the credential before a transport upgrade.
 
 ## Verify
 

@@ -13,12 +13,12 @@
 #
 #   mkdir -p security/ldap/local-secrets
 #   for name in admin-password config-password federation-bind-password demo-user-password; do
-#     openssl rand -hex 32 > "security/ldap/local-secrets/${name}"
+#     openssl rand -hex 32 | tr -d '\n' > "security/ldap/local-secrets/${name}"
 #   done
 #   kubectl apply -k security/ldap
 #
-# Hex, not base64: these values are written into LDIF, where a value starting
-# with a space or a colon has to be base64-encoded to be read back correctly.
+# Hex values avoid LDIF base64 encoding for values that start with a space or
+# colon. Removing the trailing newline keeps Secret values and passwords equal.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 

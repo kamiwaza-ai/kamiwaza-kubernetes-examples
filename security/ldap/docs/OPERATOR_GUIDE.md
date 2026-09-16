@@ -2,20 +2,21 @@
 
 This document is the **hands-on runbook** for the `security/ldap` example. Start with the scenario **[README.md](../README.md)** for a one-page overview, then use this guide for step-by-step operations.
 
-**All paths** below are relative to the scenario root **`security/ldap/`** (the directory that contains `kustomization.yaml`).
+All paths are relative to scenario root **`security/ldap/`**, which contains `kustomization.yaml`.
 
 ---
 
 ## 1. How this scenario is organized (design)
 
-| Layer                    | Directory                                                      | What operators should know                                                                                                                                                                                                     |
+| Layer                    | Directory                                                      | Operator facts                                                                                                                                                                                                                 |
 | ------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Kubernetes manifests** | `namespace.yaml`, `openldap/`, `jobs/`                         | What `kubectl apply -k .` applies: the lab directory, its content, and the bootstrap Job. Images are pinned by digest.                                                                                                         |
 | **Administrator policy** | `auth-profile-fragment.yaml`, `transport-policy-fragment.yaml` | The auth profile and the egress destination an operator-managed platform uses for a directory the customer owns. Two files because they merge into different sections of the policy document, and each is separately loadable. |
 | **LDAP sample LDIF**     | `ldap-samples/`                                                | Optional files you apply yourself with `ldapadd` / `ldapmodify`. Not mounted by default, and no passwords in them.                                                                                                             |
 | **Keycloak automation**  | `keycloak-federation/`                                         | Versioned JSON and shell scripts that call the Keycloak Admin API from a workstation.                                                                                                                                          |
 
-**Why split `ldap-samples/` from `keycloak-federation/`?**
+### Why split `ldap-samples/` from `keycloak-federation/`?
+
 Operators think in two systems: the **directory** and the **identity provider**. Keeping Keycloak JSON out of `openldap/` matches that split, and matches the production one — directory team and platform team.
 
 ---
@@ -30,9 +31,9 @@ Browser → Kamiwaza UI / API
          Directory (lab: namespace ldap)
 ```
 
-- **Kamiwaza never talks to the directory**; Keycloak does.
-- **Groups** in the directory (`user`, `admin`) map to **realm roles**, so tokens carry roles the auth gateway understands. Authorization past that point is ReBAC.
-- The federation **reads**. It creates nothing in the directory and writes nothing back.
+- Kamiwaza never talks to the directory. Keycloak talks to the directory.
+- Directory groups (`user`, `admin`) map to realm roles. Tokens contain roles that the auth gateway understands. ReBAC controls later authorization.
+- Federation reads directory data. It creates no directory objects and writes nothing back.
 
 ---
 
@@ -57,7 +58,7 @@ Four values are generated locally, and Git ignores the directory that holds them
 ```bash
 mkdir -p local-secrets
 for name in admin-password config-password federation-bind-password demo-user-password; do
-  openssl rand -hex 32 > "local-secrets/${name}"
+  openssl rand -hex 32 | tr -d '\n' > "local-secrets/${name}"
 done
 ```
 
@@ -76,14 +77,14 @@ Rotation is a re-run: write a new value into `local-secrets/`, re-apply, and del
 
 ## 5. Bootstrap Job
 
-`ldap-bootstrap-import` is the only writer of the directory tree. It:
+`ldap-bootstrap-import` is the only writer of the directory tree. The Job performs these steps:
 
-1. waits for the directory to answer;
-2. imports `openldap-bootstrap` (the tree, `ou=services`, three users, two groups) — idempotently, so an existing entry is skipped;
-3. creates `cn=federation-reader,ou=services,…`;
-4. grants that account **read** on the base DN, inserted ahead of the shipped catch-all rule. The password rule already ahead of it keeps `userPassword` unreadable, so the federation reads accounts and never their password hashes;
-5. sets the federation and lab-user credentials from the Secret; and
-6. **proves** the account can read the user branch and cannot write to it. If a write succeeds, the Job fails instead of reporting a read-only federation it does not have.
+1. It waits for the directory to answer.
+2. It imports `openldap-bootstrap`. The data contains the tree, `ou=services`, three users, and two groups. Existing entries are unchanged.
+3. It creates `cn=federation-reader,ou=services,…`.
+4. It grants that account read access on the base DN. The earlier password rule keeps `userPassword` unreadable.
+5. It sets the federation and lab-user credentials from the Secret.
+6. It proves the account can read users and cannot write. The Job fails if a write succeeds.
 
 ```bash
 kubectl -n ldap wait --for=condition=complete job/ldap-bootstrap-import --timeout=300s
@@ -133,7 +134,7 @@ No mapper assigns a group, role, or tenant the directory does not state. A user 
 1. Keycloak: **User federation → Enterprise LDAP → Synchronize all users**.
 2. Confirm **`alice`** exists and is linked to the federation.
 3. Log in through Keycloak as **`alice`** with the generated `demo-user-password`.
-4. Decode the token: `realm_access.roles` should include **`user`** and **`admin`**.
+4. Decode the token. `realm_access.roles` must include **`user`** and **`admin`**.
 
 ```bash
 cd keycloak-federation && ./validate-keycloak-ldap.sh
@@ -170,21 +171,21 @@ Then Keycloak: **Synchronize changed users**.
 
 - `ldaps://`, or `ldap://` with StartTLS required. The lab directory serves neither; see `auth-profile-fragment.yaml` for the shape a real directory takes.
 - A read-only bind account, as here, and a credential from your own secret store rather than a local file.
-- Declare the directory as a `Directory` egress destination so the platform's policy-aware dialer bounds which host and port the federation may reach.
+- Declare a `Directory` egress destination. This lets the policy-aware dialer reach only the approved host and port.
 - Document the synchronization interval and what happens when a person leaves the organisation: with `editMode: READ_ONLY`, the directory is the answer to that question.
 
 ---
 
 ## 11. Troubleshooting
 
-| Symptom                             | Check                                                                                                                                                                                                                                                 |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bootstrap Job fails                 | `kubectl logs -n ldap job/ldap-bootstrap-import` — directory readiness, ConfigMap `openldap-bootstrap`, and the four Secret keys.                                                                                                                     |
-| Job fails on the read-only proof    | The bind account can write. Check that the access rule inserted at step 4 above was not replaced, and that the account is not the directory manager.                                                                                                  |
-| Federation reads nothing            | The bind account has no read access, which the directory reports as `No such object` rather than as a permission error. Delete the completed Job and re-apply so it grants the access again.                                                          |
-| `0 users` synced                    | Empty directory, or the users DN and object classes do not match `ldap-provider.json`. `ldapsearch` on `ou=people` as the bind account.                                                                                                               |
-| TLS errors from workstation scripts | `KEYCLOAK_INSECURE_TLS=1` (development only) or trust the cluster CA.                                                                                                                                                                                 |
-| DNS: FQDNs resolve to the wrong IP  | Clusters whose node search domain has a wildcard record can hijack `*.svc.cluster.local` under the default `ndots:5`. The Job sets `dnsConfig.options: [{name: ndots, value: "1"}]` and the FQDN carries a trailing dot to force absolute resolution. |
+| Symptom                             | Check                                                                                                                                                                                        |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bootstrap Job fails                 | `kubectl logs -n ldap job/ldap-bootstrap-import` — directory readiness, ConfigMap `openldap-bootstrap`, and the four Secret keys.                                                            |
+| Job fails on the read-only proof    | The bind account can write. Check that the access rule inserted at step 4 above was not replaced, and that the account is not the directory manager.                                         |
+| Federation reads nothing            | The bind account has no read access, which the directory reports as `No such object` rather than as a permission error. Delete the completed Job and re-apply so it grants the access again. |
+| `0 users` synced                    | Empty directory, or the users DN and object classes do not match `ldap-provider.json`. `ldapsearch` on `ou=people` as the bind account.                                                      |
+| TLS errors from workstation scripts | `KEYCLOAK_INSECURE_TLS=1` (development only) or trust the cluster CA.                                                                                                                        |
+| DNS: FQDNs resolve to the wrong IP  | A wildcard node search domain can hijack `*.svc.cluster.local` with the default `ndots:5`. The Job uses `ndots:1`, and the FQDN has a trailing dot.                                          |
 
 ---
 

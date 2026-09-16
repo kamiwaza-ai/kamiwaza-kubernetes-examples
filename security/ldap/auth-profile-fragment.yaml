@@ -81,8 +81,7 @@ profiles:
       - sub
     authorizationProjection: ReBACOnly
     tenantContext: RequiredClaimThenReBAC
-    assurance:
-      fipsRequired: false
+    assurance: {}
     session:
       overallTimeout: 12h
       inactivityTimeout: 30m
