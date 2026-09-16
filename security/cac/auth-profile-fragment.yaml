@@ -83,10 +83,14 @@ profiles:
       - sub
     authorizationProjection: ReBACOnly
     tenantContext: RequiredClaimThenReBAC
+    # AAL/FAL are advertised only when an external conformance run produces
+    # complete NIST evidence bound to this immutable policy revision.
     assurance:
       minimumAAL: AAL3
       minimumFAL: FAL2
-      fipsRequired: true
+      evidenceRef:
+        name: cac-assurance-evidence
+        key: evidence.json
     session:
       overallTimeout: 8h
       inactivityTimeout: 15m

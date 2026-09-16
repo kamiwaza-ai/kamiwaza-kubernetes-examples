@@ -1,0 +1,18 @@
+# The proxy-origin mTLS identity referenced by the CAC authentication profile.
+#
+# This file is a loadable transport-policy fragment. Merge this identity into
+# the existing `transport.clientIdentities` list in administrator policy. Do
+# not replace the installation's other transport settings with this fragment.
+#
+# `issuance.mode` is present because a transport policy is validated as a
+# whole. Set it to the mode your installation uses before merging.
+transport:
+  issuance:
+    mode: PlatformIssued
+  clientIdentities:
+    - name: cac-edge-client
+      commonName: cac-edge-client
+      secretRef:
+        name: cac-edge-client-tls
+      validity: 2160h
+      renewBefore: 360h
