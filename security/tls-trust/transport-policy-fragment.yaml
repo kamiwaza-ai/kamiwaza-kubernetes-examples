@@ -1,0 +1,20 @@
+# Loadable custom-trust fragment for the operator's transport-policy loader.
+#
+# Merge only `additionalAuthorities` into the installation's existing trust
+# policy. Keep its actual issuance mode, target namespaces, public-root choice,
+# bundle ceiling, internal hops, and egress destinations.
+transport:
+  issuance:
+    mode: PlatformIssued
+  trust:
+    bundleConfigMapName: kamiwaza-trust-bundle
+    targetNamespaces:
+      - kamiwaza
+    publicRoots: Include
+    maximumBundleBytes: 900000
+    additionalAuthorities:
+      - name: organization-root
+        description: Organization outbound TLS authority
+        secretRef:
+          name: kamiwaza-org-ca
+          key: org-ca.pem

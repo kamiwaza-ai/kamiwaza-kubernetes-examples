@@ -1,16 +1,16 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: kamiwaza
+# Administrator-owned trust sources live in the operator manager namespace.
+# Change this value when the manager uses another namespace.
+namespace: kamiwaza-system
 
 generatorOptions:
-  # Stable name so build-trust-bundle-configmap.sh can read it as the customer CA
-  # source (or pass `--ca-file <pem>` instead).
   disableNameSuffixHash: true
 
 secretGenerator:
   - name: kamiwaza-org-ca
     files:
-      # Place your real (root + intermediate) PEM here — gitignored.
-      # Add more `key=path` entries to include additional CAs in the same Secret.
+      # Root and intermediate certificates in leaf-to-root order. The local
+      # file is ignored by Git and must contain certificates only.
       - org-ca.pem=local-secrets/org-ca.pem

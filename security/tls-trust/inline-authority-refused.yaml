@@ -1,0 +1,20 @@
+# Refused: authority certificate material is inline.
+#
+# The transport-policy loader rejects the unknown `certificate` field. An
+# authority must use one exact-name `secretRef` or `configMapRef`, never inline
+# PEM. Referenced objects rotate independently from immutable policy.
+transport:
+  issuance:
+    mode: PlatformIssued
+  trust:
+    bundleConfigMapName: kamiwaza-trust-bundle
+    targetNamespaces:
+      - kamiwaza
+    publicRoots: Include
+    maximumBundleBytes: 900000
+    additionalAuthorities:
+      - name: inline-root
+        certificate: |
+          -----BEGIN CERTIFICATE-----
+          INLINE_CERTIFICATE_MATERIAL_IS_REFUSED
+          -----END CERTIFICATE-----
