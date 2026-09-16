@@ -48,9 +48,9 @@ PLATFORM_ROWS=$(kubectl get kamiwazaplatform -A \
 
 mapfile -t MATCHES < <(
   printf '%s\n' "$PLATFORM_ROWS" | awk \
-    -v namespace="${KAMIWAZA_NAMESPACE:-}" \
+    -v target_namespace="${KAMIWAZA_NAMESPACE:-}" \
     -v platform="${KAMIWAZA_PLATFORM:-}" \
-    'NF && (!namespace || $1 == namespace) && (!platform || $2 == platform)'
+    'NF && (!target_namespace || $1 == target_namespace) && (!platform || $2 == platform)'
 )
 
 if [ "${#MATCHES[@]}" -eq 0 ]; then
