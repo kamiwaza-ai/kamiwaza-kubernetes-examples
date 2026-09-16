@@ -20,15 +20,21 @@ North-south transport is expressed only through Gateway API standard kinds. The 
 
 ## Three things the platform refuses to pretend
 
-**It will not assert edge TLS it has not proven.** For every listener it depends on, the proof is `Programmed=True` **and** `ResolvedRefs=True` **and** `Accepted=True`, each at the object's own generation. `Programmed` alone reports that configuration was generated, not that references resolved. Short of that the outcome is `EdgeListenerUnverified`, and no issuer is derived from an assertion that the edge terminated TLS.
+### Edge TLS must be proven
 
-**It will not emit an object the implementation would reject.** Scheme redirect and `BackendTLSPolicy` are Extended Gateway API features, so `RequireWhenSupported` emits them where the GatewayClass advertises the feature and reports `EdgeFeatureUnsupported` where it does not.
+Each listener requires current `Programmed=True`, `ResolvedRefs=True`, and `Accepted=True` conditions. `Programmed` alone does not prove that references resolved. Otherwise, the outcome is `EdgeListenerUnverified`, and no issuer is derived from the listener.
 
-**It will not accept "verify if presented".** Only the mode that requires a valid client certificate is expressible. The insecure fallback mode admits an absent certificate and an invalid certificate alike; a Gateway reporting it produces `EdgeInsecureValidationDetected` and the published contract is treated as unsatisfied.
+### Emitted objects must be supported
+
+Scheme redirect and `BackendTLSPolicy` are Extended Gateway API features. `RequireWhenSupported` emits them only when the GatewayClass advertises support. Otherwise, the platform reports `EdgeFeatureUnsupported`.
+
+### "Verify if presented" is not accepted
+
+Only the mode that requires a valid client certificate is expressible. The insecure fallback accepts absent and invalid certificates. A Gateway that reports this mode produces `EdgeInsecureValidationDetected`, and the contract is unsatisfied.
 
 ## The Gateway API floor is a hard gate, not advice
 
-An edge client-certificate requirement needs Gateway API **v1.5.0** or later. Below that bundle the frontend validation fields are _pruned by the API server rather than rejected_, so the Gateway is admitted and enforces nothing while the platform would report success. The platform therefore refuses the requirement at policy load rather than writing a field that will vanish:
+An edge client-certificate requirement needs Gateway API **v1.5.0** or later. On older bundles, the API server prunes the frontend validation fields. The Gateway remains admitted but enforces nothing, and the platform can report false success. The platform refuses the requirement during policy load:
 
 ```text
 edge client certificates require the Gateway API floor:
@@ -41,7 +47,7 @@ while enforcing nothing (EdgeFeatureUnsupported)
 
 Attesting nothing is refused the same way. The range comes from the `gatewayAPI` shared-capability attestation in administrator policy, so "we upgraded it" has to be stated where the platform can read it.
 
-This is not hypothetical. The cluster these examples were validated against runs Gateway API `v1.4.0`, and the API server there rejects `spec.tls` on a `Gateway` outright under strict decoding — the same field that a standard-channel install prunes.
+The clean validation cluster runs Gateway API `v1.5.0`. Strict server validation accepts the frontend client-certificate fields and rejects an unknown field at the same location.
 
 ## Files
 
@@ -55,13 +61,13 @@ The frontend client-certificate stanza lives in [../cac/gateway-frontend-validat
 
 ## Steps
 
-1. **Merge the fragment.** `transport-policy-fragment.yaml` has `transport` at the root, which is what the published schema declares and what the operator's loader accepts, so validate it before merging. Merge the section into the `AdminCapabilityPolicy` document the operator chart mounts and bump `adminPolicy.revision`. The policy ConfigMap is immutable, so a changed document needs a new revision.
+1. Merge the fragment. Validate `transport-policy-fragment.yaml`, then merge its `transport` section into `AdminCapabilityPolicy`. Bump `adminPolicy.revision` because the policy ConfigMap is immutable.
 
-2. **Attest the Gateway API range.** Declare the `gatewayAPI` shared capability with a range at or above `v1.5.0` if you require edge client certificates. Below it, drop `clientCertificate` or the policy is refused.
+2. Attest the Gateway API range. When you require edge client certificates, declare `gatewayAPI` at `v1.5.0` or later. Otherwise, remove `clientCertificate`.
 
-3. **Create the Gateway.** Use `gateway-listener-contract.yaml` as the shape; the listener Secret name must match `transport.edge.listenerCertificateSecretName`.
+3. Create the Gateway. Use `gateway-listener-contract.yaml` as the shape. Make the listener Secret name equal `transport.edge.listenerCertificateSecretName`.
 
-4. **Publish the edge conformance evidence** if `forwardingMode` is set. Gateway API standardizes no client-certificate header, so certificate identity reaches the origin only through administrator-owned edge behaviour, and the platform credits it only against recorded, revision-bound evidence. The record shape is [../cac/edge-conformance-evidence.example.yaml](../cac/edge-conformance-evidence.example.yaml).
+4. Publish edge conformance evidence when `forwardingMode` is set. Gateway API defines no client-certificate header. The platform accepts certificate identity only with revision-bound evidence. Use [the edge conformance evidence record](../cac/edge-conformance-evidence.example.yaml).
 
 ## Verification
 
@@ -100,6 +106,6 @@ Nothing here changes it. With no `transport` section in administrator policy the
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `transport-policy-fragment.yaml`               | The operator's own loader, `adminpolicy.LoadTransportPolicy`, then `Policy.ValidateCrossReferences` — accepted in the Full and regulated profiles with `>=1.5.0 <2.0.0` attested, and refused with `EdgeFeatureUnsupported` at `1.4.0` and with nothing attested. Also the published `transport-security.schema.yaml` (`jsonschema`, Draft 2020-12) — valid. |
 | `edge-client-authority-collision-refused.yaml` | Same loader — shape accepted. Same cross-reference rules — **refused on purpose** in both profiles with `EdgeInsecureValidationDetected` naming the shared ConfigMap. Same schema — valid, which is the point: the schema cannot express a rule needing two sections at once.                                                                                |
-| `gateway-listener-contract.yaml`               | `kubectl apply --dry-run=server --validate=strict` against a live cluster's Gateway API `v1.4.0` CRDs, with the namespace substituted for one that exists — accepted. The control, the same object with one unknown field under `listeners[].tls`, was rejected as `unknown field "spec.listeners[1].tls.bogusField"`, so the check is not vacuous.          |
+| `gateway-listener-contract.yaml`               | `kubectl apply --dry-run=server --validate=strict` against Gateway API `v1.5.0`, with its existing namespace. The manifest was accepted. A control with an unknown listener TLS field was rejected, so the check was not vacuous.                                                                                                                            |
 
-The Gateway API floor claim was checked the same way, on the same cluster: `../cac/gateway-frontend-validation.yaml` is rejected there as `unknown field "spec.tls"`, because that bundle is `v1.4.0`.
+The Gateway API floor claim was also checked against the same cluster. The server accepted `../cac/gateway-frontend-validation.yaml` and rejected an unknown field under `spec.tls.frontend.default.validation`. The operator loader separately refused the same requirement when the attested range was `1.4.0`.

@@ -32,7 +32,6 @@ transport:
   floor:
     minimumTLSVersion: TLS1.2
     hostnameVerification: Required
-    fipsApprovedOnly: false
 
   edge:
     listenerCertificate: PlatformIssued
