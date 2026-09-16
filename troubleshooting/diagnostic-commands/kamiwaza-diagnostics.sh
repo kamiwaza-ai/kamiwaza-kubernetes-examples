@@ -1,212 +1,173 @@
 #!/usr/bin/env bash
-# Kamiwaza platform diagnostic report.
-# Runs read-only checks against every component and prints a summary.
+# Read-only diagnostics for one operator-managed Kamiwaza platform.
 #
 # Usage:
 #   ./kamiwaza-diagnostics.sh
-#   ./kamiwaza-diagnostics.sh | tee diagnostics-$(date +%Y%m%d-%H%M).txt
-set -euo pipefail
+#   KAMIWAZA_NAMESPACE=tenant-a ./kamiwaza-diagnostics.sh
+#   KAMIWAZA_NAMESPACE=tenant-a KAMIWAZA_PLATFORM=kamiwaza ./kamiwaza-diagnostics.sh
+set -uo pipefail
 
-NAMESPACE="${KAMIWAZA_NAMESPACE:-kamiwaza}"
-
-# Colors (disabled if not a terminal)
 if [ -t 1 ]; then
-  GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[0;33m'; NC='\033[0m'; BOLD='\033[1m'
+  GREEN='\033[0;32m'
+  RED='\033[0;31m'
+  YELLOW='\033[0;33m'
+  NC='\033[0m'
+  BOLD='\033[1m'
 else
-  GREEN=''; RED=''; YELLOW=''; NC=''; BOLD=''
+  GREEN=''
+  RED=''
+  YELLOW=''
+  NC=''
+  BOLD=''
 fi
-
-pass() { echo -e "  ${GREEN}[OK]${NC} $1"; }
-warn() { echo -e "  ${YELLOW}[WARN]${NC} $1"; }
-fail() { echo -e "  ${RED}[FAIL]${NC} $1"; }
-section() { echo -e "\n${BOLD}=== $1 ===${NC}"; }
 
 ERRORS=0
 WARNINGS=0
 
-check_pods() {
-  local ns=$1
-  local label=$2
-  local name=$3
-  local count
-  count=$(kubectl get pods -n "$ns" -l "$label" --no-headers 2>/dev/null | grep -c Running || true)
-  if [ "$count" -gt 0 ]; then
-    pass "$name: $count running"
-  else
-    fail "$name: no running pods"
-    ERRORS=$((ERRORS + 1))
-  fi
+pass() { printf '  %b[OK]%b %s\n' "$GREEN" "$NC" "$1"; }
+warn() {
+  printf '  %b[WARN]%b %s\n' "$YELLOW" "$NC" "$1"
+  WARNINGS=$((WARNINGS + 1))
+}
+fail() {
+  printf '  %b[FAIL]%b %s\n' "$RED" "$NC" "$1"
+  ERRORS=$((ERRORS + 1))
+}
+section() { printf '\n%b=== %s ===%b\n' "$BOLD" "$1" "$NC"; }
+
+if ! command -v kubectl >/dev/null 2>&1; then
+  printf 'kubectl is required.\n' >&2
+  exit 2
+fi
+
+PLATFORM_ROWS=$(kubectl get kamiwazaplatform -A \
+  -o jsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\t"}{.metadata.generation}{"\t"}{.status.observedGeneration}{"\t"}{range .status.conditions[?(@.type=="Ready")]}{.status}{"\t"}{.reason}{end}{"\n"}{end}' 2>/dev/null) || {
+  printf 'Cannot list KamiwazaPlatform resources. Check cluster access and install the operator CRDs.\n' >&2
+  exit 2
 }
 
-# ---------------------------------------------------------------
-section "Platform overview"
-# ---------------------------------------------------------------
-TOTAL=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l)
-RUNNING=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep -c Running || true)
-COMPLETED=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep -c Completed || true)
-NOT_READY=$((TOTAL - RUNNING - COMPLETED))
+mapfile -t MATCHES < <(
+  printf '%s\n' "$PLATFORM_ROWS" | awk \
+    -v namespace="${KAMIWAZA_NAMESPACE:-}" \
+    -v platform="${KAMIWAZA_PLATFORM:-}" \
+    'NF && (!namespace || $1 == namespace) && (!platform || $2 == platform)'
+)
 
-if [ "$NOT_READY" -eq 0 ]; then
-  pass "All $TOTAL pods healthy ($RUNNING running, $COMPLETED completed)"
-else
-  warn "$NOT_READY pod(s) not in Running/Completed state"
-  kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | grep -v -E 'Running|Completed' | sed 's/^/    /'
-  WARNINGS=$((WARNINGS + 1))
+if [ "${#MATCHES[@]}" -eq 0 ]; then
+  printf 'No matching KamiwazaPlatform exists. Set KAMIWAZA_NAMESPACE and KAMIWAZA_PLATFORM when needed.\n' >&2
+  exit 2
+fi
+if [ "${#MATCHES[@]}" -gt 1 ]; then
+  printf 'More than one KamiwazaPlatform matches. Set KAMIWAZA_NAMESPACE and KAMIWAZA_PLATFORM.\n' >&2
+  exit 2
 fi
 
-RESTART_PODS=$(kubectl get pods -n "$NAMESPACE" -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.containerStatuses[*]}{.restartCount}{" "}{end}{"\n"}{end}' 2>/dev/null | \
-  awk '{total=0; for(i=2;i<=NF;i++) total+=$i; if(total>0) print "    "$1" ("total" restarts)"}')
-if [ -n "$RESTART_PODS" ]; then
-  warn "Pods with restarts:"
-  echo "$RESTART_PODS"
-  WARNINGS=$((WARNINGS + 1))
+IFS=$'\t' read -r NAMESPACE PLATFORM GENERATION OBSERVED READY READY_REASON <<<"${MATCHES[0]}"
+
+section "Platform"
+printf '  Platform: %s/%s\n' "$NAMESPACE" "$PLATFORM"
+if [ "$GENERATION" != "$OBSERVED" ]; then
+  fail "Generation not observed: desired $GENERATION, observed ${OBSERVED:-none}"
+elif [ "$READY" = "True" ]; then
+  pass "Platform Ready: $READY_REASON"
 else
-  pass "No pod restarts"
+  fail "Platform not Ready: ${READY_REASON:-reason unavailable}"
 fi
 
-# ---------------------------------------------------------------
-section "Core scheduler"
-# ---------------------------------------------------------------
-check_pods "$NAMESPACE" "app.kubernetes.io/name=core-scheduler" "Scheduler"
-
-if kubectl exec -n "$NAMESPACE" deployment/core-scheduler -c core -- \
-  curl -sf http://core-raycluster-head-svc:7777/api/node/node_status >/dev/null 2>&1; then
-  pass "API responding on core-raycluster-head-svc:7777"
-else
-  fail "API not responding on core-raycluster-head-svc:7777"
-  ERRORS=$((ERRORS + 1))
+COMPONENTS=$(kubectl get kamiwazaplatform "$PLATFORM" -n "$NAMESPACE" \
+  -o jsonpath='{range .status.components[*]}{.name}{"\t"}{.message}{"\n"}{end}' 2>/dev/null || true)
+if [ -n "$COMPONENTS" ]; then
+  printf '%s\n' "$COMPONENTS" | awk -F '\t' '{printf "  %-24s %s\n", $1, $2}'
 fi
 
-FORWARDAUTH=$(kubectl exec -n "$NAMESPACE" deployment/core-scheduler -c core -- \
-  env 2>/dev/null | grep '^FORWARDAUTH_ENABLED=' | head -1 || echo "FORWARDAUTH_ENABLED=unknown")
-pass "Auth: $FORWARDAUTH"
-
-# ---------------------------------------------------------------
-section "Ray cluster"
-# ---------------------------------------------------------------
-HEAD_POD=$(kubectl get pod -n "$NAMESPACE" -l ray.io/node-type=head -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-if [ -n "$HEAD_POD" ]; then
-  pass "Ray head: $HEAD_POD"
-  WORKER_COUNT=$(kubectl get pod -n "$NAMESPACE" -l ray.io/node-type=worker --no-headers 2>/dev/null | grep -c Running || true)
-  pass "Ray workers: ${WORKER_COUNT:-0} running"
+section "Pods"
+PODS=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null) || {
+  fail "Cannot list pods"
+  PODS=''
+}
+TOTAL=$(printf '%s\n' "$PODS" | awk 'NF {count++} END {print count+0}')
+UNHEALTHY=$(printf '%s\n' "$PODS" | awk '
+  NF {
+    split($2, ready, "/")
+    if (!(($3 == "Running" && ready[1] == ready[2]) || $3 == "Completed" || $3 == "Succeeded")) print
+  }')
+if [ "$TOTAL" -eq 0 ]; then
+  fail "No pods found"
+elif [ -z "$UNHEALTHY" ]; then
+  pass "All $TOTAL pods ready"
 else
-  fail "No Ray head pod found"
-  ERRORS=$((ERRORS + 1))
+  fail "Pods are not ready:"
+  printf '%s\n' "$UNHEALTHY" | sed 's/^/    /'
 fi
 
-# ---------------------------------------------------------------
-section "PostgreSQL"
-# ---------------------------------------------------------------
-check_pods "$NAMESPACE" "app.kubernetes.io/name=core-postgres" "PostgreSQL"
-
-PG_STATUS=$(kubectl exec -n "$NAMESPACE" core-postgres-0 -- \
-  psql -U core -d kamiwaza -tAc "SELECT numbackends FROM pg_stat_database WHERE datname = 'kamiwaza';" 2>/dev/null || echo "error")
-if [ "$PG_STATUS" != "error" ]; then
-  pass "PostgreSQL reachable ($PG_STATUS active connections)"
-  DB_SIZE=$(kubectl exec -n "$NAMESPACE" core-postgres-0 -- \
-    psql -U core -d kamiwaza -tAc "SELECT pg_size_pretty(pg_database_size('kamiwaza'));" 2>/dev/null)
-  pass "Database size: $DB_SIZE"
+RESTARTED=$(printf '%s\n' "$PODS" | awk 'NF && $4+0 > 0 {print}')
+if [ -n "$RESTARTED" ]; then
+  warn "Pods have container restarts:"
+  printf '%s\n' "$RESTARTED" | sed 's/^/    /'
 else
-  fail "PostgreSQL not reachable"
-  ERRORS=$((ERRORS + 1))
+  pass "No container restarts"
 fi
 
-# ---------------------------------------------------------------
-section "etcd"
-# ---------------------------------------------------------------
-ETCD_HEALTH=$(kubectl exec -n "$NAMESPACE" core-etcd-0 -- \
-  etcdctl endpoint health 2>&1 || true)
-if echo "$ETCD_HEALTH" | grep -q "is healthy"; then
-  pass "etcd healthy"
+section "Persistent storage"
+PVCS=$(kubectl get pvc -n "$NAMESPACE" --no-headers 2>/dev/null) || {
+  fail "Cannot list persistent volume claims"
+  PVCS=''
+}
+PVC_TOTAL=$(printf '%s\n' "$PVCS" | awk 'NF {count++} END {print count+0}')
+UNBOUND=$(printf '%s\n' "$PVCS" | awk 'NF && $2 != "Bound" {print}')
+if [ -n "$UNBOUND" ]; then
+  fail "Persistent volume claims are not bound:"
+  printf '%s\n' "$UNBOUND" | sed 's/^/    /'
 else
-  fail "etcd unhealthy: $ETCD_HEALTH"
-  ERRORS=$((ERRORS + 1))
+  pass "All $PVC_TOTAL persistent volume claims bound"
 fi
 
-ETCD_LEADER=$(kubectl exec -n "$NAMESPACE" core-etcd-0 -- \
-  etcdctl endpoint status --write-out=json 2>/dev/null | \
-  python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if d[0]['Status']['leader']==d[0]['Status']['header']['member_id'] else 'no')" 2>/dev/null || echo "unknown")
-pass "etcd-0 is leader: $ETCD_LEADER"
-
-ETCD_SIZE=$(kubectl exec -n "$NAMESPACE" core-etcd-0 -- \
-  etcdctl endpoint status --write-out=json 2>/dev/null | \
-  python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{d[0][\"Status\"][\"dbSize\"]/1024:.0f} KB')" 2>/dev/null || echo "unknown")
-pass "etcd DB size: $ETCD_SIZE"
-
-# ---------------------------------------------------------------
-section "Keycloak"
-# ---------------------------------------------------------------
-KC_PODS=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=keycloak --no-headers 2>/dev/null | grep -c Running || true)
-if [ "$KC_PODS" -gt 0 ]; then
-  pass "Keycloak: $KC_PODS running"
-  if kubectl exec -n "$NAMESPACE" deployment/core-scheduler -c core -- \
-    curl -sf http://keycloak:8080/health/ready >/dev/null 2>&1; then
-    pass "Keycloak health: ready"
+section "Model deployments"
+MODELS=$(kubectl get modeldeployments -n "$NAMESPACE" --no-headers \
+  -o custom-columns='NAME:.metadata.name,GENERATION:.metadata.generation,OBSERVED:.status.observedGeneration,READY:.status.conditions[?(@.type=="Ready")].status,REASON:.status.conditions[?(@.type=="Ready")].reason' 2>/dev/null || true)
+if [ -z "$MODELS" ]; then
+  pass "No model deployments declared"
+else
+  printf '%s\n' "$MODELS" | awk '{printf "  %-32s generation %s/%s  Ready=%s  %s\n", $1, $2, $3, $4, $5}'
+  MODEL_ISSUES=$(printf '%s\n' "$MODELS" | awk 'NF && ($2 != $3 || $4 != "True") {count++} END {print count+0}')
+  if [ "$MODEL_ISSUES" -gt 0 ]; then
+    fail "$MODEL_ISSUES model deployment(s) not reconciled and ready"
   else
-    warn "Keycloak health check failed"
-    WARNINGS=$((WARNINGS + 1))
+    pass "All model deployments reconciled and ready"
   fi
-else
-  pass "Keycloak: not deployed (lite mode)"
 fi
 
-# ---------------------------------------------------------------
-section "Frontend"
-# ---------------------------------------------------------------
-check_pods "$NAMESPACE" "app.kubernetes.io/name=frontend" "Frontend"
-
-# ---------------------------------------------------------------
-section "Traefik"
-# ---------------------------------------------------------------
-check_pods "$NAMESPACE" "app.kubernetes.io/name=traefik" "Traefik"
-
-TRAEFIK_IP=$(kubectl get svc traefik -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "none")
-if [ "$TRAEFIK_IP" != "none" ] && [ -n "$TRAEFIK_IP" ]; then
-  pass "Traefik external IP: $TRAEFIK_IP"
-else
-  pass "Traefik: ClusterIP only (use port-forward for external access)"
-fi
-
-ROUTE_COUNT=$(kubectl get ingressroute -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l)
-pass "IngressRoutes: $ROUTE_COUNT configured"
-
-# ---------------------------------------------------------------
 section "Extensions"
-# ---------------------------------------------------------------
-EXT_OP=$(kubectl get pods -n kamiwaza-system -l app.kubernetes.io/name=extension-operator --no-headers 2>/dev/null | grep -c Running || true)
-if [ "$EXT_OP" -gt 0 ]; then
-  pass "Extension operator: running"
+EXTENSIONS=$(kubectl get kamiwazaextensions -n "$NAMESPACE" --no-headers \
+  -o custom-columns='NAME:.metadata.name,PHASE:.status.phase,READY:.status.conditions[?(@.type=="Ready")].status' 2>/dev/null || true)
+if [ -z "$EXTENSIONS" ]; then
+  pass "No extensions declared"
 else
-  warn "Extension operator: not found"
-  WARNINGS=$((WARNINGS + 1))
+  printf '%s\n' "$EXTENSIONS" | awk '{printf "  %-48s phase=%s  Ready=%s\n", $1, $2, $3}'
+  EXTENSION_ISSUES=$(printf '%s\n' "$EXTENSIONS" | awk 'NF && $3 != "True" {count++} END {print count+0}')
+  if [ "$EXTENSION_ISSUES" -gt 0 ]; then
+    fail "$EXTENSION_ISSUES extension(s) not ready"
+  else
+    pass "All extensions ready"
+  fi
 fi
 
-EXT_PODS=$(kubectl get pods -n kamiwaza-extensions --no-headers 2>/dev/null | grep -c Running || true)
-pass "Extension pods: ${EXT_PODS:-0} running"
-
-SANDBOX_PODS=$(kubectl get pods -n kamiwaza-sandboxes --no-headers 2>/dev/null | grep -c Running || true)
-pass "Sandbox pods: ${SANDBOX_PODS:-0} running"
-
-# ---------------------------------------------------------------
-section "Storage"
-# ---------------------------------------------------------------
-PVC_ISSUES=$(kubectl get pvc -n "$NAMESPACE" --no-headers 2>/dev/null | grep -v Bound | wc -l || true)
-PVC_TOTAL=$(kubectl get pvc -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l || true)
-if [ "$PVC_ISSUES" -eq 0 ]; then
-  pass "All $PVC_TOTAL PVCs bound"
+section "Warning events"
+EVENTS=$(kubectl get events -n "$NAMESPACE" --field-selector type=Warning --sort-by=.lastTimestamp --no-headers 2>/dev/null || true)
+if [ -n "$EVENTS" ]; then
+  warn "Namespace has warning events:"
+  printf '%s\n' "$EVENTS" | sed 's/^/    /'
 else
-  warn "$PVC_ISSUES PVC(s) not bound:"
-  kubectl get pvc -n "$NAMESPACE" --no-headers 2>/dev/null | grep -v Bound | sed 's/^/    /'
-  WARNINGS=$((WARNINGS + 1))
+  pass "No warning events"
 fi
 
-# ---------------------------------------------------------------
 section "Summary"
-# ---------------------------------------------------------------
-if [ "$ERRORS" -eq 0 ] && [ "$WARNINGS" -eq 0 ]; then
-  echo -e "${GREEN}${BOLD}All checks passed.${NC}"
-elif [ "$ERRORS" -eq 0 ]; then
-  echo -e "${YELLOW}${BOLD}$WARNINGS warning(s), no errors.${NC}"
+if [ "$ERRORS" -gt 0 ]; then
+  printf '%b%b%d error(s), %d warning(s).%b\n' "$RED" "$BOLD" "$ERRORS" "$WARNINGS" "$NC"
+  exit 1
+fi
+if [ "$WARNINGS" -gt 0 ]; then
+  printf '%b%b%d warning(s), no errors.%b\n' "$YELLOW" "$BOLD" "$WARNINGS" "$NC"
 else
-  echo -e "${RED}${BOLD}$ERRORS error(s), $WARNINGS warning(s).${NC}"
+  printf '%b%bAll checks passed.%b\n' "$GREEN" "$BOLD" "$NC"
 fi
