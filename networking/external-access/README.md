@@ -1,121 +1,126 @@
 # Service access patterns
 
-**Scenario:** how to reach Kamiwaza services from outside the cluster. Covers `kubectl port-forward` (works everywhere), `NodePort` (for direct node access), and `LoadBalancer`/`Ingress` (for production).
+**Scenario:** access an operator-managed Kamiwaza platform from outside its
+namespace. Use `kubectl port-forward` for local diagnostics. Use the
+administrator-owned Gateway API listener for customer traffic.
 
-**Tags:** #networking #external-access #port-forward #ingress
+**Tags:** #networking #external-access #port-forward #gateway-api
+
+## Scope
+
+This example uses services that the platform operator creates. It does not
+create a `Gateway`, load balancer, ingress controller, or DNS record.
+
+Set these values before you run the commands:
+
+```bash
+export PLATFORM_NAMESPACE=kamiwaza-examples
+export PLATFORM_NAME=kamiwaza
+```
 
 ## Service map
 
-| Service | In-cluster URL | Default port | Purpose |
-| --- | --- | --- | --- |
-| **Frontend (UI)** | `http://frontend:3000` | 3000 | Kamiwaza web interface |
-| **Core API** | `http://core-raycluster-head-svc:7777` | 7777 | REST API (served by Ray head) |
-| **Keycloak** | `http://keycloak:8080` | 8080 | Identity provider (when auth enabled) |
-| **Ray Dashboard** | `http://core-raycluster-head-svc:8265` | 8265 | Ray cluster management UI |
-| **Traefik** | `http://traefik:443` | 443 (HTTPS), 80 (HTTP) | Ingress controller (routes all traffic) |
-| **Grafana** | `http://kube-prometheus-stack-grafana:80` | 80 | Monitoring dashboards (if deployed) |
-| **PostgreSQL** | `core-postgres:5432` | 5432 | Application database (not exposed externally) |
-| **etcd** | `core-etcd:2379` | 2379 | Key-value store (not exposed externally) |
+| Service | In-cluster URL | Purpose |
+| --- | --- | --- |
+| Frontend | `http://frontend:3000` | Kamiwaza web interface |
+| Core API | `http://core-api:7777` | Platform API |
+| Keycloak | `http://keycloak:80` | Identity provider |
+| Ray dashboard | `http://core-raycluster-head-svc:8265` | Restricted diagnostic UI |
+| Grafana | `http://kube-prometheus-stack-grafana.monitoring:80` | Optional monitoring UI |
+| PostgreSQL | `core-postgres:5432` | Internal database. Do not expose it. |
+| etcd | `core-etcd:2379` | Internal store. Do not expose it. |
 
-## Port-forward (works on any cluster)
+## Use a port-forward for diagnostics
 
-The simplest way to access services. No cluster configuration needed.
+Run each port-forward in a separate terminal. When the diagnostic task is
+complete, stop the port-forward.
 
 ```bash
-# Frontend UI — open http://localhost:3000
-kubectl port-forward svc/frontend 3000:3000 -n kamiwaza
+# Frontend: http://127.0.0.1:3000
+kubectl -n "$PLATFORM_NAMESPACE" port-forward service/frontend 3000:3000
 
-# Core API — open http://localhost:7777
-kubectl port-forward svc/core-raycluster-head-svc 7777:7777 -n kamiwaza
+# Core API: http://127.0.0.1:7777
+kubectl -n "$PLATFORM_NAMESPACE" port-forward service/core-api 7777:7777
 
-# Keycloak admin console — open http://localhost:9080
-kubectl port-forward svc/keycloak 9080:8080 -n kamiwaza
+# Keycloak: http://127.0.0.1:9080
+kubectl -n "$PLATFORM_NAMESPACE" port-forward service/keycloak 9080:80
 
-# Ray Dashboard — open http://localhost:8265
-kubectl port-forward svc/core-raycluster-head-svc 8265:8265 -n kamiwaza
-
-# Grafana — open http://localhost:3001
-kubectl port-forward svc/kube-prometheus-stack-grafana 3001:80 -n monitoring
-
-# Multiple services at once (background)
-kubectl port-forward svc/frontend 3000:3000 -n kamiwaza &
-kubectl port-forward svc/core-raycluster-head-svc 7777:7777 -n kamiwaza &
-kubectl port-forward svc/keycloak 9080:8080 -n kamiwaza &
-echo "Frontend: http://localhost:3000"
-echo "API:      http://localhost:7777"
-echo "Keycloak: http://localhost:9080"
+# Grafana: http://127.0.0.1:3001
+kubectl -n monitoring port-forward service/kube-prometheus-stack-grafana 3001:80
 ```
 
-## Traefik routes (default path)
+When the terminal exits, the port-forward stops. It does not change a Service
+or open a cluster port.
 
-When Kamiwaza is deployed with the standard network chart, Traefik handles all external routing. The frontend, API, and Keycloak are all accessible through a single domain:
+## Use Gateway API for customer traffic
 
-| URL | Routes to |
+The operator publishes standard `HTTPRoute` objects. Each route attaches to the
+administrator-approved `Gateway` and hostname from platform policy.
+
+```bash
+kubectl -n "$PLATFORM_NAMESPACE" get httproutes
+kubectl -n "$PLATFORM_NAMESPACE" get httproute frontend core keycloak
+```
+
+The default public paths are:
+
+| Path | Backend |
 | --- | --- |
-| `https://kamiwaza.test/` | Frontend |
-| `https://kamiwaza.test/api/*` | Core API (via Ray head) |
-| `https://kamiwaza.test/realms/*` | Keycloak (OIDC endpoints) |
-| `https://kamiwaza.test/admin/*` | Keycloak admin console |
+| `/` | `frontend:3000` |
+| `/api` | `core-api:7777` |
+| `/.well-known/openid-configuration` | Keycloak realm discovery |
+| `/realms` and `/resources` | `keycloak:80` |
+| `/v1` | governed protocol data plane |
 
-This requires DNS resolution for `kamiwaza.test` pointing to the Traefik service IP (or a load balancer in front of it).
+Model and extension controllers can publish more `HTTPRoute` objects. Inspect
+the live objects instead of assuming their generated paths.
 
-```bash
-# Find the Traefik external IP
-kubectl get svc traefik -n kamiwaza -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || \
-kubectl get svc traefik -n kamiwaza -o jsonpath='{.spec.clusterIP}'
+### Verify route attachment
 
-# Test with curl (skip TLS verification for self-signed certs)
-TRAEFIK_IP=$(kubectl get svc traefik -n kamiwaza -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
-curl -sk --resolve kamiwaza.test:443:${TRAEFIK_IP} https://kamiwaza.test/api/node/node_status
-```
-
-## NodePort (direct node access)
-
-Some services are pre-configured as NodePort:
+Get the route hostname and parent from the live object:
 
 ```bash
-# Check which services have NodePort
-kubectl get svc -n kamiwaza -o wide | grep NodePort
+export PLATFORM_DOMAIN="$(kubectl -n "$PLATFORM_NAMESPACE" get \
+  kamiwazaplatform "$PLATFORM_NAME" -o jsonpath='{.spec.domain}')"
+export GATEWAY_NAME="$(kubectl -n "$PLATFORM_NAMESPACE" get httproute frontend \
+  -o jsonpath='{.spec.parentRefs[0].name}')"
+export GATEWAY_NAMESPACE="$(kubectl -n "$PLATFORM_NAMESPACE" get httproute frontend \
+  -o jsonpath='{.spec.parentRefs[0].namespace}')"
+export GATEWAY_NAMESPACE="${GATEWAY_NAMESPACE:-$PLATFORM_NAMESPACE}"
 
-# Frontend NodePort
-FRONTEND_PORT=$(kubectl get svc frontend -n kamiwaza -o jsonpath='{.spec.ports[0].nodePort}')
-echo "Frontend: http://<any-node-ip>:${FRONTEND_PORT}"
-
-# Ray Dashboard NodePort
-RAY_PORT=$(kubectl get svc core-raycluster-dashboard -n kamiwaza -o jsonpath='{.spec.ports[0].nodePort}')
-echo "Ray Dashboard: http://<any-node-ip>:${RAY_PORT}"
+kubectl -n "$PLATFORM_NAMESPACE" get httproute frontend \
+  -o jsonpath='{range .status.parents[0].conditions[*]}{.type}={.status}{"\n"}{end}'
+kubectl -n "$GATEWAY_NAMESPACE" get gateway "$GATEWAY_NAME" \
+  -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\n"}{end}'
 ```
 
-## Verification
+Require `Accepted=True` and `ResolvedRefs=True` on the route. Require
+`Programmed=True` on the Gateway before you send customer traffic.
+
+Configure DNS so that `$PLATFORM_DOMAIN` resolves to the Gateway address. If the
+listener uses a private CA, give its CA file to the client. Do not disable TLS
+verification.
 
 ```bash
-# Verify services from the scheduler pod (already allowed by NetworkPolicies)
-kubectl exec -n kamiwaza deployment/core-scheduler -c core -- sh -c '
-  echo "API:       $(curl -sf http://core-raycluster-head-svc:7777/api/node/node_status | head -c 80)"
-  echo "Keycloak:  $(curl -sf http://keycloak:8080/health/ready && echo "ready")"
-  echo "Frontend:  $(curl -sf -o /dev/null -w "%{http_code}" http://frontend:3000)"
-'
-
-# Verify Traefik routes are configured
-kubectl get ingressroute -n kamiwaza -o custom-columns='NAME:.metadata.name,MATCH:.spec.routes[0].match'
+curl --fail --show-error --cacert /path/to/administrator-ca.pem \
+  "https://${PLATFORM_DOMAIN}/"
+curl --fail --show-error --cacert /path/to/administrator-ca.pem \
+  "https://${PLATFORM_DOMAIN}/.well-known/openid-configuration"
 ```
 
-## Credentials
+When the listener uses a public CA, omit `--cacert`.
+
+## Restrict diagnostic surfaces
+
+Do not publish PostgreSQL, etcd, Ray dashboard, model runtime, or management
+ports through public routes.
+
+Use a temporary Ray dashboard port-forward only during an approved diagnostic:
 
 ```bash
-# Keycloak admin password
-kubectl get secret keycloak-admin -n kamiwaza -o jsonpath='{.data.password}' | base64 -d; echo
-
-# Grafana admin password
-kubectl get secret kube-prometheus-stack-grafana -n monitoring -o jsonpath='{.data.admin-password}' | base64 -d 2>/dev/null; echo
-
-# Kamiwaza admin password (if present)
-kubectl get secret kamiwaza-user-admin -n kamiwaza -o jsonpath='{.data.password}' 2>/dev/null | base64 -d; echo
+kubectl -n "$PLATFORM_NAMESPACE" port-forward \
+  service/core-raycluster-head-svc 8265:8265
 ```
 
-## Notes
-
-- **Port-forward** is the safest option — no cluster changes, works with any RBAC.
-- **Traefik** is the production path — all API and UI traffic goes through it. The domain (`kamiwaza.test` by default) must resolve to the Traefik service IP.
-- **NodePort** services are accessible on every cluster node at the allocated port. Find node IPs with `kubectl get nodes -o wide`.
-- **PostgreSQL and etcd** should not be exposed externally. Use `kubectl exec` or `kubectl port-forward` for administrative access.
+Use the approved credential workflow for Keycloak, Grafana, and Kamiwaza. Do
+not print Secret values into terminal logs or automation output.
