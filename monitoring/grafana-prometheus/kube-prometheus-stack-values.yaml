@@ -3,7 +3,8 @@
 # Install:
 #   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 #   helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-#     -n monitoring --create-namespace -f kube-prometheus-stack-values.yaml
+#   --version 91.4.1 -n monitoring --create-namespace \
+#   -f kube-prometheus-stack-values.yaml
 
 crds:
   enabled: true
@@ -81,21 +82,6 @@ grafana:
           options:
             path: /var/lib/grafana/dashboards/kamiwaza
 
-  # Community dashboards from grafana.com.
-  dashboards:
-    default:
-      node-exporter-full:
-        gnetId: 1860
-        revision: 37
-        datasource: Prometheus
-      k8s-cluster-overview:
-        gnetId: 7249
-        revision: 1
-        datasource: Prometheus
-      pvc-usage:
-        gnetId: 13646
-        revision: 2
-        datasource: Prometheus
 
 nodeExporter:
   enabled: true

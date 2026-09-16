@@ -1,6 +1,8 @@
 # Grafana + Prometheus monitoring for Kamiwaza
 
-**Scenario:** deploy a Prometheus + Grafana + Loki + Alloy monitoring stack with Kamiwaza-specific ServiceMonitors, exporters, and 8 pre-built dashboards. Each component is independently usable — deploy the full stack or pick what you need.
+**Scenario:** deploy a Prometheus + Grafana + Loki + Alloy monitoring stack for
+the Deploy Helmfile topology in namespace `kamiwaza`, with ServiceMonitors,
+exporters, and 8 pre-built dashboards. Each component is independently usable.
 
 **Tags:** #monitoring #prometheus #grafana #loki #dashboards
 
@@ -15,9 +17,20 @@
 
 ## Prerequisites
 
-- Kamiwaza deployed (any method: Helmfile, ArgoCD, manual Helm).
+- Kamiwaza deployed with the Deploy Helmfile topology, or equivalent resource
+  names and labels.
 - `kubectl` configured for your cluster.
+- A default `ReadWriteOnce` StorageClass with at least 10 GiB for Loki. If the
+  cluster has no default, add
+  `--set singleBinary.persistence.storageClass=<storage-class>` to the Loki
+  install command.
 - `helm` 3 installed (for the Helm chart components).
+
+The provided ServiceMonitors and dashboard queries target the Deploy Helmfile
+resource names in `kamiwaza`. For an operator-managed platform in another
+namespace, change each ServiceMonitor `namespaceSelector` and the dashboard
+namespace variables before applying them. Ray panels do not apply to native
+`ModelDeployment` serving.
 
 ## Quick start (full stack)
 
@@ -32,16 +45,19 @@ helm repo update
 helm upgrade --install kube-prometheus-stack \
   prometheus-community/kube-prometheus-stack \
   -n monitoring --create-namespace \
+  --version 91.4.1 \
   -f monitoring/grafana-prometheus/kube-prometheus-stack-values.yaml
 
 # Loki (log aggregation)
 helm upgrade --install loki grafana/loki \
   -n monitoring \
+  --version 7.3.0 \
   -f monitoring/grafana-prometheus/loki-values.yaml
 
 # Alloy (log collector DaemonSet)
 helm upgrade --install alloy grafana/alloy \
   -n monitoring \
+  --version 1.12.1 \
   -f monitoring/grafana-prometheus/alloy-values.yaml
 
 # Kamiwaza ServiceMonitors
@@ -91,10 +107,11 @@ kubectl get pods -n monitoring -l app.kubernetes.io/name=alloy -o wide
 
 # Access Grafana
 kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80 -n monitoring
-# Default password:
-kubectl get secret kube-prometheus-stack-grafana -n monitoring \
-  -o jsonpath='{.data.admin-password}' | base64 -d; echo
 ```
+
+The chart stores the generated Grafana admin password in
+`Secret/monitoring/kube-prometheus-stack-grafana`. Read it only into a protected
+local credential flow; do not print it into terminal logs or automation output.
 
 ## Dashboards
 
