@@ -2,7 +2,7 @@
 
 **Scenario:** adopt the transport contract on a cluster that is already running, in three stages, without a flag day. Each stage is a policy document you can load before you apply it, and each one is reversible by going back to the previous revision.
 
-**Tags:** #security #transport #migration #dual-topology #profiles
+Tags: #security #transport #migration #dual-topology #profiles.
 
 ## The first thing to know: not adopting it changes nothing
 
@@ -30,7 +30,7 @@ That is a complete, working, encrypted installation. The operator becomes its ow
 
 ### Stage 2 is where a real migration lives for a while
 
-Stage 2 exists because `Plaintext` and `MeshDelegated` exist, and they exist because a policy that could only express protected hops would push the unprotected ones out of the policy and out of status, where nobody counts them.
+Stage 2 exists to keep `Plaintext` and `MeshDelegated` hops visible. A policy limited to protected hops pushes unprotected hops out of policy and status.
 
 - A `Plaintext` hop requires an `exemption` with a justification of at least eight characters, and the justification appears in status for as long as the exception is active. Give it an `expires` date so it cannot quietly become permanent.
 - A `MeshDelegated` hop requires `evidenceSource: AdminAttested`, and the platform reports it as attested rather than observed. No standard object can corroborate a mesh's protection, so the platform records whose word it is.
@@ -43,11 +43,11 @@ transport.internal.hops[4].transport: a regulated profile refuses plaintext
 transport, and hop CoreToObjectStorage declares it (PlaintextDenied)
 ```
 
-A regulated profile also refuses an administrator-attested hop (`HopUnprotected`), refuses a shortened denied-network set, requires the workload ingress floor, and requires a stated minimum TLS version.
+A regulated profile also refuses administrator-attested hops (`HopUnprotected`) and shortened denied-network sets. It requires the workload ingress floor. Stage 3 states the default TLS 1.2 floor for audit visibility.
 
 ### Stage 3 is not an editing exercise
 
-The diff from stage 2 is: the plaintext hop is gone because the pinned object-storage version now terminates TLS; the mesh-delegated hop is gone because the platform protects it itself; the TLS floor is stated rather than defaulted.
+The stage-2 diff is short. The object-storage version now terminates TLS, so its plaintext exception is gone. The platform now protects the compute hop, so mesh delegation is gone. The TLS floor is explicit for audit visibility.
 
 Every removed exception was removed because the thing it excused was fixed. Deleting the exceptions without fixing them yields a policy that loads and an installation that does not work.
 
@@ -85,6 +85,8 @@ kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
 
 Expect `PlaintextExceptionActive` and `HopAttestedOnly` in step 4 while you are in stage 2. They are advisories, not failures: they are how the exceptions stay counted.
 
+On the live validation platform, stage 2 also reported unprotected hops for selected capabilities outside this migration slice. Those advisories remain migration backlog rather than being hidden.
+
 ## A note on the profile field
 
 The strict posture in this document is the **regulated cross-reference profile**, which administrator policy is evaluated against. On the platform resource itself, `spec.profile` currently admits `Full` only, so a regulated installation is not selectable there in this release: what you can do today is validate a policy against the regulated rules before you rely on them. Do not read stage 3 as "select the regulated profile" — read it as "this policy has nothing left that the regulated rules refuse".
@@ -106,5 +108,7 @@ The namespace-scope axis is separate and is in [../../operator/transport-scopes/
 | `stage-1-encrypt-only.yaml`     | The operator's own loader, `adminpolicy.LoadTransportPolicy`, then `Policy.ValidateCrossReferences` in the Full profile — accepted. Also `transport-security.schema.yaml` (`jsonschema`, Draft 2020-12) — valid.                                           |
 | `stage-2-named-exceptions.yaml` | Same loader — accepted. Cross-reference rules — accepted in the Full profile, and **refused in the regulated profile**: `a regulated profile refuses plaintext transport, and hop CoreToObjectStorage declares it (PlaintextDenied)`. Same schema — valid. |
 | `stage-3-regulated.yaml`        | Same loader — accepted. Cross-reference rules — accepted in **both** the Full and the regulated profile. Same schema — valid.                                                                                                                              |
+
+The three revisions were also applied in order on the clean cluster. Stage 1 reached `TransportReady`. Stage 2 reported `PlaintextExceptionActive` and `HopAttestedOnly`. Stage 3 removed both advisories. Rolling back the Helm release restored the original policy revision and platform readiness.
 
 The stage-2 pair is the load-bearing result here: one document, two profiles, two different answers, from the operator's own rules rather than from this README's description of them.

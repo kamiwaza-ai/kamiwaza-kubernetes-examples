@@ -7,8 +7,8 @@
 #     to one that terminates TLS, and the hop is `PlatformTLS`;
 #   * the mesh-delegated compute hop is gone -- the platform protects it
 #     itself, so its evidence is observed rather than attested;
-#   * the minimum TLS version is stated rather than defaulted, because a
-#     regulated profile requires a stated floor;
+#   * the minimum TLS version is stated for audit visibility instead of using
+#     the published TLS 1.2 default;
 #   * the workload ingress floor and the complete denied network set are both
 #     required rather than optional.
 #
@@ -54,7 +54,6 @@ transport:
     # Required to be stated in a regulated profile, not merely defaulted.
     minimumTLSVersion: TLS1.2
     hostnameVerification: Required
-    fipsApprovedOnly: false
 
   internal:
     defaultTransport: PlatformTLS
