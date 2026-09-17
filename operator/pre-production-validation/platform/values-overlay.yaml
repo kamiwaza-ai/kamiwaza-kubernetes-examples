@@ -16,11 +16,33 @@ adminPolicy:
   extensions:
     allowedNamespaces:
       - ${PLATFORM_NAMESPACE}
+    # Namespaced, because an extension gets its own Role in its own namespace.
+    # The shipped default disables it, and an extension cannot run at all
+    # while it is off: sharing one Role across extensions is the isolation
+    # failure the setting exists to prevent, so the platform refuses rather
+    # than sharing.
+    dynamicRBAC: Namespaced
   routing:
     gateway:
       name: kamiwaza-gateway
       namespace: ${PLATFORM_NAMESPACE}
+      # Where this environment's implementation runs the proxy that serves the
+      # Gateway. Without it the platform ingress floor admits only its own
+      # namespace, and every request through the published route is dropped
+      # while the Gateway reports Accepted.
+      dataPlaneNamespace: ${CALLBACK_SERVICE_NAMESPACE}
       sectionName: https
+    # Where platform callbacks travel. This is a Service reference, so the
+    # operator derives the origin and no extension supplies a URL. The
+    # Service is the environment's own Gateway data plane, which differs by
+    # implementation, so it is named here rather than in the published
+    # fragment.
+    callbackTransport:
+      serviceRef:
+        name: ${CALLBACK_SERVICE_NAME}
+        namespace: ${CALLBACK_SERVICE_NAMESPACE}
+        port: 443
+      scheme: HTTPS
   trust:
     # This environment deliberately has no certificate controller, which is the
     # `controller-free-cluster` dependency the matrix names. The platform signs

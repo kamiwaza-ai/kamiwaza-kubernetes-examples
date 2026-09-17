@@ -37,7 +37,15 @@ transport:
         secretRef: { name: enterprise-trust, key: root-2027.pem }
   floor: { minimumTLSVersion: TLS1.2, hostnameVerification: Required }
   edge:
-    listenerCertificate: PlatformIssued
+    # AdministratorSupplied, because this release consumes the listener
+    # certificate name but issues nothing for it: with PlatformIssued, the
+    # Secret named below never appears, the Gateway listener references
+    # material that does not exist, and the implementation refuses to
+    # provision a data plane at all -- a Gateway that reports Accepted while
+    # Programmed stays false and no route is ever served. The environment
+    # supplies this Secret instead, which is a posture the policy already
+    # names.
+    listenerCertificate: AdministratorSupplied
     listenerCertificateSecretName: kamiwaza-gateway-tls
     httpsRedirect: RequireWhenSupported
     backendTLS: RequireWhenSupported
@@ -128,6 +136,18 @@ transport:
             trustDomain: kamiwaza-examples.example.com
             acceptedIdentities:
               - spiffe://kamiwaza-examples.example.com/ns/kamiwaza/sa/kamiwaza-dataplane
+      # Platform callbacks from an extension. Declaring this hop is what
+      # permits a callback transport at all: the operator refuses to derive a
+      # callback origin for a hop nobody classified, because that is how a
+      # callback plane ends up unprotected by omission.
+      #
+      # The callback dials the Gateway's own in-cluster address over TLS, so
+      # the hop is classified PlatformTLS and the scheme is HTTPS. The
+      # operator refuses the pair when they disagree, which is the check that
+      # keeps a plaintext callback from being described as a protected one.
+      - name: ExtensionToPlatformGateway
+        transport: PlatformTLS
+        authentication: { type: None }
       - name: ExtensionToCore
         transport: PlatformTLS
         authentication:

@@ -101,6 +101,13 @@ issue core-client-tls core ''
 issue core-retrieval-streamer-tls core-retrieval-streamer \
   "DNS:core-retrieval-streamer,DNS:core-retrieval-streamer.${namespace},DNS:core-retrieval-streamer.${namespace}.svc,DNS:core-retrieval-streamer.${namespace}.svc.cluster.local,DNS:kamiwaza-examples.example.com"
 
+# The Gateway listener's own certificate. The routing implementation refuses
+# to provision a data plane for a listener whose Secret is absent, so without
+# this the Gateway reports Accepted while Programmed stays false and no route
+# is ever served -- including the callback route an extension uses.
+issue kamiwaza-gateway-tls "${domain:-kamiwaza-examples.example.com}" \
+  "DNS:${domain:-kamiwaza-examples.example.com}"
+
 # The transport policy fragment names two administrator authorities in a
 # rotation overlap, read from a Secret in the namespace the manager runs in.
 # Trust distribution refuses to publish a bundle while a declared authority is
