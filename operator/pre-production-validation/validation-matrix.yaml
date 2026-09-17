@@ -1,0 +1,95 @@
+schemaVersion: examples.kamiwaza.ai/pre-production-validation-v1
+checks:
+  - order: 1
+    name: validate-administrator-policy
+    artifacts:
+      - operator/pre-production-validation/policy/auth-profile-fragment.yaml
+      - operator/pre-production-validation/policy/transport-policy-fragment.yaml
+  - order: 2
+    name: run-repository-validation
+    artifacts: [operator/pre-production-validation/validate.py]
+  - order: 3
+    name: select-authentication-profile
+    artifacts: [operator/pre-production-validation/policy/auth-profile-fragment.yaml]
+  - order: 4
+    name: verify-role-and-relationship-separation
+    artifacts: [security/rebac/grant-change.sh]
+  - order: 5
+    name: verify-gateway-portability
+    artifacts:
+      - operator/pre-production-validation/environments/envoy/gateway.yaml
+      - operator/pre-production-validation/environments/istio/gateway.yaml
+  - order: 6
+    name: verify-external-identity-providers
+    artifacts: [operator/pre-production-validation/fixtures/identity.yaml]
+  - order: 7
+    name: verify-client-certificate-edge
+    artifacts:
+      - operator/pre-production-validation/fixtures/workloads.yaml
+      - security/cac/gateway-frontend-validation.yaml
+  - order: 8
+    name: verify-identity-lifecycle
+    artifacts:
+      - operator/pre-production-validation/fixtures/bootstrap-idp.py
+      - operator/pre-production-validation/fixtures/bootstrap-directory.sh
+  - order: 9
+    name: verify-grant-producer-ownership
+    artifacts:
+      - security/rebac/grant-manifest.example.yaml
+      - security/rebac/grant-manifest-second-producer.example.yaml
+  - order: 10
+    name: verify-migration-and-writer-retirement
+    artifacts:
+      - security/migration/stage-1-encrypt-only.yaml
+      - security/migration/stage-2-named-exceptions.yaml
+      - security/migration/stage-3-regulated.yaml
+  - order: 11
+    name: verify-transport-policy
+    artifacts:
+      - operator/pre-production-validation/fixtures/workloads.yaml
+      - operator/pre-production-validation/policy/transport-policy-fragment.yaml
+  - order: 12
+    name: verify-runtime-survivability
+    artifacts:
+      - operator/pre-production-validation/fixtures/server.py
+      - security/rotation-drain/rotate-authority-request.yaml
+  - order: 13
+    name: capture-sanitized-evidence
+    artifacts: [operator/pre-production-validation/evidence-template.yaml]
+dependencies:
+  - id: gateway-implementations
+    setup: operator/pre-production-validation/gateways/install.sh
+    verify: operator/pre-production-validation/verify.sh
+    artifacts:
+      - operator/pre-production-validation/environments/envoy/gateway.yaml
+      - operator/pre-production-validation/environments/istio/gateway.yaml
+  - id: controller-free-cluster
+    setup: operator/pre-production-validation/environments/create-kind.sh
+    verify: operator/pre-production-validation/verify.sh
+    artifacts: [operator/pre-production-validation/environments/kind.yaml]
+  - id: external-identity-providers
+    setup: operator/pre-production-validation/fixtures/apply.sh
+    verify: operator/pre-production-validation/verify.sh
+    artifacts:
+      - operator/pre-production-validation/fixtures/identity.yaml
+      - operator/pre-production-validation/policy/auth-profile-fragment.yaml
+  - id: cac-piv-edge
+    setup: operator/pre-production-validation/fixtures/apply.sh
+    verify: operator/pre-production-validation/verify.sh
+    artifacts:
+      - operator/pre-production-validation/fixtures/workloads.yaml
+      - security/cac/gateway-frontend-validation.yaml
+  - id: enforcing-egress-proxy
+    setup: operator/pre-production-validation/fixtures/apply.sh
+    verify: operator/pre-production-validation/verify.sh
+    artifacts:
+      - operator/pre-production-validation/fixtures/workloads.yaml
+      - operator/pre-production-validation/fixtures/network-policies.yaml
+  - id: mutual-tls-destination
+    setup: operator/pre-production-validation/fixtures/apply.sh
+    verify: operator/pre-production-validation/verify.sh
+    artifacts: [operator/pre-production-validation/fixtures/workloads.yaml]
+  - id: resumable-stream
+    setup: operator/pre-production-validation/fixtures/apply.sh
+    verify: operator/pre-production-validation/verify.sh
+    artifacts: [operator/pre-production-validation/fixtures/workloads.yaml]

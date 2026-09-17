@@ -1,0 +1,23 @@
+schemaVersion: examples.kamiwaza.ai/pre-production-evidence-v1
+sourceRelease: ""
+targetRelease: ""
+operatorRevision: ""
+policyRevision: ""
+policyDigest: ""
+environments:
+  - gatewayClassName: eg
+    namespace: kamiwaza-examples
+    outcomes: []
+  - gatewayClassName: istio
+    namespace: kamiwaza-examples-secondary
+    outcomes: []
+externalEvidence:
+  edge: { class: "", revision: "", digest: "" }
+  egressProxy: { class: "", revision: "", digest: "" }
+migration: { digest: "", confirmed: false }
+rotations: []
+drains: []
+resumptions: []
+fencingRejections: []
+privacyScanPassed: false
+secretScanPassed: false

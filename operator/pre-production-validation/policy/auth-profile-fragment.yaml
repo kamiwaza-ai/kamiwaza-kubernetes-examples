@@ -1,0 +1,102 @@
+profiles:
+  - name: enterprise
+    methods:
+      - name: builtin
+        type: BuiltInKeycloak
+        providerID: builtin-keycloak
+        enabled: true
+        realm: kamiwaza
+        clientID: kamiwaza-platform
+        clientSecretRef: { name: builtin-keycloak-client, key: client-secret }
+      - name: enterprise-oidc
+        type: BrokeredOIDC
+        providerID: enterprise-oidc
+        enabled: true
+        issuer: https://login.example.com/realms/enterprise
+        discoveryPolicy: PinnedMetadata
+        metadataRef: { name: enterprise-oidc-metadata, key: metadata.json }
+        destinationClass: enterprise-idp
+        clientID: kamiwaza
+        clientSecretRef: { name: enterprise-oidc-client, key: client-secret }
+        subjectClaim: sub
+        usernameClaims: [preferred_username]
+        emailClaims: [email]
+        groupClaims: [groups]
+        requiredACR: [urn:example:acr:multifactor]
+      - name: enterprise-saml
+        type: SAML
+        providerID: enterprise-saml
+        enabled: true
+        idpEntityID: https://idp.example.com/saml/metadata
+        metadataRef: { name: enterprise-saml-metadata, key: metadata.xml }
+        spEntityID: https://kamiwaza.example.invalid/saml/sp
+        spSigningSecretRef: { name: enterprise-saml-sp, key: signing-key }
+        signRequests: true
+        requireSignedAssertions: true
+        requiredAttributes: [subject, roles, tenant_id]
+        replayWindow: 5m
+      - name: enterprise-ldap
+        type: LDAPThroughKeycloak
+        providerID: enterprise-ldap
+        enabled: true
+        connectionUrl: ldap://ldap.example.com:389
+        startTlsRequired: true
+        destinationClass: enterprise-directory
+        bindDN: cn=platform-service,ou=services,dc=example,dc=com
+        bindSecretRef: { name: enterprise-ldap-bind, key: password }
+        usersDN: ou=people,dc=example,dc=com
+        uniqueIDAttribute: entryUUID
+        usernameAttribute: uid
+        editMode: READ_ONLY
+        syncPolicy: Changed
+        mappers:
+          - { name: username, type: UserAttribute, source: uid, target: preferred_username }
+          - { name: groups, type: GroupRole, source: memberOf, target: groups }
+      - name: cac
+        type: X509CAC
+        providerID: cac
+        enabled: true
+        clientCARef: { name: cac-client-authorities, key: authorities.pem }
+        certificatePolicy:
+          requiredExtendedKeyUsages: [ClientAuth, PIVAuthentication]
+          requiredPolicyOIDs: [1.3.6.1.4.1.99999.1.2]
+          sourceIdentity: CustomOID
+          sourceIdentityOID: 1.3.6.1.4.1.99999.1.1
+          allowedIssuerKeyIDs: [example-issuer-key-identifier]
+          minimumKeyPolicy: FipsApproved
+        revocation:
+          mode: Both
+          required: true
+          maxEvidenceAge: 24h
+          failureMode: FailClosed
+          evidenceSource: { name: cac-revocation-evidence, key: evidence.json }
+        edge:
+          capability: ClientCertificateAuthentication
+          backendAuthentication: MutualTLS
+          backendClientIdentityRef: cac-edge-client
+          externalEvidenceRef: { name: edge-conformance, key: result.json }
+          protectedPath: /api/auth/cac/login
+          directAccessPolicy: Deny
+          sanitizeHeaders: AllCertificateVerificationEdgeAuthAndUserIdentityHeaders
+          requiredEvidence:
+            - ClientCertificateEnforced
+            - HeadersSanitized
+            - BackendAuthenticated
+            - PathRestricted
+            - DirectOriginDenied
+        certificateHeader: Client-Cert
+        certificateChainHeader: Client-Cert-Chain
+        maxHeaderBytes: 32768
+    jitAdmission: Allowed
+    requiredClaims: [sub, roles, tenant_id]
+    authorizationProjection: ReBACOnly
+    tenantContext: RequiredClaimThenReBAC
+    assurance:
+      requiredACR: [urn:example:acr:multifactor]
+      requiredAMR: [pwd, otp]
+    session:
+      overallTimeout: 12h
+      inactivityTimeout: 30m
+      reauthentication: StepUpForSensitiveAction
+      tokenAudience: kamiwaza-platform
+    failureMode: FailClosed
