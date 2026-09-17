@@ -130,6 +130,10 @@ def serve_http():
     server = ThreadingHTTPServer(("0.0.0.0", port), FixtureHandler)
     if MODE in {"mtls", "edge"}:
         context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        # The default server context still admits TLS 1.0 and 1.1. A lab
+        # fixture that accepts them is a lab that cannot prove anything about
+        # a platform requiring TLS 1.2 or better.
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
         context.verify_mode = ssl.CERT_REQUIRED
         context.load_verify_locations("/ca/ca.crt")
         context.load_cert_chain("/tls/tls.crt", "/tls/tls.key")
