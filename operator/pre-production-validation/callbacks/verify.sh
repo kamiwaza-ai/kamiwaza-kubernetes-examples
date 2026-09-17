@@ -97,17 +97,20 @@ for component in api background-worker document-worker; do
     exit 1
   }
   echo "${record}"
-  printf '%s' "${record}" | python3 - "${component}" "${origins}" <<'PY'
+  # The record is an argument, not piped input: the program itself arrives on
+  # standard input, so a pipe into it is read as the program and the record is
+  # never seen.
+  python3 - "${component}" "${origins}" "${record}" <<'PY'
 import json
 import sys
 
-record = json.loads(sys.stdin.read())
-with open(sys.argv[2], "a", encoding="utf-8") as handle:
+component, origins, record = sys.argv[1], sys.argv[2], json.loads(sys.argv[3])
+with open(origins, "a", encoding="utf-8") as handle:
     handle.write(record["origin"] + "\n")
 reached = {200, 401, 403, 404}
 for family, status in record["results"].items():
     if status not in reached:
-        raise SystemExit(f"{sys.argv[1]} did not reach the {family} route family: {status}")
+        raise SystemExit(f"{component} did not reach the {family} route family: {status}")
 PY
 done
 
