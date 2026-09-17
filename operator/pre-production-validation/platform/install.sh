@@ -102,7 +102,10 @@ helm --kube-context "${context}" upgrade --install kamiwaza-platform-operator "$
   --values "${tmp}/values-overlay.yaml" \
   --values "${tmp}/policy-values.yaml" \
   --set-string image.registry="${MANAGER_IMAGE%%/*}" \
-  --set-string image.repository="$(ref="${MANAGER_IMAGE#*/}"; printf '%s' "${ref%@*}")" \
+  --set-string image.repository="$(
+    ref="${MANAGER_IMAGE#*/}"
+    printf '%s' "${ref%@*}"
+  )" \
   --set-string image.digest="${MANAGER_IMAGE#*@}" \
   --wait --timeout=10m
 

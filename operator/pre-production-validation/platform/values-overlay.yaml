@@ -28,9 +28,9 @@ adminPolicy:
     # from the transport policy fragment, so no issuer is referenced here.
     managementPolicy: External
     issuer:
-      group: ''
-      kind: ''
-      name: ''
+      group: ""
+      kind: ""
+      name: ""
   dependencies:
     # Null removes the key. A declared dependency is an administrator
     # attestation that the controller is installed, and attesting to a
@@ -41,14 +41,14 @@ adminPolicy:
     gatewayAPI:
       managementPolicy: External
       evidenceSource: AdminAttested
-      namespace: ''
+      namespace: ""
       # The version `gateways/install.sh` pins. The chart's own default
       # attests `>=1.4.0`, which the manager refuses against this scenario's
       # policy: edge client certificates need Gateway API v1.5.0 or later,
       # and it will not write a client-certificate field that a bundle below
       # that floor would silently prune -- a Gateway accepted while
       # enforcing nothing.
-      versionConstraint: '>=1.6.0 <2.0.0'
+      versionConstraint: ">=1.6.0 <2.0.0"
   images:
     requireDigests: true
     allowedRepositoryPrefixes:
