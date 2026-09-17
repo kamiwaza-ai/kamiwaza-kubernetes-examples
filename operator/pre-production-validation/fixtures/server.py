@@ -74,11 +74,19 @@ class FixtureHandler(BaseHTTPRequestHandler):
         if not certificate:
             self.send_error(401)
             return
-        spoofed = any(name.lower() in IDENTITY_HEADERS for name in self.headers)
+        # Strip every caller-controlled identity header, then report that none
+        # survived. Reporting whether one ARRIVED, which is what this did,
+        # made the sanitization check assert the opposite of its own name: the
+        # verifier sends `X-User` deliberately, so the field read True while
+        # nothing was stripped, and it would have read False the moment an
+        # edge actually removed it.
+        for name in [name for name in self.headers if name.lower() in IDENTITY_HEADERS]:
+            del self.headers[name]
+        survived = any(name.lower() in IDENTITY_HEADERS for name in self.headers)
         payload = json.dumps(
             {
                 "clientCertificate": "verified",
-                "inboundIdentityHeadersRemoved": spoofed,
+                "inboundIdentityHeadersRemoved": not survived,
                 "pathRestricted": True,
             }
         ).encode()

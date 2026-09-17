@@ -43,6 +43,24 @@ def verify_edge():
     }:
         raise RuntimeError(f"unexpected edge result: {result}")
 
+    # The edge reports its own path restriction, so ask for a path it must not
+    # serve. Without this the reported field was a constant nobody tested.
+    with contextlib.closing(
+        http.client.HTTPSConnection(
+            f"cac-piv-edge.{DEPENDENCY_NAMESPACE}.svc.cluster.local",
+            8443,
+            context=tls_context(),
+            timeout=10,
+        )
+    ) as edge:
+        edge.request("GET", "/api/models")
+        unprotected = edge.getresponse()
+        unprotected.read()
+    if unprotected.status != 404:
+        raise RuntimeError(
+            f"the edge served an unprotected path with HTTP {unprotected.status}"
+        )
+
 
 def verify_stream():
     with contextlib.closing(
