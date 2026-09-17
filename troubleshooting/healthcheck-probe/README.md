@@ -145,23 +145,20 @@ kubectl -n kamiwaza-extensions patch kamiwazaextension <cr> --type=json -p '[
 ]'
 ```
 
-### B. Helm-deployed service (chart-owned)
+### B. Platform component (operator-owned)
 
-Set the probe in values and re-sync — never `kubectl edit` the Deployment:
-
-```yaml
-<component>:
-  livenessProbe:
-    httpGet: { path: /<basePath>/health, port: http }
-    initialDelaySeconds: 15
-    failureThreshold: 3
-  readinessProbe:
-    httpGet: { path: /<basePath>/health, port: http }
-```
+Platform component probes come from the operator's rendered desired state, so a
+live edit is reverted on the next reconcile. Change the tenant intent on
+`KamiwazaPlatform`, or the administrator-owned immutable policy when the field
+is policy-governed, and let reconciliation roll the workload:
 
 ```bash
-helmfile -f cluster/helmfile.yaml.gotmpl -e <env> sync
+kubectl -n "$PLATFORM_NAMESPACE" get kamiwazaplatform kamiwaza \
+  -o jsonpath='{range .status.conditions[*]}{.type}{"\t"}{.status}{"\t"}{.reason}{"\n"}{end}'
 ```
+
+A probe field the platform API does not expose is not tenant intent. Report it
+rather than patching the Deployment the operator owns.
 
 ### C. Plain Deployment you own
 
@@ -216,5 +213,5 @@ remediation; the durable fix is in the extension image.
 ## Related
 
 - [`../diagnostic-commands/`](../diagnostic-commands/) — the general triage this branches off.
-- [`../../operations/apply-overrides-reinstall/`](../../operations/apply-overrides-reinstall/) — apply config changes (overrides) and roll workloads safely.
-- [`../../security/tls-trust/extensions/`](../../security/tls-trust/extensions/) — extension trust/egress patterns.
+- [`../../operator/upgrades/`](../../operator/upgrades/) — change platform intent and roll workloads through the operator.
+- [`../../security/tls-trust/`](../../security/tls-trust/) — administrator-approved outbound trust for platform workloads.

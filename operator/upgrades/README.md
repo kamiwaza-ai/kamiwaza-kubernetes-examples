@@ -2,18 +2,18 @@
 
 Request the exact supported forward upgrade and observe preflight, versioned Jobs, and staged convergence.
 
-**Tags:** #operator #upgrade #migration #day2
+**Tags:** #operator #upgrade #day2
 
-The current operator release converges to `1.3.0`. It supports a `1.1.0` source only at the exact revision and source-controller state published in `dist/compatibility.json`. A `1.2.0` source with active KubeRay `1.6.2` is blocked. No reverse migration is advertised.
+The current operator release converges to `1.3.0`. A source is supported only at an exact source/target edge published in the installed release's `dist/compatibility.json`. No reverse migration is advertised.
 
 The commands use `kamiwaza-examples` for an isolated rehearsal. Replace it only
 after selecting and recording the reviewed production namespace.
 
-This scenario does not start from the operator quickstart, which is already at `1.3.0`. Without the exact supported `1.1.0` source and completed handoff, the target-version patch is only an idempotence check; it does not exercise the migration edge.
+This scenario does not start from the operator quickstart, which is already at `1.3.0`. Applied to a platform already at the target version, the patch is only an idempotence check; it does not exercise a migration edge.
 
 ## Prerequisites
 
-- Adoption of the supported source is complete or the source installation already satisfies the published ownership contract.
+- The platform is already owned by this operator and reports `Ready`.
 - A current backup exists outside the cluster, including recovery credentials.
 - The maintenance window covers the forward-only migration boundary.
 - The cluster administrator has upgraded every CRD in `dist/kamiwaza-apis.yaml` before rolling out a manager that requires them. Withheld APIs use the separate explicit ownership-transfer procedure.
@@ -29,11 +29,11 @@ kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
   -o custom-columns=DESIRED:.spec.version,CURRENT:.status.currentVersion,GENERATION:.metadata.generation,OBSERVED:.status.observedGeneration
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
   -o jsonpath='{range .status.conditions[*]}{.type}{"\t"}{.status}{"\t"}{.reason}{"\t"}{.message}{"\n"}{end}'
-kubectl -n kamiwaza-examples get deployment extension-operator kuberay-operator \
-  --ignore-not-found
+kubectl -n kamiwaza-examples get jobs \
+  -l app.kubernetes.io/managed-by=kamiwaza-platform-operator
 ```
 
-The exact source revision, legacy extension-controller handoff, and KubeRay tombstone state must match the published edge.
+The live version, observed generation, and conditions must match an edge the installed compatibility artifact publishes.
 
 ## 2. Upgrade administrator-owned APIs
 

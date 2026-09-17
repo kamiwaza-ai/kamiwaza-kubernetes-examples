@@ -1,6 +1,6 @@
 {
   "uid": "kam-02",
-  "title": "Inference & Ray Cluster",
+  "title": "Inference & Delegated Compute",
   "tags": [
     "kamiwaza",
     "ray",
@@ -21,7 +21,7 @@
   "graphTooltip": 1,
   "links": [
     {
-      "title": "\u2190 Platform Overview",
+      "title": "← Platform Overview",
       "url": "/d/kam-01",
       "type": "link",
       "targetBlank": false
@@ -70,22 +70,6 @@
         "label": "Loki",
         "multi": false,
         "refresh": 1
-      },
-      {
-        "name": "deployment",
-        "type": "query",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${datasource}"
-        },
-        "query": "label_values(ray_serve_deployment_request_counter_requests_total, deployment_name)",
-        "current": {},
-        "hide": 0,
-        "label": "Deployment",
-        "multi": true,
-        "includeAll": true,
-        "allValue": ".*",
-        "refresh": 2
       }
     ]
   },
@@ -306,74 +290,6 @@
       }
     },
     {
-      "id": 5,
-      "type": "stat",
-      "title": "Ongoing Serve Requests",
-      "description": "In-flight requests currently being processed by Ray Serve",
-      "gridPos": {
-        "x": 18,
-        "y": 1,
-        "w": 6,
-        "h": 4
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(ray_serve_num_ongoing_requests) or vector(0)",
-          "instant": true,
-          "legendFormat": ""
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 50
-              },
-              {
-                "color": "red",
-                "value": 100
-              }
-            ]
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
       "id": 6,
       "type": "row",
       "title": "Inference Throughput & Latency",
@@ -385,216 +301,6 @@
         "h": 1
       },
       "panels": []
-    },
-    {
-      "id": 7,
-      "type": "timeseries",
-      "title": "Requests/sec per Deployment",
-      "gridPos": {
-        "x": 0,
-        "y": 6,
-        "w": 8,
-        "h": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(rate(ray_serve_deployment_request_counter_requests_total{deployment_name=~\"${deployment}\"}[5m])) by (deployment_name)",
-          "legendFormat": "{{deployment_name}}"
-        }
-      ],
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "drawStyle": "line"
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "reqps"
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 8,
-      "type": "timeseries",
-      "title": "Error Rate per Deployment",
-      "gridPos": {
-        "x": 8,
-        "y": 6,
-        "w": 8,
-        "h": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(rate(ray_serve_deployment_error_counter_requests_total{deployment_name=~\"${deployment}\"}[5m])) by (deployment_name)",
-          "legendFormat": "{{deployment_name}} errors"
-        }
-      ],
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 20,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "drawStyle": "line"
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "ops"
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 14,
-      "type": "timeseries",
-      "title": "Serve Request Latency (p50 / p95 / p99)",
-      "description": "End-to-end request processing latency as seen by Ray Serve",
-      "gridPos": {
-        "x": 16,
-        "y": 6,
-        "w": 8,
-        "h": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "histogram_quantile(0.5, sum(rate(ray_serve_deployment_processing_latency_ms_bucket{deployment_name=~\"${deployment}\"}[5m])) by (le, deployment_name))",
-          "legendFormat": "p50 {{deployment_name}}"
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(ray_serve_deployment_processing_latency_ms_bucket{deployment_name=~\"${deployment}\"}[5m])) by (le, deployment_name))",
-          "legendFormat": "p95 {{deployment_name}}"
-        },
-        {
-          "refId": "C",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "histogram_quantile(0.99, sum(rate(ray_serve_deployment_processing_latency_ms_bucket{deployment_name=~\"${deployment}\"}[5m])) by (le, deployment_name))",
-          "legendFormat": "p99 {{deployment_name}}"
-        }
-      ],
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 5,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "drawStyle": "line"
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "ms",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1000
-              },
-              {
-                "color": "red",
-                "value": 5000
-              }
-            ]
-          }
-        },
-        "overrides": []
-      }
     },
     {
       "id": 9,

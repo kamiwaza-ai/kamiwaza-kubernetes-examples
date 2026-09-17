@@ -7,8 +7,8 @@ Eight pre-built Grafana dashboards covering the full Kamiwaza platform. Each `.j
 | File | Title | Datasources | Focus |
 | --- | --- | --- | --- |
 | `kam-01-platform-overview.json` | Platform Health Overview | Prometheus, Loki | Component health, golden signals, resource utilisation, PVC usage, K8s warning events |
-| `kam-02-inference-ray.json` | Inference & Ray Cluster | Prometheus, Loki | Ray node health, inference throughput/latency, GPU utilisation, Ray logs |
-| `kam-03-core-api-scheduler.json` | Core API & Scheduler | Prometheus, Loki | Ray Serve request rate/errors/latency, scheduler CPU/memory/restarts, error log rate |
+| `kam-02-inference-ray.json` | Inference & Delegated Compute | Prometheus, Loki | Delegated-compute node health, object store, pending tasks, GPU utilisation, compute logs |
+| `kam-03-core-api-scheduler.json` | Core API & Scheduler | Prometheus, Loki | Scheduler CPU/memory/restarts, Core API workload health, error log rate |
 | `kam-04-data-infrastructure.json` | Data Infrastructure | Prometheus, Loki | etcd leader/DB size/WAL fsync, PostgreSQL connections/cache hit/transactions/row activity |
 | `kam-05-extensions-kaizen.json` | Extensions & Kaizen | Prometheus, Loki | Extension sync status, operator health, sandbox pods, namespace resource usage |
 | `kam-06-auth-identity.json` | Auth & Identity | Prometheus | Keycloak health, active sessions, login rate, auth errors, certificate expiry |

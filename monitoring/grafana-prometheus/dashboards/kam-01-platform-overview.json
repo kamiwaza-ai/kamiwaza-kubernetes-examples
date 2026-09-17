@@ -575,136 +575,6 @@
       "panels": []
     },
     {
-      "id": 9,
-      "type": "timeseries",
-      "title": "Inference Request Rate (RPS)",
-      "description": "Requests/sec served by Ray Serve deployments",
-      "gridPos": {
-        "x": 0,
-        "y": 5,
-        "w": 6,
-        "h": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(rate(ray_serve_deployment_request_counter_requests_total[5m])) by (deployment_name)",
-          "legendFormat": "{{deployment_name}}"
-        }
-      ],
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": []
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "drawStyle": "line"
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "reqps"
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 10,
-      "type": "timeseries",
-      "title": "API Error Rate (5xx %)",
-      "description": "Percentage of Ray Serve requests returning errors",
-      "gridPos": {
-        "x": 6,
-        "y": 5,
-        "w": 6,
-        "h": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "100 * sum(rate(ray_serve_deployment_error_counter_requests_total[5m])) / (sum(rate(ray_serve_deployment_request_counter_requests_total[5m])) > 0)",
-          "legendFormat": "Error %"
-        }
-      ],
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": []
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 20,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "drawStyle": "line"
-          },
-          "color": {
-            "fixedColor": "red",
-            "mode": "fixed"
-          },
-          "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 5
-              }
-            ]
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
       "id": 11,
       "type": "timeseries",
       "title": "Pod Restarts (last 1h)",
@@ -1241,7 +1111,7 @@
           "id": 20,
           "type": "logs",
           "title": "Recent Warning Events (kamiwaza namespaces)",
-          "description": "Kubernetes events from Alloy eventhandler \u2014 filtered to Warning severity in Kamiwaza namespaces",
+          "description": "Kubernetes events from Alloy eventhandler — filtered to Warning severity in Kamiwaza namespaces",
           "gridPos": {
             "x": 0,
             "y": 30,

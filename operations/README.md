@@ -11,11 +11,12 @@ self-contained procedure with verification steps.
 
 | Procedure | When to use |
 | --- | --- |
-| [`apply-overrides-reinstall/`](apply-overrides-reinstall/) | Apply values/overrides changes, reinstall, or uninstall the platform. |
+| [`backup-restore/`](backup-restore/) | Back up and restore platform-owned PostgreSQL and etcd state. |
 
 ---
 
 ## Related
 
 - [`../troubleshooting/`](../troubleshooting/) — diagnosis-first playbooks for failures.
-- [`../security/`](../security/) — TLS trust, CA, ingress, and auth scenarios.
+- [`../operator/upgrades/`](../operator/upgrades/) — change platform intent and roll workloads through the operator.
+- [`../security/`](../security/) — TLS trust, authority, edge, and auth scenarios.

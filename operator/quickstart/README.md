@@ -4,7 +4,7 @@ Deploy one Kamiwaza `1.3.0` platform with a separately placed manager watching o
 
 **Tags:** #operator #quickstart #fresh-install #namespaced
 
-The operator is under release verification. Run this workflow on a disposable or explicitly approved cluster. It does not adopt an existing Helmfile installation.
+The operator is under release verification. Run this workflow on a disposable or explicitly approved cluster. It does not adopt an existing installation.
 
 ## Prerequisites
 

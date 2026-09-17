@@ -23,7 +23,7 @@ This example covers outbound server trust. It does not configure the inbound Gat
 | [kustomization.yaml](kustomization.yaml)                         | Generates the exact-name authority Secret from a local PEM file |
 | [org-ca-secret.template.yaml](org-ca-secret.template.yaml)       | Reference Secret shape; do not put real PEM in Git              |
 
-Files and directories for the retired 0.13 Deploy procedure remain historical evidence only. Do not use `build-trust-bundle-configmap.sh`, `trust-bundle-values-snippet.yaml`, `verify.sh`, `ingress/`, `extensions/`, or `bedrock-custom-region/` with an operator-managed installation. The operator replaces the manual ConfigMap builder and workload patching.
+Trust is published by the operator. There is no manual bundle builder, no chart values fragment, and no workload patch step in this scenario: an authority source plus an administrator policy revision is the whole procedure.
 
 ## Prerequisites
 

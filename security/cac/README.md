@@ -112,7 +112,6 @@ The auth origin reads a revocation JSON document with a `generated_at` timestamp
 | [edge-conformance-evidence.example.yaml](edge-conformance-evidence.example.yaml) | shape of the five conformance records (not for applying)                          |
 | [revocation-evidence.example.yaml](revocation-evidence.example.yaml)             | shape of the revocation record (not for applying)                                 |
 | [assurance-evidence.example.yaml](assurance-evidence.example.yaml)               | shape of the protected NIST assurance record (not for applying)                   |
-| [core-values-snippet.yaml](core-values-snippet.yaml)                             | auth-origin configuration for the Helmfile lifecycle                              |
 | [kustomization.yaml](kustomization.yaml)                                         | generates `cac-edge-origin` and `cac-client-authorities` from local files         |
 
 ## Steps
@@ -142,7 +141,7 @@ kubectl -n kamiwaza patch kamiwazaplatform kamiwaza \
   --type merge --patch-file security/cac/platform-profile-selection.yaml
 ```
 
-6. **Configure the origin.** On the Helmfile lifecycle, merge `core-values-snippet.yaml` into `cluster/values/overrides.yaml` and sync. Setting `AUTH_GATEWAY_CAC_EDGE_PROFILE=rfc9440` is what selects the strict contract; leaving it unset keeps the installation's existing behaviour unchanged.
+6. **Confirm the published origin contract.** The origin bound, accepted login path, forwarded-field ceilings, edge identity, and revocation source all come from the selected profile's `X509CAC` method. The operator publishes the forwarding route, the origin `BackendTLSPolicy`, and the client-authority ConfigMap only once every control is proven, so there is no separate origin configuration step and no environment override to set.
 
 The profile claims `AAL3` and `FAL2` only while `cac-assurance-evidence` contains externally observed, revision-bound evidence at or above both floors. Do not copy the sample record. Remove the minimums and `evidenceRef` together if the installation has no complete NIST evidence set.
 
@@ -185,6 +184,6 @@ kubectl -n kamiwaza get gateway kamiwaza-gateway \
 
 ## Migration from the previous version of this example
 
-The previous version configured a specific ingress product through vendor `Middleware` and `IngressRoute` kinds. It also put a **plaintext edge shared secret in a Middleware header**. The credential then appeared in a values file, Git, and every rendered manifest. This contract contains none of those surfaces.
+The previous version configured a specific ingress product through vendor `Middleware` and `IngressRoute` kinds, and it put a **plaintext edge shared secret in a Middleware header**. The credential then appeared in a values file, Git, and every rendered manifest. This contract contains none of those surfaces: the edge is administrator-owned, the platform publishes only standard Gateway API objects, and every credential arrives by reference.
 
-An installation with the previous configuration continues to work. The auth origin keeps the legacy forwarded-header flow as the default. An unset `AUTH_GATEWAY_CAC_EDGE_PROFILE` preserves that behavior. Migration requires canonical RFC 9440 fields, five proven outcomes, and rotation of the previously committed shared secret.
+Migration requires canonical RFC 9440 fields at the edge, five proven conformance outcomes, current revocation evidence for the live policy revision, and rotation of any previously committed shared secret.

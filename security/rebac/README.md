@@ -11,7 +11,7 @@ The previous version of this directory taught tenant tuple bootstrap: copy a man
 - It made the operator a second writer to the store. The grant service owns its outbox and its backend projection; a CLI that writes tuples beside it produces state no producer reconciles and no audit attributes.
 - It revoked by tuple identity. An edge can have several owners. Deleting the tuple to undo your own grant deletes somebody else's grant at the same time, silently and unattributably.
 
-Enabling relationship decisions with Helm values is still here, because that part was never wrong. Everything about writing tuples directly is gone.
+Enabling relationship decisions is still here, because that part was never wrong. It is stated as tenant intent on the platform resource now instead of as chart values. Everything about writing tuples directly is gone.
 
 ## The contract is the authority
 
@@ -31,23 +31,33 @@ Two properties of that document matter before you start:
 
 ## Prerequisites
 
-- Kamiwaza deployed with full auth (Keycloak plus PostgreSQL) and relationship decisions enabled. ReBAC is not available in lite mode; the core chart fails template rather than rendering a half-enabled state.
+- A platform reconciled by the platform operator with authentication enabled and relationship decisions enabled. ReBAC requires Keycloak and PostgreSQL; the operator refuses a half-enabled state rather than rendering one.
 - A bearer token holding the dedicated authorization-administration authority. Kubernetes namespace administration does not satisfy it, whatever the role is named.
 - `curl`, `jq`, and either `yq` or `python3` with PyYAML.
 - A platform that serves the four operations above. `HTTP 404` from `:plan` means your release does not serve this contract; it does not mean the grant is fine.
 
-## Step 0 — select the profile
-
-Merge `core-values-snippet.yaml` into Deploy `cluster/values/overrides.yaml` (or another later values layer) and re-sync.
-
-`AUTH_GATEWAY_GRANT_PRODUCER_PROFILE=producer_owned` is the whole switch. Unset, blank, `legacy`, or any unrecognised value is exactly today's grant behaviour — an unrecognised value logs one warning and stays legacy — so rolling a new image never changes how an existing installation's grant paths behave. On an installation that has not selected it, an edge carries no owners and the producer-ownership properties below are not in effect.
-
-`AUTH_GATEWAY_ROLE_SEPARATION_PROFILE=least_privilege` is in the same snippet for a reason. Under the legacy profile the coarse Kamiwaza `admin` role satisfies authorization administration and short-circuits the ownership lookup, so any admin can change any producer's grants. Read the note in the snippet before selecting it: it removes the coarse role's ambient resource access, so the explicit relationships have to exist first.
-
-Verify the signal reached the process that serves the operations:
+## Step 0 — enable relationship decisions
 
 ```bash
-kubectl -n kamiwaza exec deploy/core-scheduler -c core -- \
+kubectl -n "$PLATFORM_NAMESPACE" patch kamiwazaplatform kamiwaza \
+  --type merge --patch-file security/rebac/platform-rebac-selection.yaml
+kubectl -n "$PLATFORM_NAMESPACE" wait --for=condition=Ready \
+  kamiwazaplatform/kamiwaza --timeout=30m
+```
+
+Confirm the projected decision configuration:
+
+```bash
+kubectl -n "$PLATFORM_NAMESPACE" get configmap core-config \
+  -o jsonpath='{.data.AUTH_REBAC_ENABLED}{"\t"}{.data.AUTH_REBAC_BACKEND}{"\t"}{.data.AUTH_REBAC_ALLOW_COMMUNITY_FALLBACK}{"\n"}'
+```
+
+Two further switches decide grant semantics: `AUTH_GATEWAY_GRANT_PRODUCER_PROFILE=producer_owned` makes an edge carry its owners, so a remove releases one producer's claim instead of deleting the edge, and `AUTH_GATEWAY_ROLE_SEPARATION_PROFILE=least_privilege` separates authorization administration from identity administration so the coarse `admin` role no longer short-circuits the ownership lookup. Both default to the compatible behaviour, and the platform API exposes neither today, so they are properties of the reviewed image configuration rather than tenant intent. Read the workflow below as the producer-owned contract; on an installation that has not selected it, an edge carries no owners and the properties below are not in effect.
+
+Verify what the serving process actually received:
+
+```bash
+kubectl -n "$PLATFORM_NAMESPACE" exec deploy/core-api -c core -- \
   env | grep -E '^(AUTH_REBAC_ENABLED|AUTH_GATEWAY_GRANT_PRODUCER_PROFILE|AUTH_GATEWAY_ROLE_SEPARATION_PROFILE)=' | sort
 ```
 
@@ -196,7 +206,7 @@ Closed vocabularies are not bureaucracy. An open one means a typo becomes a rela
 
 ## Tenants
 
-Tenant scope comes from the token, not from this workflow: the platform reads the active tenant from the `tenant_id` / `tenant` claims, and `core.scheduler.rebac.defaultTenantId` is the default used by bootstrap jobs and as a reference id, not a per-user assignment. Per-user tenants need per-user or per-group claim mappers in Keycloak. Registering a tenant id is `tenant-registry-snippet.yaml`, and rejecting a token whose `tenant_id` is not registered is `tenant-registry-enforcement-snippet.yaml`. Neither is a grant: `Tenant` has no writable relation in the shipped internal schema, so tenant-scoped access is granted on the resources inside the tenant, as ordinary bundle entries. What is gone is bootstrapping tenant tuples by CLI — that is a plan, a diff, and an apply like every other grant change.
+Tenant scope comes from the token, not from this workflow: the platform reads the active tenant from the `tenant_id` / `tenant` claims. Registering a tenant id is `tenant-registry-snippet.yaml`, which is read from the reviewed image's own `configs/rebac/tenant_registry.yaml` or from the path `AUTH_TENANT_REGISTRY_PATH` names; the platform API exposes neither the registry nor its enforcement switch, so both are properties of the reviewed image configuration. Registration is not a grant: `Tenant` has no writable relation in the shipped internal schema, so tenant-scoped access is granted on the resources inside the tenant, as ordinary bundle entries. What is gone is bootstrapping tenant tuples by CLI.
 
 ## Verification
 
@@ -228,13 +238,12 @@ Everything specific to your installation, because none of it belongs in this rep
 | `grant-manifest-second-producer.example.yaml` | Same loader — one entry, no blockers. Same schema — valid.                                                                                                                                                                                               |
 | `grant-manifest-refused.example.yaml`         | Same loader — **refused on purpose**, blockers `unknown_relation` and `unknown_resource_type`. Same schema — invalid at exactly those two closed enumerations.                                                                                           |
 | `tenant-registry-snippet.yaml`                | The platform's own registry loader, `kamiwaza.services.authz.tenant_registry` — both ids load, and an unregistered id is rejected under enforcement.                                                                                                     |
-| `core-values-snippet.yaml`                    | `yamllint` with this repository's configuration. Its chart keys were read from `charts/core/values.yaml`.                                                                                                                                                |
-| `tenant-registry-enforcement-snippet.yaml`    | `yamllint` with this repository's configuration. Its chart key was read from `charts/core/values.yaml`.                                                                                                                                                  |
+| `platform-rebac-selection.yaml`               | `yamllint` with this repository's configuration, and its fields against the operator's `KamiwazaPlatform` CRD schema.                                                                                                                                    |
 | `grant-change.sh`                             | `shellcheck` clean at every severity, `shfmt -s -i 2` clean, and the whole plan → diff → apply → observe → remove sequence run end to end.                                                                                                               |
 
 The manifest loader ran first and found a real defect: an entry named `Operator` on a `Model`, which the contract's schema accepts because both words are in its vocabularies, and which the loader refuses as `relation_not_writable`. The contract schema alone would not have caught it. That is why the loader claim above is the one that matters and the schema claim is secondary.
 
-Nothing in this directory is a Kubernetes object, so nothing was checked with `kubectl apply --dry-run=client`, and there is no kustomization to build. The values snippets are Helm values fragments for the Deploy umbrella; Helm has no fragment loader to validate a values fragment against, so they were checked as YAML and against the chart's own keys.
+Only `platform-rebac-selection.yaml` is a Kubernetes merge patch; the remaining files are request bundles or image-side configuration, so nothing else was checked with `kubectl apply --dry-run=client`, and there is no kustomization to build.
 
 The sample outputs above were produced by running `grant-change.sh` against a local stub implementing the four operations and the ownership rules, so the workflow, the exit statuses, and the shapes are real. They are not evidence from a live grant service, and this example does not claim a live run.
 
@@ -246,9 +255,8 @@ The sample outputs above were produced by running `grant-change.sh` against a lo
 | `grant-manifest.example.yaml`                 | One administrator-automation bundle: three edges, one of them co-owned             |
 | `grant-manifest-second-producer.example.yaml` | A second producer declaring one of the same edges                                  |
 | `grant-manifest-refused.example.yaml`         | A bundle refused at plan time: unknown relation, unknown resource type             |
-| `core-values-snippet.yaml`                    | Relationship decisions, the producer-ownership profile, and role separation        |
+| `platform-rebac-selection.yaml`               | Relationship decisions as tenant intent on the platform resource                   |
 | `tenant-registry-snippet.yaml`                | Which `tenant_id` claims this installation admits                                  |
-| `tenant-registry-enforcement-snippet.yaml`    | Reject a token whose `tenant_id` is not registered                                 |
 
 ## On an installation that has not migrated
 

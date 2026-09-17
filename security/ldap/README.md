@@ -19,7 +19,7 @@
 
 ## Prerequisites
 
-- Kamiwaza deployed with Keycloak from your **pinned release chart** (or merge `values-snippet.yaml` and re-sync first). This example pins its own images; it selects no chart version, because the Keycloak your platform runs comes from your release.
+- Kamiwaza deployed with Keycloak, and authentication enabled on the platform resource (`spec.auth.enabled: true`). This example pins its own images; it selects no chart version, because the Keycloak your platform runs comes from your release.
 - StorageClass `local-path` is installed. Change both PVC manifests before applying when the cluster uses another reviewed class.
 - Secret `keycloak-admin` in namespace `kamiwaza`.
 - `kubectl` with kustomize support, plus `curl` and `jq` on the workstation that applies the federation.
@@ -57,7 +57,6 @@ Use hexadecimal values without trailing newline characters. LDIF requires base64
 | **Egress destination** | `transport-policy-fragment.yaml`                             | Loadable `transport` fragment; merge under `transport.egress.destinations`     |
 | **Sample data**        | `ldap-samples/`                                              | Optional LDIF for labs, with no passwords in it                                |
 | **Runbook**            | `docs/OPERATOR_GUIDE.md`                                     | Step-by-step operations and troubleshooting                                    |
-| **Values snippet**     | `values-snippet.yaml`                                        | Re-enables Keycloak when an environment has auth disabled                      |
 
 ## The lab directory is not the contract
 

@@ -2,7 +2,7 @@
 
 These scenarios exercise the declarative Kamiwaza lifecycle provided by the Kamiwaza Platform Operator. They use one shared manager with separate controllers for `KamiwazaPlatform`, `KamiwazaExtension`, and subordinate `ModelDeployment` resources.
 
-The operator is under release verification. Use these workflows on disposable or explicitly approved clusters until your Kamiwaza release publishes the operator as a supported lifecycle authority. Existing Helmfile installations remain Helmfile-managed unless you complete the explicit adoption workflow.
+The operator is under release verification. Use these workflows on disposable or explicitly approved clusters until your Kamiwaza release publishes the operator as a supported lifecycle authority.
 
 ## Responsibilities
 
@@ -16,22 +16,22 @@ The manager never installs CRDs, StorageClasses, ingress controllers, certificat
 
 ## Scenario index
 
-| Scenario                                              | Start here when                                                        | Destructive                                                             |
-| ----------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| [Quickstart](quickstart/)                             | Installing one fresh `1.3.0` platform in a bounded namespace           | No                                                                      |
-| [Production profile](deployment-profiles/production/) | Declaring three-zone application compute with fixed capacity           | No                                                                      |
-| [Reviewed image inventory](reviewed-image-inventory/) | Applying release-reviewed image digests to platform intent             | No                                                                      |
-| [Namespace scopes](namespace-scopes/)                 | Choosing manager placement and watch authority                         | No                                                                      |
-| [Transport scopes](transport-scopes/)                 | Pairing transport policy with the manager's watch scope                | No                                                                      |
-| [Protocol data plane](protocol-data-plane/)           | Running the governed endpoint and fencing its configuration channel    | No                                                                      |
-| [Operator chart upgrades](chart-upgrades/)            | Upgrading the shared manager chart, CRDs, policy, or RBAC              | Helm rollback does not reverse stored-version or application migrations |
-| [Model serving](model-serving/)                       | Observing `ModelDeployment`, the only served-model surface             | Deletes a replaceable child Deployment                                  |
-| [Extensions](extensions/)                             | Deploying an independent extension root through the shared manager     | No                                                                      |
-| [Drift repair](drift-repair/)                         | Proving reconciliation after an owned Deployment is deleted            | Deletes a replaceable Deployment                                        |
-| [Adoption](adoption/)                                 | Previewing transfer from an explicitly supported Helmfile installation | Preview is read-only; explicit transfer changes field ownership         |
-| [Upgrades](upgrades/)                                 | Requesting the exact supported `1.1.0` to `1.3.0` edge                 | Forward-only after the documented migration boundary                    |
-| [Deletion and retention](deletion/)                   | Removing a platform root while retaining data by default               | Root deletion; `DeleteAll` is intentionally not automated here          |
-| [Development registry](registry/)                     | Supplying an administrator-owned OCI registry in an isolated lab       | No platform owner reference; not a production default                   |
+| Scenario                                                | Start here when                                                                       | Destructive                                                             |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| [Quickstart](quickstart/)                               | Installing one fresh `1.3.0` platform in a bounded namespace                          | No                                                                      |
+| [Production profile](deployment-profiles/production/)   | Declaring three-zone application compute with fixed capacity                          | No                                                                      |
+| [Reviewed image inventory](reviewed-image-inventory/)   | Applying release-reviewed image digests to platform intent                            | No                                                                      |
+| [Pre-production validation](pre-production-validation/) | Testing identity, transport, routing, and runtime behavior in disposable environments | Deletes only the two disposable Kind clusters created by the scenario   |
+| [Namespace scopes](namespace-scopes/)                   | Choosing manager placement and watch authority                                        | No                                                                      |
+| [Transport scopes](transport-scopes/)                   | Pairing transport policy with the manager's watch scope                               | No                                                                      |
+| [Protocol data plane](protocol-data-plane/)             | Running the governed endpoint and fencing its configuration channel                   | No                                                                      |
+| [Operator chart upgrades](chart-upgrades/)              | Upgrading the shared manager chart, CRDs, policy, or RBAC                             | Helm rollback does not reverse stored-version or application migrations |
+| [Model serving](model-serving/)                         | Observing `ModelDeployment`, the only served-model surface                            | Deletes a replaceable child Deployment                                  |
+| [Extensions](extensions/)                               | Deploying an independent extension root through the shared manager                    | No                                                                      |
+| [Drift repair](drift-repair/)                           | Proving reconciliation after an owned Deployment is deleted                           | Deletes a replaceable Deployment                                        |
+| [Upgrades](upgrades/)                                   | Requesting a published forward-only upgrade edge                                      | Forward-only after the documented migration boundary                    |
+| [Deletion and retention](deletion/)                     | Removing a platform root while retaining data by default                              | Root deletion; `DeleteAll` is intentionally not automated here          |
+| [Development registry](registry/)                       | Supplying an administrator-owned OCI registry in an isolated lab                      | No platform owner reference; not a production default                   |
 
 Product-level tenant and workroom isolation lives under
 [multi-tenancy](../multi-tenancy/), not under operator installation examples.

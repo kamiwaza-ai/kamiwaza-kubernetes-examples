@@ -1,8 +1,9 @@
 # Grafana + Prometheus monitoring for Kamiwaza
 
 **Scenario:** deploy a Prometheus + Grafana + Loki + Alloy monitoring stack for
-the Deploy Helmfile topology in namespace `kamiwaza`, with ServiceMonitors,
-exporters, and 8 pre-built dashboards. Each component is independently usable.
+an operator-managed platform in namespace `kamiwaza`, with scrape
+configuration, exporters, and 8 pre-built dashboards. Each component is
+independently usable.
 
 **Tags:** #monitoring #prometheus #grafana #loki #dashboards
 
@@ -11,14 +12,14 @@ exporters, and 8 pre-built dashboards. Each component is independently usable.
 | Component | Path | Purpose |
 | --- | --- | --- |
 | **Dashboards** | `dashboards/` | 8 Grafana dashboards (kam-01 through kam-08) covering platform health, inference, API, data infrastructure, extensions, auth, events, and logs |
-| **ServiceMonitors** | `servicemonitors/` | Prometheus scrape configs for Ray cluster, etcd, and Keycloak + NetworkPolicy |
+| **Scrape configuration** | `servicemonitors/` | Prometheus scrape configs for delegated compute, etcd, and Keycloak + NetworkPolicy |
 | **Postgres exporter** | `exporters/` | Helm values for `prometheus-postgres-exporter` against core-postgres |
 | **Full stack values** | `kube-prometheus-stack-values.yaml`, `loki-values.yaml`, `alloy-values.yaml` | Helm values to deploy Prometheus, Grafana, Loki, and Alloy from scratch |
 
 ## Prerequisites
 
-- Kamiwaza deployed with the Deploy Helmfile topology, or equivalent resource
-  names and labels.
+- A platform reconciled by the platform operator, or equivalent resource names
+  and labels.
 - `kubectl` configured for your cluster.
 - A default `ReadWriteOnce` StorageClass with at least 10 GiB for Loki. If the
   cluster has no default, add
@@ -26,11 +27,10 @@ exporters, and 8 pre-built dashboards. Each component is independently usable.
   install command.
 - `helm` 3 installed (for the Helm chart components).
 
-The provided ServiceMonitors and dashboard queries target the Deploy Helmfile
-resource names in `kamiwaza`. For an operator-managed platform in another
-namespace, change each ServiceMonitor `namespaceSelector` and the dashboard
-namespace variables before applying them. Ray panels do not apply to native
-`ModelDeployment` serving.
+The provided scrape configuration and dashboard queries target the resource
+names and labels the operator renders in `kamiwaza`. For a platform in another
+namespace, change each `namespaceSelector` and the dashboard namespace
+variables before applying them.
 
 ## Quick start (full stack)
 
@@ -118,8 +118,8 @@ local credential flow; do not print it into terminal logs or automation output.
 | Dashboard | Focus |
 | --- | --- |
 | **kam-01 Platform Overview** | Component health, golden signals, resource utilisation, PVC usage, K8s warning events |
-| **kam-02 Inference & Ray** | Ray cluster nodes, inference throughput/latency, GPU utilisation |
-| **kam-03 Core API & Scheduler** | Ray Serve request rate/errors/latency, scheduler CPU/memory/restarts |
+| **kam-02 Inference & Compute** | Delegated-compute nodes, inference throughput/latency, GPU utilisation |
+| **kam-03 Core API & Scheduler** | Core API request rate/errors/latency, scheduler CPU/memory/restarts |
 | **kam-04 Data Infrastructure** | etcd leader/DB size/WAL fsync, PostgreSQL connections/cache hit/transactions |
 | **kam-05 Extensions & Kaizen** | Extension sync status, operator health, sandbox pods |
 | **kam-06 Auth & Identity** | Keycloak status, active sessions, logins, auth errors, certificate expiry |
@@ -137,6 +137,6 @@ See [dashboards/README.md](dashboards/README.md) for import options and datasour
 | `alloy-values.yaml` | Helm values for Alloy DaemonSet log collector |
 | `dashboards/*.json` | 8 Grafana dashboard JSON files (importable or auto-loaded via sidecar) |
 | `dashboards/kustomization.yaml` | Wraps JSON files as ConfigMaps for sidecar auto-loading |
-| `servicemonitors/*.yaml` | Prometheus ServiceMonitor CRDs for Ray, etcd, Keycloak |
+| `servicemonitors/*.yaml` | Prometheus PodMonitor for delegated compute and ServiceMonitors for etcd and Keycloak |
 | `servicemonitors/keycloak-allow-prometheus-netpol.yaml` | NetworkPolicy for monitoring namespace to scrape Keycloak |
 | `exporters/postgres-exporter-values.yaml` | Helm values for postgres-exporter against core-postgres |

@@ -25,7 +25,7 @@ export PLATFORM_NAME=kamiwaza
 | Frontend | `http://frontend:3000` | Kamiwaza web interface |
 | Core API | `http://core-api:7777` | Platform API |
 | Keycloak | `http://keycloak:80` | Identity provider |
-| Ray dashboard | `http://core-raycluster-head-svc:8265` | Restricted diagnostic UI |
+| Delegated-compute dashboard | `http://core-raycluster-head-svc:8265` | Restricted diagnostic UI |
 | Grafana | `http://kube-prometheus-stack-grafana.monitoring:80` | Optional monitoring UI |
 | PostgreSQL | `core-postgres:5432` | Internal database. Do not expose it. |
 | etcd | `core-etcd:2379` | Internal store. Do not expose it. |
@@ -112,10 +112,10 @@ When the listener uses a public CA, omit `--cacert`.
 
 ## Restrict diagnostic surfaces
 
-Do not publish PostgreSQL, etcd, Ray dashboard, model runtime, or management
-ports through public routes.
+Do not publish PostgreSQL, etcd, the delegated-compute dashboard, model
+runtime, or management ports through public routes.
 
-Use a temporary Ray dashboard port-forward only during an approved diagnostic:
+Use a temporary dashboard port-forward only during an approved diagnostic:
 
 ```bash
 kubectl -n "$PLATFORM_NAMESPACE" port-forward \
