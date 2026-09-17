@@ -1,3 +1,4 @@
+import contextlib
 import http.client
 import json
 import os
@@ -20,7 +21,12 @@ def request(path, *, data=None, method="GET", token=None):
     if token:
         headers["Authorization"] = f"Bearer {token}"
     body = json.dumps(data).encode() if isinstance(data, dict) else data
-    with http.client.HTTPConnection(IDP_HOST, 8080, timeout=10) as connection:
+    # contextlib.closing, because an http.client connection is not a context
+    # manager: `with HTTPConnection(...)` raises TypeError before any request
+    # is made, which reads as an unreachable provider rather than as a typo.
+    with contextlib.closing(
+        http.client.HTTPConnection(IDP_HOST, 8080, timeout=10)
+    ) as connection:
         connection.request(method, path, body=body, headers=headers)
         response = connection.getresponse()
         payload = response.read()
@@ -62,11 +68,8 @@ def publish_metadata(name, key, metadata):
         cafile="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
     )
     path = f"/api/v1/namespaces/{namespace}/configmaps/{name}"
-    with http.client.HTTPSConnection(
-        host,
-        int(port),
-        context=context,
-        timeout=10,
+    with contextlib.closing(
+        http.client.HTTPSConnection(host, int(port), context=context, timeout=10)
     ) as connection:
         connection.request(
             "PATCH",
@@ -113,7 +116,9 @@ publish_metadata(
     "metadata.json",
     json.dumps(discovery, separators=(",", ":")),
 )
-with http.client.HTTPConnection(IDP_HOST, 8080, timeout=10) as connection:
+with contextlib.closing(
+    http.client.HTTPConnection(IDP_HOST, 8080, timeout=10)
+) as connection:
     connection.request("GET", f"/realms/{REALM}/protocol/saml/descriptor")
     response = connection.getresponse()
     metadata = response.read().decode()

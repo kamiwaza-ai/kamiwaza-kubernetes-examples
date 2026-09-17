@@ -1,3 +1,4 @@
+import contextlib
 import http.client
 import json
 import os
@@ -17,11 +18,16 @@ def tls_context():
 
 
 def verify_edge():
-    with http.client.HTTPSConnection(
-        f"cac-piv-edge.{DEPENDENCY_NAMESPACE}.svc.cluster.local",
-        8443,
-        context=tls_context(),
-        timeout=10,
+    # contextlib.closing, because an http.client connection is not a context
+    # manager: `with HTTPSConnection(...)` raises TypeError before any request
+    # is made, which reads as a failed fixture rather than as a typo here.
+    with contextlib.closing(
+        http.client.HTTPSConnection(
+            f"cac-piv-edge.{DEPENDENCY_NAMESPACE}.svc.cluster.local",
+            8443,
+            context=tls_context(),
+            timeout=10,
+        )
     ) as edge:
         edge.request(
             "GET",
@@ -39,10 +45,12 @@ def verify_edge():
 
 
 def verify_stream():
-    with http.client.HTTPConnection(
-        f"resumable-stream.{DEPENDENCY_NAMESPACE}.svc.cluster.local",
-        8080,
-        timeout=10,
+    with contextlib.closing(
+        http.client.HTTPConnection(
+            f"resumable-stream.{DEPENDENCY_NAMESPACE}.svc.cluster.local",
+            8080,
+            timeout=10,
+        )
     ) as stream:
         stream.request("GET", "/stream")
         first = stream.getresponse().read().decode()

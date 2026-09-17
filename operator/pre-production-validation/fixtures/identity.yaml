@@ -241,6 +241,28 @@ spec:
         app.kubernetes.io/name: external-directory
         app.kubernetes.io/part-of: platform-validation
     spec:
+      # This image chowns its certificate directory on startup, so a Secret or
+      # projected volume mounted straight onto that path fails with
+      # "Read-only file system" and the container crash-loops before slapd
+      # starts. The init container copies the same material into a writable
+      # emptyDir instead, which is the only reason it exists.
+      initContainers:
+        - name: stage-certificates
+          image: docker.io/osixia/openldap:1.5.0@sha256:18742e9c449c9c1afe129d3f2f3ee15fb34cc43e5f940a20f3399728f41d7c28
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              cp /source/tls.crt /source/tls.key /source/ca.crt /certs/
+              chown 911:911 /certs/tls.crt /certs/tls.key /certs/ca.crt
+              chmod 0600 /certs/tls.key
+          volumeMounts:
+            - name: tls-source
+              mountPath: /source
+              readOnly: true
+            - name: certs
+              mountPath: /certs
       containers:
         - name: openldap
           image: docker.io/osixia/openldap:1.5.0@sha256:18742e9c449c9c1afe129d3f2f3ee15fb34cc43e5f940a20f3399728f41d7c28
@@ -276,17 +298,18 @@ spec:
             tcpSocket:
               port: ldaps
           volumeMounts:
-            - name: tls
+            - name: certs
               mountPath: /container/service/slapd/assets/certs
-              readOnly: true
       volumes:
-        - name: tls
+        - name: tls-source
           projected:
             sources:
               - secret:
                   name: platform-validation-server-tls
               - configMap:
                   name: platform-validation-ca
+        - name: certs
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
