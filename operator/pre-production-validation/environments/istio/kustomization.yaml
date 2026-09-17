@@ -1,3 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-resources: [gateway.yaml]
+# The second environment runs the same published intent in its own namespace,
+# which is what makes the two runs comparable.
+resources: [gateway.yaml, ../../../quickstart]
+namespace: kamiwaza-examples-secondary
+patches: [{ path: platform.yaml }]

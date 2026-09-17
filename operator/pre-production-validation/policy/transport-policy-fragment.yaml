@@ -8,6 +8,21 @@ transport:
       leafRenewBefore: 360h
       expirationPolicy: ReplaceKey
       privateKeyPolicy: { algorithm: ECDSA, size: 384, rotationPolicy: Always }
+      # Internal hops here authenticate with workload identity, and the
+      # protected protocol data plane enrolls a client identity, so this
+      # fragment must also say where workload identity comes from. Without
+      # this block the platform signs nothing for workloads and the data
+      # plane reports that no file-backed client material is projected.
+      #
+      # OfflineTokenReview is the floor: it verifies a projected
+      # ServiceAccount token without any cluster-scoped permission. Select
+      # ApiTokenReview only where that permission is granted deliberately.
+      workloadIdentity:
+        source: PlatformIssued
+        trustDomain: kamiwaza-examples.example.com
+        attestation: OfflineTokenReview
+        identityLifetime: 24h
+        identityRenewBefore: 8h
     maintenanceWindows: ["0 2 * * 6"]
   trust:
     bundleConfigMapName: kamiwaza-trust-bundle
@@ -35,10 +50,39 @@ transport:
     defaultTransport: PlatformTLS
     workloadIngressFloor: true
     hops:
+      # The application API's own identity is raised from the hops it carries,
+      # and a hop that names no accepted identity cannot raise one: an empty
+      # accepted set would admit every workload the trust domain will ever
+      # issue, and a set the platform invented would be a peer list nobody
+      # reviewed. So the callers of the application API are named here.
+      #
+      # The namespace inside each identity is this installation's namespace,
+      # substituted the same way the trust distribution target is.
+      - name: GatewayToCore
+        transport: PlatformTLS
+        authentication:
+          type: WorkloadIdentityX509
+          maxConnectionAge: 30m
+          workloadIdentityX509:
+            trustDomain: kamiwaza-examples.example.com
+            acceptedIdentities:
+              - spiffe://kamiwaza-examples.example.com/ns/kamiwaza/sa/kamiwaza-dataplane
+      # Every platform workload raises its identity from the hops it carries,
+      # so each hop a workload carries states which peers it accepts. The
+      # application API, its task runner, and the retrieval streamer all run
+      # under platform service accounts in this namespace, and those are the
+      # only peers named.
       - name: CoreToApplicationDatabase
         transport: PlatformTLS
         authentication:
-          { type: MutualTLS, maxConnectionAge: 30m, mutualTLS: { clientIdentityRef: core-client } }
+          type: WorkloadIdentityX509
+          maxConnectionAge: 30m
+          workloadIdentityX509:
+            trustDomain: kamiwaza-examples.example.com
+            acceptedIdentities:
+              - spiffe://kamiwaza-examples.example.com/ns/kamiwaza/sa/core-scheduler
+              - spiffe://kamiwaza-examples.example.com/ns/kamiwaza/sa/core-retrieval-streamer
+              - spiffe://kamiwaza-examples.example.com/ns/kamiwaza/sa/core-db-init
       - name: CoreToKeyValueStore
         transport: PlatformTLS
         authentication:
@@ -63,10 +107,45 @@ transport:
           workloadIdentityJWT:
             audience: kamiwaza-workload-sts
             attestationProfiles: [kubernetes-offline-v1]
+      # The delegated compute workloads carry their own two hops, so they
+      # name their own peers: the task runner that submits work, and the
+      # other members of the compute group.
+      - name: CoreToDistributedCompute
+        transport: PlatformTLS
+        authentication:
+          type: WorkloadIdentityX509
+          maxConnectionAge: 30m
+          workloadIdentityX509:
+            trustDomain: kamiwaza-examples.example.com
+            acceptedIdentities:
+              - spiffe://kamiwaza-examples.example.com/ns/kamiwaza/sa/core-scheduler
+              - spiffe://kamiwaza-examples.example.com/ns/kamiwaza/sa/core-ray
       - name: DistributedComputeInternal
         transport: MeshDelegated
         evidenceSource: AdminAttested
         authentication: { type: None }
+      # The retrieval streamer and the initialization Job each carry exactly
+      # one hop, so that hop is where their peers are named. The streamer
+      # serves the request surface; the Job seeds the datastore and is dialed
+      # by nothing, so it names the account it runs under.
+      - name: CoreToRetrievalStreamer
+        transport: PlatformTLS
+        authentication:
+          type: WorkloadIdentityX509
+          maxConnectionAge: 30m
+          workloadIdentityX509:
+            trustDomain: kamiwaza-examples.example.com
+            acceptedIdentities:
+              - spiffe://kamiwaza-examples.example.com/ns/kamiwaza/sa/core-scheduler
+      - name: InitializationJobToDatastore
+        transport: PlatformTLS
+        authentication:
+          type: WorkloadIdentityX509
+          maxConnectionAge: 30m
+          workloadIdentityX509:
+            trustDomain: kamiwaza-examples.example.com
+            acceptedIdentities:
+              - spiffe://kamiwaza-examples.example.com/ns/kamiwaza/sa/core-db-init
   clientIdentities:
     - name: core-client
       secretRef: { name: kamiwaza-core-client }

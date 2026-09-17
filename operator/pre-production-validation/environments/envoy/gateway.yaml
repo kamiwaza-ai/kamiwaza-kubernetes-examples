@@ -9,7 +9,7 @@ spec:
     - name: https
       protocol: HTTPS
       port: 443
-      hostname: kamiwaza.example.com
+      hostname: kamiwaza-examples.example.com
       tls:
         mode: Terminate
         certificateRefs:

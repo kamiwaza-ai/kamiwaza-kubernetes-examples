@@ -54,5 +54,12 @@ if [ -n "${gateway_class_manifest}" ]; then
   kubectl --context "${context}" apply -f "${gateway_class_manifest}"
 fi
 
+# Istio's own controller creates its GatewayClass, and it does so only after
+# the Gateway API CRDs exist -- which is after this script applies the pinned
+# bundle. Waiting for a condition on an object that does not exist yet fails
+# immediately, so wait for the class to appear before waiting for it to be
+# accepted.
+kubectl --context "${context}" wait \
+  --for=create "gatewayclass/${gateway_class}" --timeout=5m
 kubectl --context "${context}" wait \
   --for=condition=Accepted "gatewayclass/${gateway_class}" --timeout=5m
