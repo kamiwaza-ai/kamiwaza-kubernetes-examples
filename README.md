@@ -49,6 +49,7 @@ Use your organization’s fork or this copy when vendored inside the Deploy mono
 Category indexes:
 
 - **Platform operator:** [operator/README.md](operator/README.md)
+- **GitOps:** [gitops/README.md](gitops/README.md)
 - **Scheduling:** [application compute scaling](scheduling/application-compute-scaling/) and [multi-zone placement](scheduling/multi-zone/)
 - **Multi-tenancy:** [multi-tenancy/README.md](multi-tenancy/README.md)
 - **Monitoring:** [monitoring/README.md](monitoring/README.md)
@@ -75,6 +76,8 @@ Category indexes:
 | Administrator-owned development registry               | [operator/registry](operator/registry)                                             | #operator #registry #development                            |
 | Transport under a strict and a relaxed scope           | [operator/transport-scopes](operator/transport-scopes)                             | #operator #transport #namespaces #rbac                      |
 | Governed endpoint and configuration fencing            | [operator/protocol-data-plane](operator/protocol-data-plane)                       | #operator #transport #fencing #data-plane                   |
+| Flux delivery                                          | [gitops/flux](gitops/flux)                                                         | #gitops #flux #helm #kustomize #health                      |
+| Argo CD delivery                                       | [gitops/argocd](gitops/argocd)                                                     | #gitops #argocd #sync-waves #health                         |
 | Tomo shared-workroom tenant isolation                  | [multi-tenancy/tomo-shared-workrooms](multi-tenancy/tomo-shared-workrooms)         | #multi-tenancy #tomo #rebac #models                         |
 | Grafana + Prometheus monitoring                        | [monitoring/grafana-prometheus](monitoring/grafana-prometheus)                     | #monitoring #prometheus #grafana #loki                      |
 | Service access patterns                                | [networking/external-access](networking/external-access)                           | #networking #port-forward #gateway-api                      |

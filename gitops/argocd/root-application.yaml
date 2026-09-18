@@ -1,0 +1,32 @@
+# The one Application an administrator applies. It owns the two child
+# Applications in `applications/`, and nothing else in this scenario is
+# applied by hand.
+#
+# Namespaces and the image pull Secret are administrator-owned prerequisites
+# created before this file. `CreateNamespace` is deliberately absent: the
+# operator never creates a target namespace, and neither should its delivery.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kamiwaza
+  namespace: argocd
+spec:
+  project: default
+  source:
+    # The published configuration for this installation. Replace with your own
+    # artifact: this repository's layout is what the child Applications expect.
+    # `targetRevision` accepts a digest, which is what pins what runs.
+    repoURL: oci://registry.example.com/kamiwaza/kubernetes-examples
+    targetRevision: "1.3.0"
+    path: gitops/argocd/applications
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      # Pruning a child Application removes the child, which is the intended
+      # behavior for this layer: the children are Argo CD's own objects. What
+      # each child does with its own resources is that child's decision, and
+      # the platform child sets `prune: false` for a reason it states there.
+      prune: true
+      selfHeal: true
