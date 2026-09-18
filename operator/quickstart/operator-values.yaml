@@ -8,8 +8,10 @@ manager:
 
 adminPolicy:
   revision: examples-bounded-r1
-  allowedTargetNamespaces:
-    - kamiwaza-examples
+  # allowedTargetNamespaces is deliberately absent. It defaults to the
+  # manager's watch set above, which is this installation's one namespace, and
+  # a value stated twice is a value the two copies can disagree about. State a
+  # list only to narrow within the watch set.
   storage:
     # Replace with a dynamic RWO StorageClass available in the target cluster.
     allowedClassNames:
@@ -38,12 +40,10 @@ adminPolicy:
     # here: no registry credential belongs in a values file.
     pullSecretNames:
       - registry-pull
-  modelRegistry:
-    type: OCIRegistry
-    endpoint: registry.kamiwaza-examples.svc.cluster.local:5000
-    credentialSecretName: kamiwaza-registry-credentials
-    usernameKey: username
-    passwordKey: password
+  # modelRegistry is absent because this installation declares no model
+  # source. Declaring the block selects an artifact store; omitting it renders
+  # `type: None`, and the administrator-owned registry workflow in
+  # ../registry/ shows what to write when there is one.
   operations:
     adoptionAllowed: false
     deleteAllAllowed: false

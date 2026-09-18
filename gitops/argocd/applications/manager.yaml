@@ -42,8 +42,6 @@ spec:
           watchAnyNamespace: false
         adminPolicy:
           revision: examples-gitops-r1
-          allowedTargetNamespaces:
-            - kamiwaza-examples
           storage:
             allowedClassNames:
               - example-rwo
@@ -64,12 +62,6 @@ spec:
             # delivery source, and nothing in this scenario puts one there.
             pullSecretNames:
               - registry-pull
-          modelRegistry:
-            type: OCIRegistry
-            endpoint: registry.kamiwaza-examples.svc.cluster.local:5000
-            credentialSecretName: kamiwaza-registry-credentials
-            usernameKey: username
-            passwordKey: password
           operations:
             adoptionAllowed: false
             deleteAllAllowed: false
