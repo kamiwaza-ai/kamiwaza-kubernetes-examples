@@ -27,12 +27,17 @@ def validate_artifacts(matrix):
 
 
 def render_manifests():
-    render_roots = [
-        SCENARIO / "environments" / "envoy",
-        SCENARIO / "environments" / "istio",
-        SCENARIO / "fixtures",
-    ]
-    for render_root in render_roots:
+    # Every environment directory, discovered rather than listed. A fourth
+    # routing implementation is then a directory, and forgetting to add it
+    # here cannot make it silently unvalidated.
+    render_roots = sorted(
+        path.parent for path in (SCENARIO / "environments").glob("*/kustomization.yaml")
+    )
+    if len(render_roots) < 3:
+        raise ValueError(
+            "portability needs three routing implementations; two can agree by coincidence"
+        )
+    for render_root in [*render_roots, SCENARIO / "fixtures"]:
         subprocess.run(
             ["kubectl", "kustomize", str(render_root)],
             check=True,

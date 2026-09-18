@@ -71,6 +71,19 @@ adminPolicy:
       # that floor would silently prune -- a Gateway accepted while
       # enforcing nothing.
       versionConstraint: ">=1.6.0 <2.0.0"
+      # What this environment's administrator states the installed routing
+      # implementation serves, in upstream conformance feature names. It is
+      # stated per environment because it is a fact about the controller the
+      # environment installed, not about the platform.
+      #
+      # None of the three implementations this scenario installs publishes
+      # anything in GatewayClass.status.supportedFeatures, and reading that
+      # status needs cluster-scoped authority a namespaced installation does
+      # not have, so the attestation is the evidence. It is not taken on
+      # faith: the platform publishes the object and the implementation's own
+      # namespaced status on it either confirms or refuses the claim, which is
+      # what the matrix measures.
+      attestedFeatures: ${ATTESTED_GATEWAY_FEATURES}
   images:
     requireDigests: true
     allowedRepositoryPrefixes:

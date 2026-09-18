@@ -1,37 +1,60 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-operator_root="${1:?usage: verify.sh <operator-root> <envoy-context|-> <istio-context|->}"
-envoy_context="${2:?usage: verify.sh <operator-root> <envoy-context|-> <istio-context|->}"
-istio_context="${3:?usage: verify.sh <operator-root> <envoy-context|-> <istio-context|->}"
+# Verifies one published platform intent against every routing implementation
+# this scenario has an environment for.
+#
+# Usage: verify.sh <operator-root> <environment>=<context> [...]
+#
+#   verify.sh ../kamiwaza-platform-operator \
+#     envoy=kind-kamiwaza-validation-envoy \
+#     istio=kind-kamiwaza-validation-istio \
+#     kong=kind-kamiwaza-validation-kong
+#
+# An environment left off the command line is skipped and reported as skipped.
+# A host that cannot hold three platforms at once runs them one after another
+# rather than reporting a three-implementation result it never observed.
+operator_root="${1:?usage: verify.sh <operator-root> <environment>=<context> [...]}"
+shift
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 python3 "${root}/validate.py" --operator-root "${operator_root}"
 
-if [ "${envoy_context}" != - ] &&
-  kubectl --context "${envoy_context}" get crd certificates.cert-manager.io >/dev/null 2>&1; then
-  echo "Envoy validation environment must not contain a certificate controller" >&2
-  exit 1
-fi
-
-# A dash skips one environment. Both environments are the point of this
-# scenario, but a host that cannot hold two platforms at once verifies them one
-# after the other rather than reporting a two-implementation result it never
-# observed. Skipping both verifies nothing and is refused.
-if [ "${envoy_context}" = - ] && [ "${istio_context}" = - ]; then
-  echo "at least one environment context is required" >&2
+[ "$#" -gt 0 ] || {
+  echo "at least one <environment>=<context> pair is required" >&2
   exit 2
-fi
+}
 
-for row in "${envoy_context}:envoy:kamiwaza-examples:eg" \
-  "${istio_context}:istio:kamiwaza-examples-secondary:istio"; do
-  IFS=: read -r context environment namespace gateway_class <<<"${row}"
-  if [ "${context}" = - ]; then
-    echo "skipping the ${environment} environment: no context supplied"
-    continue
+for pair in "$@"; do
+  environment="${pair%%=*}"
+  context="${pair#*=}"
+  overlay="${root}/environments/${environment}"
+  [ -f "${overlay}/kustomization.yaml" ] || {
+    echo "no environment named ${environment}" >&2
+    exit 2
+  }
+
+  # The namespace and the class are the environment's own statements, read
+  # from its Gateway rather than restated here: a table of environment
+  # properties in this script is a second source of truth for facts the
+  # overlay already carries.
+  read -r namespace gateway_class <<<"$(python3 -c "
+import sys, yaml
+gateway = yaml.safe_load(open(sys.argv[1]))
+print(gateway['metadata']['namespace'], gateway['spec']['gatewayClassName'])" "${overlay}/gateway.yaml")"
+
+  # The controller-free environment proves the platform converges on
+  # administrator-supplied certificate material. A certificate controller in
+  # that cluster would make the check prove nothing.
+  if [ "${environment}" = envoy ] &&
+    kubectl --context "${context}" get crd certificates.cert-manager.io >/dev/null 2>&1; then
+    echo "the envoy validation environment must not contain a certificate controller" >&2
+    exit 1
   fi
+
+  echo "== ${environment}: ${namespace} through gatewayclass/${gateway_class}"
   kubectl --context "${context}" get gatewayclass "${gateway_class}" >/dev/null
-  kubectl --context "${context}" apply -k "${root}/environments/${environment}"
+  kubectl --context "${context}" apply -k "${overlay}"
   kubectl --context "${context}" -n "${namespace}" wait \
     --for=condition=Accepted gateway/kamiwaza-gateway --timeout=5m
   kubectl --context "${context}" -n "${namespace}" wait \

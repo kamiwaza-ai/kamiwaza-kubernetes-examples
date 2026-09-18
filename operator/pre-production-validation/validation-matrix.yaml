@@ -19,6 +19,7 @@ checks:
     artifacts:
       - operator/pre-production-validation/environments/envoy/gateway.yaml
       - operator/pre-production-validation/environments/istio/gateway.yaml
+      - operator/pre-production-validation/environments/kong/gateway.yaml
   - order: 6
     name: verify-external-identity-providers
     artifacts: [operator/pre-production-validation/fixtures/identity.yaml]
@@ -63,6 +64,7 @@ dependencies:
     artifacts:
       - operator/pre-production-validation/environments/envoy/gateway.yaml
       - operator/pre-production-validation/environments/istio/gateway.yaml
+      - operator/pre-production-validation/environments/kong/gateway.yaml
   - id: controller-free-cluster
     setup: operator/pre-production-validation/environments/create-kind.sh
     verify: operator/pre-production-validation/verify.sh

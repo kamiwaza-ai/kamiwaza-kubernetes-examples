@@ -20,6 +20,15 @@ namespace="${2:?usage: certificates.sh <kubectl-context> <namespace>}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
 
+# The namespaces this material lands in, created here because this script runs
+# before the platform installer: an administrator supplies certificates first,
+# and a Gateway whose listener Secret is absent never programs its listener.
+# Creating them is idempotent, and the installer creates the same two.
+for name in "${namespace}" "${namespace}-system"; do
+  kubectl --context "${context}" create namespace "${name}" \
+    --dry-run=client -o yaml | kubectl --context "${context}" apply -f - >/dev/null
+done
+
 # One authority per environment, kept in its own Secret so a rerun reuses it.
 # Regenerating it would orphan every leaf a workload already loaded.
 if ! kubectl --context "${context}" -n "${namespace}" get secret platform-component-ca \

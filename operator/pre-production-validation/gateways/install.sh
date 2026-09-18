@@ -1,16 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-implementation="${1:?usage: install.sh <envoy|istio> <kubectl-context>}"
-context="${2:?usage: install.sh <envoy|istio> <kubectl-context>}"
+implementation="${1:?usage: install.sh <envoy|istio|kong> <kubectl-context>}"
+context="${2:?usage: install.sh <envoy|istio|kong> <kubectl-context>}"
 gateway_api_version=v1.6.2
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Envoy Gateway ships no GatewayClass, unlike Istio, so this environment
-# declares the administrator-owned class its Gateway selects. It is applied
-# here rather than from the environment overlay because verify.sh requires the
-# class to exist before it applies that overlay.
+# Two of the three implementations ship no GatewayClass of their own, so those
+# environments declare the administrator-owned class their Gateway selects. It
+# is applied here rather than from the environment overlay because verify.sh
+# requires the class to exist before it applies that overlay.
 gateway_class_manifest=""
+
+# One implementation reconciles Gateway API only when the CRDs were present
+# before its controller started, so its bundle is applied first. The others
+# take the bundle afterwards because their charts ship one and would otherwise
+# decide the Gateway API version for their own cluster.
+#
+# Server-side, because the experimental channel's HTTPRoute schema exceeds the
+# 262144-byte last-applied-configuration annotation a client-side apply writes,
+# which fails the install outright. --force-conflicts takes those fields back
+# from a chart that installed its own bundle.
+bundle_applied=false
+apply_bundle() {
+  [ "${bundle_applied}" = true ] && return 0
+  kubectl --context "${context}" apply --server-side --force-conflicts -f \
+    "https://github.com/kubernetes-sigs/gateway-api/releases/download/${gateway_api_version}/experimental-install.yaml"
+  bundle_applied=true
+}
 
 case "${implementation}" in
 envoy)
@@ -33,22 +50,34 @@ istio)
     oci://gcr.io/istio-release/charts/istiod \
     --version 1.30.4 --namespace istio-system --wait
   ;;
+kong)
+  gateway_class=kong
+  gateway_class_manifest="${root}/environments/kong/gatewayclass.yaml"
+  # This controller watches Gateway API only when the definitions existed
+  # before it started, so the bundle goes in first and the class is applied
+  # before the controller can look for it.
+  apply_bundle
+  kubectl --context "${context}" apply -f "${gateway_class_manifest}"
+  # The Gateway API support this implementation counts as alpha is behind its
+  # own feature gate, and the standard BackendTLSPolicy it implements is part
+  # of that set. NodePort because its proxy Service defaults to LoadBalancer,
+  # which stays Pending on a cluster with no load balancer and leaves every
+  # listener unprogrammed. The chart name is given alone with --repo: a
+  # `repo/chart` reference resolves against locally added repositories, and
+  # naming both is refused.
+  helm --kube-context "${context}" upgrade --install kong \
+    ingress --repo https://charts.konghq.com \
+    --version 0.24.0 --namespace kong --create-namespace --wait \
+    --set gateway.proxy.type=NodePort \
+    --set controller.ingressController.env.feature_gates=GatewayAlpha=true
+  ;;
 *)
   echo "unknown Gateway API implementation: ${implementation}" >&2
   exit 2
   ;;
 esac
 
-# The pinned bundle is applied after the implementation so both environments
-# end on the same Gateway API version: a chart that ships its own bundle would
-# otherwise decide the version for its own cluster.
-#
-# Server-side, because the experimental channel's HTTPRoute schema exceeds the
-# 262144-byte last-applied-configuration annotation a client-side apply writes,
-# which fails the install outright. --force-conflicts takes those fields back
-# from the chart that installed its own bundle.
-kubectl --context "${context}" apply --server-side --force-conflicts -f \
-  "https://github.com/kubernetes-sigs/gateway-api/releases/download/${gateway_api_version}/experimental-install.yaml"
+apply_bundle
 
 if [ -n "${gateway_class_manifest}" ]; then
   kubectl --context "${context}" apply -f "${gateway_class_manifest}"
