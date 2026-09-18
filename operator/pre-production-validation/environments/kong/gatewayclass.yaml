@@ -12,6 +12,6 @@ kind: GatewayClass
 metadata:
   name: kong
   annotations:
-    konghq.com/gatewayclass-unmanaged: 'true'
+    konghq.com/gatewayclass-unmanaged: "true"
 spec:
   controllerName: konghq.com/kic-gateway-controller

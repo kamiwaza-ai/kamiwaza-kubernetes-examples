@@ -8,16 +8,16 @@ Nothing here is a production identity system, certificate authority, proxy, or r
 
 ## What this scenario supplies
 
-| Dependency                               | Lab implementation                                                                           |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Dependency                               | Lab implementation                                                                                                                                     |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Three Gateway API implementations        | Envoy Gateway `v1.9.1`, Istio `1.30.4`, and Kong Ingress Controller `3.5` with Kong `3.9` (chart `kong/ingress` `0.24.0`), all on Gateway API `v1.6.2` |
-| Cluster without a certificate controller | Fresh Kind environment; the PlatformIssued path must work without cert-manager               |
-| OIDC and SAML provider                   | Keycloak `26.7.4`, digest pinned, with one generated user and client credential              |
-| LDAP provider                            | Digest-pinned OpenLDAP over TLS with a generated read-only federation account                |
-| CAC/PIV edge                             | Mutual-TLS lab edge that strips caller identity headers and accepts only the login path      |
-| Enforcing egress proxy                   | CONNECT proxy with one allowed destination plus NetworkPolicy denial of direct client egress |
-| Mutual-TLS destination                   | TLS endpoint that requires a client certificate signed by the generated lab authority        |
-| Resumable stream                         | Two-replica SSE endpoint that resumes from `Last-Event-ID`                                   |
+| Cluster without a certificate controller | Fresh Kind environment; the PlatformIssued path must work without cert-manager                                                                         |
+| OIDC and SAML provider                   | Keycloak `26.7.4`, digest pinned, with one generated user and client credential                                                                        |
+| LDAP provider                            | Digest-pinned OpenLDAP over TLS with a generated read-only federation account                                                                          |
+| CAC/PIV edge                             | Mutual-TLS lab edge that strips caller identity headers and accepts only the login path                                                                |
+| Enforcing egress proxy                   | CONNECT proxy with one allowed destination plus NetworkPolicy denial of direct client egress                                                           |
+| Mutual-TLS destination                   | TLS endpoint that requires a client certificate signed by the generated lab authority                                                                  |
+| Resumable stream                         | Two-replica SSE endpoint that resumes from `Last-Event-ID`                                                                                             |
 
 The administrator policy fragments use reserved documentation hosts. Replace those hosts with the reviewed addresses that expose these fixtures in your lab. Do not weaken `deniedNetworks` to make a private endpoint pass.
 
