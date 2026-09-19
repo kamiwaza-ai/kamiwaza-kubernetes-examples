@@ -1,0 +1,83 @@
+# Shape A -- the Kamiwaza MCP served as a platform extension.
+#
+# The extension controller runs the package, injects KAMIWAZA_API_URL, and the
+# platform authenticates every caller at its own edge before a request reaches
+# this workload. The server therefore runs its hosted topology: it reads the
+# forwarded member context, terminates no edge, and publishes no
+# protected-resource metadata of its own. The challenge a client needs comes
+# from the platform.
+#
+# The digest below is a placeholder. Replace it with the one you are
+# installing, and confirm it is approved by immutable image policy: a tag
+# alone names something that can change underneath a running install.
+apiVersion: extensions.kamiwaza.ai/v1alpha1
+kind: KamiwazaExtension
+metadata:
+  name: kamiwaza-mcp
+  namespace: kamiwaza-examples
+spec:
+  type: tool
+  extensionRef:
+    name: tool-kamiwaza-mcp
+    version: 0.1.0
+  security:
+    riskTier: 1
+    sourceType: kamiwaza
+    verified: false
+  services:
+    - name: tool
+      primary: true
+      image:
+        registry: ghcr.io
+        repository: kamiwaza-internal/tool-kamiwaza-mcp
+        tag: 0.1.0
+        digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+        pullPolicy: IfNotPresent
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+          appProtocol: http
+      env:
+        # The posture is a fact about the deployment, so this is the only way
+        # to state it: nothing in a request can reach it. A value that is
+        # neither on nor off is refused at startup rather than read as off.
+        - name: KAMIWAZA_MCP_READ_ONLY
+          value: "false"
+        # The ring that seals multi-round exchanges -- an approval, a task
+        # handle. 32 bytes minimum, newest first. Held in a Secret because a
+        # handle sealed with a leaked key is a forgeable one.
+        - name: KAMIWAZA_MCP_CONTINUATION_KEYS
+          valueFrom:
+            secretKeyRef:
+              name: kamiwaza-mcp-continuation-keys
+              key: keys
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+      healthCheck:
+        httpGet:
+          path: /healthz
+          port: 8080
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+  kamiwaza:
+    namespace: kamiwaza-examples
+    useAuth: "true"
+  networking:
+    ingress:
+      enabled: true
+      # The public prefix. The server mounts the protocol at /mcp, so with the
+      # prefix kept the endpoint is https://<domain>/extensions/kamiwaza-mcp/mcp.
+      pathPrefix: /extensions/kamiwaza-mcp
+      stripPrefix: false
+    networkPolicy:
+      enabled: true
+      allowNamespaces:
+        - kamiwaza-examples
