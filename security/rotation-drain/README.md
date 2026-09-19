@@ -71,7 +71,7 @@ kubectl -n kamiwaza-examples patch kamiwazaplatform kamiwaza \
   --type merge --patch-file security/rotation-drain/rotate-authority-request.yaml
 ```
 
-`transport.kamiwaza.io/rotate-authority` is `Server` or `Client` — two roles, never one, so a leaked client-authority key cannot mint a server identity and revoking client trust does not invalidate every server certificate. `transport.kamiwaza.io/rotate-operation` is `RenewCertificate` or `ReplaceKey`.
+`transport.kamiwaza.ai/rotate-authority` is `Server` or `Client` — two roles, never one, so a leaked client-authority key cannot mint a server identity and revoking client trust does not invalidate every server certificate. `transport.kamiwaza.ai/rotate-operation` is `RenewCertificate` or `ReplaceKey`.
 
 The request is carried out once. A ledger beside the authorities records which request was honoured, so an annotation left in place does not rotate again on the next reconcile; asking for the same operation again means removing the annotation and setting it once more.
 

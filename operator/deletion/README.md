@@ -27,11 +27,11 @@ kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
 PLATFORM_UID="$(kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza -o jsonpath='{.metadata.uid}')"
 test -n "${PLATFORM_UID}"
 kubectl -n kamiwaza-examples get pvc,secret \
-  -l "platform.kamiwaza.io/uid=${PLATFORM_UID}" \
+  -l "platform.kamiwaza.ai/uid=${PLATFORM_UID}" \
   -o custom-columns=KIND:.kind,NAME:.metadata.name,UID:.metadata.uid
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
   -o jsonpath='{range .status.retainedResources[*]}{.identity.kind}{"\t"}{.identity.namespace}{"\t"}{.identity.name}{"\t"}{.reason}{"\t"}{.ownership}{"\n"}{end}'
-kubectl -n kamiwaza-examples get kamiwazaextensions.extensions.kamiwaza.io
+kubectl -n kamiwaza-examples get kamiwazaextensions.extensions.kamiwaza.ai
 ```
 
 Require `spec.deletionPolicy` to be `RetainData` or omitted. The retained-resource status must name every labeled PVC and Secret before deletion starts. Capture PVC UIDs and Secret content hashes through an approved non-printing procedure.
@@ -58,11 +58,11 @@ kubectl -n kamiwaza-examples wait \
   --for=delete kamiwazaplatform/kamiwaza \
   --timeout=10m
 kubectl -n kamiwaza-examples get pvc,secret \
-  -l "platform.kamiwaza.io/uid=${PLATFORM_UID}" \
+  -l "platform.kamiwaza.ai/uid=${PLATFORM_UID}" \
   -o custom-columns=KIND:.kind,NAME:.metadata.name,UID:.metadata.uid
 kubectl -n kamiwaza-examples get deployment,statefulset,job \
-  -l "platform.kamiwaza.io/uid=${PLATFORM_UID}"
-kubectl -n kamiwaza-examples get kamiwazaextensions.extensions.kamiwaza.io
+  -l "platform.kamiwaza.ai/uid=${PLATFORM_UID}"
+kubectl -n kamiwaza-examples get kamiwazaextensions.extensions.kamiwaza.ai
 ```
 
 Require retained PVC and Secret identities to match the baseline. Extension
@@ -85,7 +85,7 @@ kubectl -n kamiwaza-examples wait \
   --timeout=15m
 NEW_PLATFORM_UID="$(kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza -o jsonpath='{.metadata.uid}')"
 kubectl -n kamiwaza-examples get pvc,secret \
-  -l "platform.kamiwaza.io/uid=${NEW_PLATFORM_UID}" \
+  -l "platform.kamiwaza.ai/uid=${NEW_PLATFORM_UID}" \
   -o custom-columns=KIND:.kind,NAME:.metadata.name,UID:.metadata.uid
 ```
 

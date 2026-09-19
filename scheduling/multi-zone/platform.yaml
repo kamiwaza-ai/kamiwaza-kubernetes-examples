@@ -1,4 +1,4 @@
-apiVersion: platform.kamiwaza.io/v1alpha1
+apiVersion: platform.kamiwaza.ai/v1alpha1
 kind: KamiwazaPlatform
 metadata:
   name: kamiwaza

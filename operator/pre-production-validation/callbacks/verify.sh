@@ -55,7 +55,7 @@ kubectl --context "${context}" -n "${namespace}" create configmap "${bundle_obje
 # runtime to fall back to, which is why one is declared here rather than
 # assumed.
 kubectl --context "${context}" apply --server-side -f - >/dev/null <<EOF
-apiVersion: extensions.kamiwaza.io/v1alpha1
+apiVersion: extensions.kamiwaza.ai/v1alpha1
 kind: ExtensionRuntime
 metadata:
   name: validation
@@ -65,14 +65,14 @@ spec:
   storage:
     className: example-rwo
 ---
-apiVersion: extensions.kamiwaza.io/v1alpha1
+apiVersion: extensions.kamiwaza.ai/v1alpha1
 kind: Extension
 metadata:
   name: callback-matrix
   namespace: ${namespace}
   labels:
     # An extension names the runtime that hosts it.
-    kamiwaza.io/runtime: validation
+    kamiwaza.ai/runtime: validation
 spec:
   package:
     repository: examples/callback-matrix

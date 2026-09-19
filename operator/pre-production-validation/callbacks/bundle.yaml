@@ -10,7 +10,7 @@
 # component declares its own image, command, and environment and does not
 # reach into the namespace for a ConfigMap this scenario would then have to
 # keep in step with the artifact's digest.
-apiVersion: extensions.kamiwaza.io/bundle-v1alpha1
+apiVersion: extensions.kamiwaza.ai/bundle-v1alpha1
 components:
   - name: api
     image: cgr.dev/chainguard/python@sha256:5df43ab0f8ea19e305ad41fff3eef71a836aa2392c4c3f25c90d2d00fbf5fc52

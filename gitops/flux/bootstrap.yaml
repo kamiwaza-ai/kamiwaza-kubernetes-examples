@@ -69,7 +69,7 @@ spec:
     name: kamiwaza-config
   path: ./gitops/platform
   healthCheckExprs:
-    - apiVersion: platform.kamiwaza.io/v1alpha1
+    - apiVersion: platform.kamiwaza.ai/v1alpha1
       kind: KamiwazaPlatform
       # `exists`, not `filter(...).all(...)`. An empty list satisfies `all`, so
       # the common spelling reports a platform that has no conditions yet --

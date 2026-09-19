@@ -15,7 +15,7 @@ metadata:
   name: argocd-cm
   namespace: argocd
 data:
-  resource.customizations.health.platform.kamiwaza.io_KamiwazaPlatform: |
+  resource.customizations.health.platform.kamiwaza.ai_KamiwazaPlatform: |
     -- The platform publishes metav1 conditions with observedGeneration, so
     -- this is an answer about the revision that was applied rather than
     -- about whatever the operator last finished.

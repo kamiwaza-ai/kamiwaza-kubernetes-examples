@@ -81,7 +81,7 @@ This mode uses a cluster-wide cache and a non-sensitive ClusterRole. Secret muta
 kubectl -n kamiwaza-examples-system get deployment,serviceaccount,role,rolebinding
 kubectl -n kamiwaza-examples get role,rolebinding
 kubectl auth can-i --as=system:serviceaccount:kamiwaza-examples-system:kamiwaza-platform-operator \
-  get kamiwazaplatforms.platform.kamiwaza.io -n kamiwaza-examples
+  get kamiwazaplatforms.platform.kamiwaza.ai -n kamiwaza-examples
 kubectl auth can-i --as=system:serviceaccount:kamiwaza-examples-system:kamiwaza-platform-operator \
   get nodes
 kubectl auth can-i --as=system:serviceaccount:kamiwaza-examples-system:kamiwaza-platform-operator \

@@ -26,11 +26,11 @@ The extension is an independent aggregate root. Its controller alone owns extens
 ## Observe
 
 ```bash
-kubectl -n kamiwaza-examples get kamiwazaextensions.extensions.kamiwaza.io example-web
-kubectl -n kamiwaza-examples describe kamiwazaextensions.extensions.kamiwaza.io example-web
+kubectl -n kamiwaza-examples get kamiwazaextensions.extensions.kamiwaza.ai example-web
+kubectl -n kamiwaza-examples describe kamiwazaextensions.extensions.kamiwaza.ai example-web
 kubectl -n kamiwaza-examples wait \
   --for=condition=Ready \
-  kamiwazaextensions.extensions.kamiwaza.io/example-web \
+  kamiwazaextensions.extensions.kamiwaza.ai/example-web \
   --timeout=10m
 ```
 
@@ -51,17 +51,17 @@ Record the platform identity and generation, delete the extension, and verify th
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
   -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,GENERATION:.metadata.generation
 
-kubectl -n kamiwaza-examples delete kamiwazaextension.extensions.kamiwaza.io example-web
+kubectl -n kamiwaza-examples delete kamiwazaextension.extensions.kamiwaza.ai example-web
 
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
   -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,GENERATION:.metadata.generation
 kubectl -n kamiwaza-examples wait \
   --for=condition=Ready \
-  kamiwazaplatform.platform.kamiwaza.io/kamiwaza \
+  kamiwazaplatform.platform.kamiwaza.ai/kamiwaza \
   --timeout=10m
 kubectl -n kamiwaza-examples get deployment,service,networkpolicy,httproute \
   -l app.kubernetes.io/instance=example-web
-kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io
+kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.ai
 ```
 
 The platform UID and generation must remain unchanged. The final child query must return no extension-owned resources. Deleting the extension does not delete the platform or subordinate model resources.

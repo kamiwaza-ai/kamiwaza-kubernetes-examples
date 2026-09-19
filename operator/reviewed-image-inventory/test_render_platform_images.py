@@ -15,7 +15,7 @@ MODULE_SPEC.loader.exec_module(RENDERER)
 class RenderPlatformImagesTest(unittest.TestCase):
     def setUp(self):
         self.metadata = {
-            "schemaVersion": "platform.kamiwaza.io/release-metadata-v3",
+            "schemaVersion": "platform.kamiwaza.ai/release-metadata-v3",
             "platformVersion": "1.3.0",
             "reviewedImages": [
                 {

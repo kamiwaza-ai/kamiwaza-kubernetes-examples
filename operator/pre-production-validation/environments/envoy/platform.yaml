@@ -4,7 +4,7 @@
 # and no trust distribution controller -- that absence is what the
 # controller-free check proves. The platform issues its own workload
 # certificates through the transport policy fragment instead.
-apiVersion: platform.kamiwaza.io/v1alpha1
+apiVersion: platform.kamiwaza.ai/v1alpha1
 kind: KamiwazaPlatform
 metadata:
   name: kamiwaza

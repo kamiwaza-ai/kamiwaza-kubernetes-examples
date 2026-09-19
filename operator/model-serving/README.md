@@ -10,7 +10,7 @@ The previous version of this directory patched `KamiwazaPlatform.spec.models` wi
 
 ## Contract
 
-`ModelDeployment` in `serving.kamiwaza.io` is the only surface that deploys a served model. One object is one deployment, keyed by `spec.deploymentId`, serving `spec.modelId`, with `spec.engineName` naming the engine that authored `spec.carriedPodTemplate`.
+`ModelDeployment` in `serving.kamiwaza.ai` is the only surface that deploys a served model. One object is one deployment, keyed by `spec.deploymentId`, serving `spec.modelId`, with `spec.engineName` naming the engine that authored `spec.carriedPodTemplate`.
 
 The template is engine-authored. The application writes it when a model is deployed through it, which is why this repository publishes no hand-written one: a Pod template that has never served a request would be a guess rather than an example, and the failure would land on whoever applied it.
 
@@ -47,13 +47,13 @@ deployment target, and request deployment. The application must create the
 Continue after this command shows at least one request:
 
 ```bash
-kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io
+kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.ai
 ```
 
 ## Observe what is requested and what is serving
 
 ```bash
-kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io \
+kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.ai \
   -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,DEPLOYMENT_ID:.spec.deploymentId,MODEL:.spec.modelId,ENGINE:.spec.engineName,PHASE:.status.phase,READY:.status.readyReplicas
 
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
@@ -65,7 +65,7 @@ An empty list means the application has not created the request. Return to the p
 Wait for every requested deployment to report Ready:
 
 ```bash
-for name in $(kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io -o name); do
+for name in $(kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.ai -o name); do
   kubectl -n kamiwaza-examples wait --for=condition=Ready "${name}" --timeout=30m
 done
 ```
@@ -78,13 +78,13 @@ The hardening and the pull-credential wiring are visible on the request itself, 
 MODEL_DEPLOYMENT=<name-from-the-previous-command>
 
 # Hardened Pod security context on the engine-authored template.
-kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io "${MODEL_DEPLOYMENT}" \
+kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.ai "${MODEL_DEPLOYMENT}" \
   -o jsonpath='{.spec.carriedPodTemplate.spec.securityContext}{"\n"}'
 
 # The registry credentials reach the pull container as environment from the
 # policy-named Secret. The names of the Secret and its keys are visible; the
 # credential itself is not, and never appears in a container argument.
-kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io "${MODEL_DEPLOYMENT}" \
+kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.ai "${MODEL_DEPLOYMENT}" \
   -o jsonpath='{range .spec.carriedPodTemplate.spec.initContainers[?(@.name=="pull-model")]}{range .env[*]}{.name}{"\t"}{.valueFrom.secretKeyRef.name}{"\t"}{.valueFrom.secretKeyRef.key}{"\n"}{end}{end}'
 ```
 
@@ -103,15 +103,15 @@ The serving controller must recreate the Deployment under the same `ModelDeploym
 `spec.state` is what the owner wants the deployment to be doing, and `stopped` is not deletion: artifacts and identity are retained.
 
 ```bash
-kubectl -n kamiwaza-examples patch modeldeployments.serving.kamiwaza.io "${MODEL_DEPLOYMENT}" \
+kubectl -n kamiwaza-examples patch modeldeployments.serving.kamiwaza.ai "${MODEL_DEPLOYMENT}" \
   --type=merge --patch '{"spec":{"state":"stopped"}}'
 
 kubectl -n kamiwaza-examples wait \
   --for=jsonpath='{.status.phase}'=Stopped \
-  "modeldeployments.serving.kamiwaza.io/${MODEL_DEPLOYMENT}" \
+  "modeldeployments.serving.kamiwaza.ai/${MODEL_DEPLOYMENT}" \
   --timeout=5m
 
-kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io "${MODEL_DEPLOYMENT}" \
+kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.ai "${MODEL_DEPLOYMENT}" \
   -o custom-columns=UID:.metadata.uid,DEPLOYMENT_ID:.spec.deploymentId,STATE:.spec.state,PHASE:.status.phase
 
 kubectl -n kamiwaza-examples get deployment "${MODEL_DEPLOYMENT}" \
@@ -123,12 +123,12 @@ The UID and deployment ID must remain unchanged, while the child Deployment repo
 Resume the same deployment if another scenario will use it:
 
 ```bash
-kubectl -n kamiwaza-examples patch modeldeployments.serving.kamiwaza.io "${MODEL_DEPLOYMENT}" \
+kubectl -n kamiwaza-examples patch modeldeployments.serving.kamiwaza.ai "${MODEL_DEPLOYMENT}" \
   --type=merge --patch '{"spec":{"state":"running"}}'
 
 kubectl -n kamiwaza-examples wait \
   --for=condition=Ready \
-  "modeldeployments.serving.kamiwaza.io/${MODEL_DEPLOYMENT}" \
+  "modeldeployments.serving.kamiwaza.ai/${MODEL_DEPLOYMENT}" \
   --timeout=30m
 ```
 

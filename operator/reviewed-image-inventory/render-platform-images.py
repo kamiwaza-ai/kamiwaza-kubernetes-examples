@@ -7,7 +7,7 @@ import re
 import sys
 from pathlib import Path
 
-SCHEMA_VERSION = "platform.kamiwaza.io/release-metadata-v3"
+SCHEMA_VERSION = "platform.kamiwaza.ai/release-metadata-v3"
 DIGEST_REFERENCE = re.compile(
     r"^[a-z0-9][a-z0-9.-]*(?::[0-9]+)?"
     r"(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)+"

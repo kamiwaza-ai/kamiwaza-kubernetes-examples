@@ -2,7 +2,7 @@
 # cluster identity for this installation. `spec.clusterID` identifies retained
 # volumes and operator-created Secrets after a RetainData delete, so the two
 # installations never share one.
-apiVersion: platform.kamiwaza.io/v1alpha1
+apiVersion: platform.kamiwaza.ai/v1alpha1
 kind: KamiwazaPlatform
 metadata:
   name: kamiwaza

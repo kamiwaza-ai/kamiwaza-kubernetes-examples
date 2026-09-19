@@ -27,4 +27,4 @@ kubectl -n "${namespace}" get kamiwazaplatform "${platform}" \
   -o jsonpath='{range .status.components[*]}{.name}{"\t"}{.phase}{"\t"}{.reason}{"\n"}{end}'
 
 echo "Model deployments"
-kubectl -n "${namespace}" get modeldeployments.serving.kamiwaza.io
+kubectl -n "${namespace}" get modeldeployments.serving.kamiwaza.ai

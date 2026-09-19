@@ -28,7 +28,7 @@
 # against, copied from `config/release/reviewed-images.yaml` in the platform
 # operator repository. Replace them with the digests your own release
 # publishes; do not replace them with tags.
-apiVersion: platform.kamiwaza.io/v1alpha1
+apiVersion: platform.kamiwaza.ai/v1alpha1
 kind: KamiwazaPlatform
 metadata:
   name: kamiwaza
@@ -57,7 +57,7 @@ spec:
   components:
     # There is no model intent on this resource, and its absence is the
     # design rather than an omission. `ModelDeployment` in
-    # serving.kamiwaza.io is the only surface that deploys a served model,
+    # serving.kamiwaza.ai is the only surface that deploys a served model,
     # and a conformance test asserts this CRD declares no `models` field
     # precisely so that declaring a platform cannot deploy a model by
     # default. A `ModelDeployment` also carries an engine-authored Pod
@@ -65,7 +65,7 @@ spec:
     # through it, so this repository publishes no hand-written one: a
     # template that has never served a request is a guess, not an example.
     # Observe what exists with
-    # `kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io`.
+    # `kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.ai`.
     identityAndAccess:
       enabled: true
       rebac:

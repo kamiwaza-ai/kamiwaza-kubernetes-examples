@@ -37,7 +37,7 @@ kubectl -n kamiwaza-examples wait \
   --timeout=45m
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
   -o jsonpath='{range .status.models[*]}{.name}{"\t"}{.phase}{"\t"}{.deploymentId}{"\n"}{end}'
-kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io
+kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.ai
 ```
 
 Require at least one Ready model. `ModelDeployment` is inspection-only for tenant users; desired model intent remains on the main platform.
@@ -70,14 +70,14 @@ Do not replace this step with a hand-written demonstration extension. The platfo
 Find the generated resource without assuming its generated name or installation namespace:
 
 ```bash
-kubectl get kamiwazaextensions.extensions.kamiwaza.io -A \
-  -l extensions.kamiwaza.io/name=kaizen
+kubectl get kamiwazaextensions.extensions.kamiwaza.ai -A \
+  -l extensions.kamiwaza.ai/name=kaizen
 
-TOMO_NAMESPACE="$(kubectl get kamiwazaextensions.extensions.kamiwaza.io -A \
-  -l extensions.kamiwaza.io/name=kaizen \
+TOMO_NAMESPACE="$(kubectl get kamiwazaextensions.extensions.kamiwaza.ai -A \
+  -l extensions.kamiwaza.ai/name=kaizen \
   -o jsonpath='{.items[0].metadata.namespace}')"
-TOMO_EXTENSION="$(kubectl get kamiwazaextensions.extensions.kamiwaza.io -A \
-  -l extensions.kamiwaza.io/name=kaizen \
+TOMO_EXTENSION="$(kubectl get kamiwazaextensions.extensions.kamiwaza.ai -A \
+  -l extensions.kamiwaza.ai/name=kaizen \
   -o jsonpath='{.items[0].metadata.name}')"
 test -n "${TOMO_NAMESPACE}"
 test -n "${TOMO_EXTENSION}"
@@ -146,7 +146,7 @@ kubectl -n "${TOMO_NAMESPACE}" get kamiwazaextension "${TOMO_EXTENSION}" \
   -o jsonpath='{range .status.conditions[*]}{.type}{"\t"}{.status}{"\t"}{.reason}{"\n"}{end}'
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
   -o custom-columns=PHASE:.status.phase,CURRENT:.status.currentVersion,OBSERVED:.status.observedGeneration
-kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io
+kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.ai
 ```
 
 The evidence must show one healthy main platform, the real Tomo extension Running, shared models Ready, same-tenant collaboration working, and cross-tenant direct access denied.

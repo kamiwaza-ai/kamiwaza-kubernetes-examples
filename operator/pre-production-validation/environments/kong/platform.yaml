@@ -5,7 +5,7 @@
 # Nothing here names the routing implementation. A third implementation that
 # needed one platform field to differ would be the finding this environment
 # exists to surface.
-apiVersion: platform.kamiwaza.io/v1alpha1
+apiVersion: platform.kamiwaza.ai/v1alpha1
 kind: KamiwazaPlatform
 metadata:
   name: kamiwaza

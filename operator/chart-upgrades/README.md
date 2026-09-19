@@ -26,12 +26,12 @@ helm get values kamiwaza-platform-operator -n kamiwaza-examples-system -o yaml \
 kubectl -n kamiwaza-examples-system get deployment kamiwaza-platform-operator \
   -o custom-columns=IMAGE:.spec.template.spec.containers[0].image,AVAILABLE:.status.availableReplicas
 kubectl get crd \
-  kamiwazaplatforms.platform.kamiwaza.io \
-  kamiwazaextensions.extensions.kamiwaza.io \
-  extensions.extensions.kamiwaza.io \
-  extensionruntimes.extensions.kamiwaza.io \
-  sandboxpools.extensions.kamiwaza.io \
-  modeldeployments.serving.kamiwaza.io \
+  kamiwazaplatforms.platform.kamiwaza.ai \
+  kamiwazaextensions.extensions.kamiwaza.ai \
+  extensions.extensions.kamiwaza.ai \
+  extensionruntimes.extensions.kamiwaza.ai \
+  sandboxpools.extensions.kamiwaza.ai \
+  modeldeployments.serving.kamiwaza.ai \
   -o custom-columns=NAME:.metadata.name,STORED_VERSIONS:.status.storedVersions
 ```
 
@@ -100,7 +100,7 @@ kubectl -n kamiwaza-examples-system logs \
   deployment/kamiwaza-platform-operator \
   --since=10m
 kubectl -n kamiwaza-examples get kamiwazaplatform,kamiwazaextension
-kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.io
+kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.ai
 ```
 
 Require one manager Deployment, the expected digest-pinned image, healthy manager probes, registered platform, extension, and model-serving controller domains, unchanged immutable watch authority, and no unrelated platform, extension, or model rollout.

@@ -22,13 +22,13 @@ kubectl -n kamiwaza-examples wait \
   kamiwazaplatform/kamiwaza \
   --timeout=10m
 kubectl -n kamiwaza-examples get deployments \
-  -l app.kubernetes.io/managed-by=kamiwaza-platform-operator,platform.kamiwaza.io/controller-domain=platform \
+  -l app.kubernetes.io/managed-by=kamiwaza-platform-operator,platform.kamiwaza.ai/controller-domain=platform \
   -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,READY:.status.readyReplicas,DESIRED:.spec.replicas
 kubectl -n kamiwaza-examples get jobs \
   -l app.kubernetes.io/managed-by=kamiwaza-platform-operator \
   -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,SUCCEEDED:.status.succeeded
 kubectl -n kamiwaza-examples get secrets \
-  -l platform.kamiwaza.io/uid \
+  -l platform.kamiwaza.ai/uid \
   -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,DATA_VERSION:.metadata.resourceVersion
 ```
 

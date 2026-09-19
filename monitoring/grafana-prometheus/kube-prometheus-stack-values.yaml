@@ -90,7 +90,7 @@ kubeStateMetrics:
   enabled: true
 kube-state-metrics:
   metricLabelsAllowlist:
-    - configmaps=[kamiwaza.io/template-name,kamiwaza.io/template-version]
+    - configmaps=[kamiwaza.ai/template-name,kamiwaza.ai/template-version]
 
 kubelet:
   enabled: true

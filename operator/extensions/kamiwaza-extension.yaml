@@ -1,4 +1,4 @@
-apiVersion: extensions.kamiwaza.io/v1alpha1
+apiVersion: extensions.kamiwaza.ai/v1alpha1
 kind: KamiwazaExtension
 metadata:
   name: example-web

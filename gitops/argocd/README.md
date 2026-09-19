@@ -64,7 +64,7 @@ Wave 1 does not start until wave 0 is Healthy, which is what keeps the first syn
 Both children set `ServerSideApply=true`. The platform CRD this chart installs renders to 737 KB, and a client-side apply records the whole object in the `kubectl.kubernetes.io/last-applied-configuration` annotation, which the API server refuses above 262144 bytes:
 
 ```
-The CustomResourceDefinition "kamiwazaplatforms.platform.kamiwaza.io" is invalid:
+The CustomResourceDefinition "kamiwazaplatforms.platform.kamiwaza.ai" is invalid:
   metadata.annotations: Too long: may not be more than 262144 bytes
 ```
 

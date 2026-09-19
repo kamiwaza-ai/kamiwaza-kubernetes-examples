@@ -11,7 +11,7 @@ metadata:
   namespace: kw-profile-production
 rules:
   - apiGroups:
-      - platform.kamiwaza.io
+      - platform.kamiwaza.ai
     resources:
       - kamiwazaplatforms
     verbs:
@@ -63,7 +63,7 @@ spec:
               port = os.environ["KUBERNETES_SERVICE_PORT_HTTPS"]
               token = open("/var/run/secrets/kubernetes.io/serviceaccount/token").read()
               request = urllib.request.Request(
-                  f"https://{host}:{port}/apis/platform.kamiwaza.io/v1alpha1/namespaces/kw-profile-production/kamiwazaplatforms/kamiwaza",
+                  f"https://{host}:{port}/apis/platform.kamiwaza.ai/v1alpha1/namespaces/kw-profile-production/kamiwazaplatforms/kamiwaza",
                   headers={"Authorization": "Bearer " + token},
               )
               context = ssl.create_default_context(

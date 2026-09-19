@@ -19,7 +19,7 @@
 # Disabling the plane does not remove a served model's own in-cluster address.
 # The plane is an additional front door, not a replacement, so the direct path
 # keeps working and keeps being reported on its own observation.
-apiVersion: platform.kamiwaza.io/v1alpha1
+apiVersion: platform.kamiwaza.ai/v1alpha1
 kind: KamiwazaPlatform
 metadata:
   name: kamiwaza

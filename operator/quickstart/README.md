@@ -125,7 +125,7 @@ kubectl apply --server-side \
   -f kamiwaza-platform.local.yaml
 ```
 
-This platform declares no model, and there is no field on the resource for one. `ModelDeployment` in `serving.kamiwaza.io` is the only surface that deploys a served model, and the platform CRD carries no model intent by design so that declaring a platform cannot deploy a model by default. A `ModelDeployment` also carries an engine-authored Pod template, which the application writes when a model is deployed through it, so this quickstart applies none by hand: a template that has never served a request would be a guess rather than an example. Image pulls still require the registries and outbound access approved for the cluster.
+This platform declares no model, and there is no field on the resource for one. `ModelDeployment` in `serving.kamiwaza.ai` is the only surface that deploys a served model, and the platform CRD carries no model intent by design so that declaring a platform cannot deploy a model by default. A `ModelDeployment` also carries an engine-authored Pod template, which the application writes when a model is deployed through it, so this quickstart applies none by hand: a template that has never served a request would be a guess rather than an example. Image pulls still require the registries and outbound access approved for the cluster.
 
 ## 6. Observe convergence
 
