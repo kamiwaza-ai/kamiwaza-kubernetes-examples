@@ -55,6 +55,7 @@ Category indexes:
 - **Monitoring:** [monitoring/README.md](monitoring/README.md)
 - **Networking:** [networking/README.md](networking/README.md)
 - **Operations:** [operations/README.md](operations/README.md)
+- **Protocols:** [protocols/README.md](protocols/README.md)
 - **Security:** [security/README.md](security/README.md)
 - **Troubleshooting:** [troubleshooting/README.md](troubleshooting/README.md)
 
@@ -76,6 +77,7 @@ Category indexes:
 | Administrator-owned development registry               | [operator/registry](operator/registry)                                             | #operator #registry #development                            |
 | Transport under a strict and a relaxed scope           | [operator/transport-scopes](operator/transport-scopes)                             | #operator #transport #namespaces #rbac                      |
 | Governed endpoint and configuration fencing            | [operator/protocol-data-plane](operator/protocol-data-plane)                       | #operator #transport #fencing #data-plane                   |
+| Running MCP servers in Kamiwaza                        | [protocols/mcp-serving](protocols/mcp-serving)                                     | #protocols #mcp #oauth #extensions                          |
 | Flux delivery                                          | [gitops/flux](gitops/flux)                                                         | #gitops #flux #helm #kustomize #health                      |
 | Argo CD delivery                                       | [gitops/argocd](gitops/argocd)                                                     | #gitops #argocd #sync-waves #health                         |
 | Tomo shared-workroom tenant isolation                  | [multi-tenancy/tomo-shared-workrooms](multi-tenancy/tomo-shared-workrooms)         | #multi-tenancy #tomo #rebac #models                         |

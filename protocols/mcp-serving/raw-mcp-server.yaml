@@ -1,0 +1,120 @@
+# Shape B1 — an ordinary workload serving MCP on the platform domain.
+#
+# Not an extension: the platform does not manage this package, this lifecycle,
+# or this route. What it does provide is the edge in front of it, so the
+# workload serves the hosted shape — it reads the member context the edge
+# forwards and publishes no protected-resource metadata of its own.
+#
+# For a client to discover how to authenticate here, the path below must appear
+# in the platform's published protected resources
+# (AUTH_PROTECTED_RESOURCE_PATHS in core-config). Without it the endpoint is
+# still protected and still refuses, but the refusal names no metadata document
+# and a conformant client cannot recover.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-demo
+  namespace: kamiwaza-examples
+  labels:
+    app.kubernetes.io/name: mcp-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mcp-demo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mcp-demo
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: server
+          image: ghcr.io/kamiwaza-internal/tool-kamiwaza-mcp:0.1.0
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # The platform root this server calls under the caller's own
+            # credential. In-cluster address: no public hop for a call that
+            # never leaves the cluster.
+            - name: KAMIWAZA_API_URL
+              value: http://core-api.kamiwaza.svc:7777/api
+            - name: KAMIWAZA_MCP_READ_ONLY
+              value: "true"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-demo
+  namespace: kamiwaza-examples
+spec:
+  selector:
+    app.kubernetes.io/name: mcp-demo
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+# Gateway API, so this works on whichever implementation the cluster runs.
+# Replace the hostname with your platform domain.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mcp-demo
+  namespace: kamiwaza-examples
+spec:
+  hostnames:
+    - kamiwaza.example
+  parentRefs:
+    # The platform's Gateway, which lives in the platform namespace. A route
+    # attaching from another namespace is accepted only where the listener's
+    # allowedRoutes permits it; the Gateway reports the refusal in the route's
+    # parent status rather than silently ignoring it.
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: kamiwaza-gateway
+      namespace: kamiwaza
+      sectionName: https
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /mcp-demo
+      filters:
+        # The server mounts the protocol at /mcp and knows nothing of the
+        # public prefix, so the prefix is replaced rather than forwarded:
+        # https://<domain>/mcp-demo/mcp reaches /mcp on the workload.
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: mcp-demo
+          port: 8080
