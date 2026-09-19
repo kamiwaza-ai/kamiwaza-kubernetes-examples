@@ -1,5 +1,0 @@
-# Operator's real config — holds account id, paths, admin password. Never commit.
-config.env
-
-# Rendered/temp artifacts produced by `make deploy`.
-*.rendered.yaml

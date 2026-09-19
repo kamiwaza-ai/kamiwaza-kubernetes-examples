@@ -1,0 +1,51 @@
+manager:
+  # This example starts on an empty cluster. Publish and own the APIs that
+  # coexistence mode withholds while an incumbent operator still serves them.
+  adoptWithheldKinds: true
+  watchNamespaces:
+    - kamiwaza-examples
+  watchAnyNamespace: false
+
+adminPolicy:
+  revision: examples-bounded-r1
+  # allowedTargetNamespaces is deliberately absent. It defaults to the
+  # manager's watch set above, which is this installation's one namespace, and
+  # a value stated twice is a value the two copies can disagree about. State a
+  # list only to narrow within the watch set.
+  storage:
+    # Replace with a dynamic RWO StorageClass available in the target cluster.
+    allowedClassNames:
+      - example-rwo
+    allowedSharedClassNames: []
+  domains:
+    allocationMode: ExplicitAllowlist
+    # Replace with the DNS name routed to the administrator-selected gateway.
+    allowedDomains:
+      - kamiwaza-examples.example.com
+    allowedSuffixes: []
+  images:
+    # Digest enforcement and registry credentials are administrator policy,
+    # not platform intent. The platform names which image it runs; this says
+    # which repositories are approved and which local Secret pulls them, so
+    # the two cannot disagree about who owns the credential.
+    requireDigests: true
+    allowedRepositoryPrefixes:
+      - ghcr.io/kamiwaza-internal/
+      # The relationship store and the protocol data plane are third-party
+      # images the platform pins by digest, so their repositories are named
+      # here rather than left out of the approved set.
+      - ghcr.io/authzed/
+      - ghcr.io/agentgateway/
+    # The Secret created in the target namespace in step 3. It stays a name
+    # here: no registry credential belongs in a values file.
+    pullSecretNames:
+      - registry-pull
+  # modelRegistry is absent because this installation declares no model
+  # source. Declaring the block selects an artifact store; omitting it renders
+  # `type: None`, and the administrator-owned registry workflow in
+  # ../registry/ shows what to write when there is one.
+  operations:
+    adoptionAllowed: false
+    deleteAllAllowed: false
+    genericSecretRotationAllowed: false
+    approvedForwardOnlyUpgradeTargets: []

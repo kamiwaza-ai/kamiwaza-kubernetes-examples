@@ -1,0 +1,114 @@
+## Lab additions to ../../quickstart/operator-values.yaml, applied after it.
+##
+## Everything here is a property of a disposable validation environment: which
+## namespace it owns, that it has no certificate controller, and which locally
+## built workload identity images it runs. Nothing here belongs in a customer
+## installation, and no credential appears in it -- the pull Secret is named,
+## not carried.
+manager:
+  watchNamespaces:
+    - ${PLATFORM_NAMESPACE}
+
+adminPolicy:
+  revision: ${POLICY_REVISION}
+  allowedTargetNamespaces:
+    - ${PLATFORM_NAMESPACE}
+  extensions:
+    allowedNamespaces:
+      - ${PLATFORM_NAMESPACE}
+    # Namespaced, because an extension gets its own Role in its own namespace.
+    # The shipped default disables it, and an extension cannot run at all
+    # while it is off: sharing one Role across extensions is the isolation
+    # failure the setting exists to prevent, so the platform refuses rather
+    # than sharing.
+    dynamicRBAC: Namespaced
+  routing:
+    gateway:
+      name: kamiwaza-gateway
+      namespace: ${PLATFORM_NAMESPACE}
+      # Where this environment's implementation runs the proxy that serves the
+      # Gateway. Without it the platform ingress floor admits only its own
+      # namespace, and every request through the published route is dropped
+      # while the Gateway reports Accepted.
+      dataPlaneNamespace: ${CALLBACK_SERVICE_NAMESPACE}
+      sectionName: https
+    # Where platform callbacks travel. This is a Service reference, so the
+    # operator derives the origin and no extension supplies a URL. The
+    # Service is the environment's own Gateway data plane, which differs by
+    # implementation, so it is named here rather than in the published
+    # fragment.
+    callbackTransport:
+      serviceRef:
+        name: ${CALLBACK_SERVICE_NAME}
+        namespace: ${CALLBACK_SERVICE_NAMESPACE}
+        port: 443
+      scheme: HTTPS
+  trust:
+    # This environment deliberately has no certificate controller, which is the
+    # `controller-free-cluster` dependency the matrix names. The platform signs
+    # its own workload certificates through `transport.issuance`, merged in
+    # from the transport policy fragment, so no issuer is referenced here.
+    managementPolicy: External
+    issuer:
+      group: ""
+      kind: ""
+      name: ""
+  dependencies:
+    # Null removes the key. A declared dependency is an administrator
+    # attestation that the controller is installed, and attesting to a
+    # certificate controller this environment does not have would make the
+    # controller-free check prove nothing.
+    certManager: null
+    trustManager: null
+    gatewayAPI:
+      managementPolicy: External
+      evidenceSource: AdminAttested
+      namespace: ""
+      # The version `gateways/install.sh` pins. The chart's own default
+      # attests `>=1.4.0`, which the manager refuses against this scenario's
+      # policy: edge client certificates need Gateway API v1.5.0 or later,
+      # and it will not write a client-certificate field that a bundle below
+      # that floor would silently prune -- a Gateway accepted while
+      # enforcing nothing.
+      versionConstraint: ">=1.6.0 <2.0.0"
+      # What this environment's administrator states the installed routing
+      # implementation serves, in upstream conformance feature names. It is
+      # stated per environment because it is a fact about the controller the
+      # environment installed, not about the platform.
+      #
+      # None of the three implementations this scenario installs publishes
+      # anything in GatewayClass.status.supportedFeatures, and reading that
+      # status needs cluster-scoped authority a namespaced installation does
+      # not have, so the attestation is the evidence. It is not taken on
+      # faith: the platform publishes the object and the implementation's own
+      # namespaced status on it either confirms or refuses the claim, which is
+      # what the matrix measures.
+      attestedFeatures: ${ATTESTED_GATEWAY_FEATURES}
+  images:
+    requireDigests: true
+    allowedRepositoryPrefixes:
+      - ghcr.io/kamiwaza-internal/
+      - ghcr.io/authzed/
+      - ghcr.io/agentgateway/
+      # The lab registry that serves the locally built workload identity
+      # images below.
+      - ${LAB_IMAGE_PREFIX}
+    pullSecretNames:
+      - registry-pull
+    pinned:
+      # This release renders the workload identity plane but publishes no
+      # images for it: its reviewed release data carries the all-zero digest
+      # for all three roles, which can never resolve to bytes. The signer
+      # refuses to run on an unresolvable reference rather than falling back
+      # to a tag, so a validation environment supplies reviewed local builds
+      # through administrator policy, which is the one surface allowed to
+      # override a release pin.
+      - capability: platformTransport
+        role: certificateSigner
+        reference: ${TRANSPORT_SIGNER_IMAGE}
+      - capability: platformTransport
+        role: workloadIdentityAgent
+        reference: ${WORKLOAD_IDENTITY_AGENT_IMAGE}
+      - capability: platformTransport
+        role: pinnedTransportProxy
+        reference: ${TRANSPORT_PROXY_IMAGE}

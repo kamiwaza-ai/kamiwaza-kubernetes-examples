@@ -1,0 +1,15 @@
+# The checked-in platform intent names `example-rwo`, and immutable policy
+# allows exactly that name. A validation environment provides a dynamic RWO
+# class under it rather than editing the published example, so what runs here
+# is the example a customer reads.
+#
+# The provisioner is whatever the disposable environment already has. Kind
+# ships the local-path provisioner, which is RWO and dynamic, and is not a
+# recommendation for any real installation.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: example-rwo
+provisioner: rancher.io/local-path
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer

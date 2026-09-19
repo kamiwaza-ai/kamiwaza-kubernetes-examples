@@ -1,0 +1,17 @@
+# Environment-owned statements about the published platform intent. A
+# dependency requirement is an administrator statement that the controller is
+# installed, and this environment deliberately has no certificate controller
+# and no trust distribution controller -- that absence is what the
+# controller-free check proves. The platform issues its own workload
+# certificates through the transport policy fragment instead.
+apiVersion: platform.kamiwaza.ai/v1alpha1
+kind: KamiwazaPlatform
+metadata:
+  name: kamiwaza
+  namespace: kamiwaza-examples
+spec:
+  dependencies:
+    certManager:
+      required: false
+    trustManager:
+      required: false

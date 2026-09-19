@@ -1,0 +1,56 @@
+# One administrator-automation grant bundle: the desired set of relationship
+# edges this producer owns.
+#
+# The bundle is desired state, not a list of commands. Every edge the bundle
+# declares is an edge this producer wants to own; an edge it stops declaring is
+# an edge it stops owning. That is why a removal is previewed by planning the
+# next revision of this file with the entry dropped, and never by hand-editing
+# the relationship store.
+#
+# This document is the published contract's `GrantManifest`:
+# `specs/002-identity-transport-runtime/contracts/grant-service.openapi.yaml`
+# in the platform operator repository. The schema is closed
+# (`additionalProperties: false`), so a key the contract does not declare is
+# refused rather than ignored — including a key added to carry a note. Notes
+# belong in comments, like this one.
+#
+# `revision` is yours to choose and it must change whenever the entries change.
+# The service binds an apply to the plan digest computed for one revision, so a
+# changed file under an unchanged revision is what a stale approval looks like.
+#
+# Every value below is a placeholder. `principalID` values are synthetic UUIDs
+# and identify nobody; `resourceID` values name no real dataset, workroom or
+# model. No token, credential, email, or directory name appears in a manifest:
+# a principal is an opaque platform identifier, which is the only identifier
+# this document is allowed to carry.
+bundleID: example-analytics-automation
+revision: rev-0001
+platformID: example-platform
+entries:
+  # `entryID` is this bundle's name for the edge. It is how a plan, an apply
+  # result and a removal all refer to the same intent, and it is scoped to the
+  # bundle: two producers declaring the same edge use their own entry IDs and
+  # neither sees the other's.
+  - entryID: analytics-reader-on-quarterly-metrics
+    principalID: 00000000-0000-4000-8000-000000000001
+    resourceType: Dataset
+    resourceID: example-quarterly-metrics
+    relation: Viewer
+  # The edge the second producer in this example also declares. Nothing in the
+  # manifest says so, and nothing needs to: co-ownership is a property of the
+  # edge in the store, which is what the plan reports and this file cannot
+  # know.
+  - entryID: analytics-editor-on-shared-workroom
+    principalID: 00000000-0000-4000-8000-000000000002
+    resourceType: Workroom
+    resourceID: example-lab-shared
+    relation: Editor
+  # `Operator` is writable for a Connector and not for a Model, which is why
+  # the plan is the authority on what an entry may say: a relation in the
+  # contract's vocabulary is still refused for a resource type that has no
+  # such relation to write.
+  - entryID: analytics-operator-on-metrics-connector
+    principalID: 00000000-0000-4000-8000-000000000002
+    resourceType: Connector
+    resourceID: example-metrics-connector
+    relation: Operator

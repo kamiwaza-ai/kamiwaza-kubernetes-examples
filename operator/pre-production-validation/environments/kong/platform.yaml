@@ -1,0 +1,21 @@
+# The same environment-owned statements as the other environments, plus this
+# installation's own cluster identity so retained volumes and operator-created
+# Secrets are never shared between them.
+#
+# Nothing here names the routing implementation. A third implementation that
+# needed one platform field to differ would be the finding this environment
+# exists to surface.
+apiVersion: platform.kamiwaza.ai/v1alpha1
+kind: KamiwazaPlatform
+metadata:
+  name: kamiwaza
+  # The base namespace, because a patch is matched before the namespace
+  # transformer moves the object into this environment's namespace.
+  namespace: kamiwaza-examples
+spec:
+  clusterID: kamiwaza-examples-third
+  dependencies:
+    certManager:
+      required: false
+    trustManager:
+      required: false

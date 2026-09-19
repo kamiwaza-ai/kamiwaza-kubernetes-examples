@@ -21,13 +21,6 @@ metadata:
   labels:
     app.kubernetes.io/name: kamiwaza-debug
     app.kubernetes.io/component: jump-pod
-  # ----- remaining accepted exceptions -----
-  # The drop-net-raw-capability annotation is no longer needed: this PR
-  # drops NET_RAW from the cap allowlist entirely (it was dead config —
-  # see securityContext block). Findings below are by-design.
-  annotations:
-    ignore-check.kube-linter.io/no-read-only-root-fs: "Read-only-root-fs is a separate ATO follow-up; triage console writes to /tmp and the operator's home (emptyDir-mounted). Tracked for the next hardening pass."
-    ignore-check.kube-linter.io/default-deny-ingress-policy: "Cluster-side NetworkPolicy is a separate ATO follow-up; the jump-pod itself listens on no ports."
 spec:
   serviceAccountName: kamiwaza-debug
   restartPolicy: Always
@@ -82,25 +75,65 @@ spec:
       # for aws-cli too, so a baseline pod must keep instance-role creds.
       env:
         - name: AWS_REGION
-          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: AWS_REGION, optional: true } }
+          valueFrom:
+            secretKeyRef:
+              name: kamiwaza-debug-bedrock
+              key: AWS_REGION
+              optional: true
         - name: ANTHROPIC_BEDROCK_BASE_URL
-          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: ANTHROPIC_BEDROCK_BASE_URL, optional: true } }
+          valueFrom:
+            secretKeyRef:
+              name: kamiwaza-debug-bedrock
+              key: ANTHROPIC_BEDROCK_BASE_URL
+              optional: true
         - name: ANTHROPIC_MODEL
-          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: ANTHROPIC_MODEL, optional: true } }
+          valueFrom:
+            secretKeyRef:
+              name: kamiwaza-debug-bedrock
+              key: ANTHROPIC_MODEL
+              optional: true
         - name: ANTHROPIC_DEFAULT_HAIKU_MODEL
-          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: ANTHROPIC_DEFAULT_HAIKU_MODEL, optional: true } }
+          valueFrom:
+            secretKeyRef:
+              name: kamiwaza-debug-bedrock
+              key: ANTHROPIC_DEFAULT_HAIKU_MODEL
+              optional: true
         - name: AWS_BEARER_TOKEN_BEDROCK
-          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: AWS_BEARER_TOKEN_BEDROCK, optional: true } }
+          valueFrom:
+            secretKeyRef:
+              name: kamiwaza-debug-bedrock
+              key: AWS_BEARER_TOKEN_BEDROCK
+              optional: true
         - name: AWS_ACCESS_KEY_ID
-          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: AWS_ACCESS_KEY_ID, optional: true } }
+          valueFrom:
+            secretKeyRef:
+              name: kamiwaza-debug-bedrock
+              key: AWS_ACCESS_KEY_ID
+              optional: true
         - name: AWS_SECRET_ACCESS_KEY
-          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: AWS_SECRET_ACCESS_KEY, optional: true } }
+          valueFrom:
+            secretKeyRef:
+              name: kamiwaza-debug-bedrock
+              key: AWS_SECRET_ACCESS_KEY
+              optional: true
         - name: AWS_SESSION_TOKEN
-          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: AWS_SESSION_TOKEN, optional: true } }
+          valueFrom:
+            secretKeyRef:
+              name: kamiwaza-debug-bedrock
+              key: AWS_SESSION_TOKEN
+              optional: true
         - name: AWS_EC2_METADATA_DISABLED
-          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: AWS_EC2_METADATA_DISABLED, optional: true } }
+          valueFrom:
+            secretKeyRef:
+              name: kamiwaza-debug-bedrock
+              key: AWS_EC2_METADATA_DISABLED
+              optional: true
         - name: NODE_EXTRA_CA_CERTS
-          valueFrom: { secretKeyRef: { name: kamiwaza-debug-bedrock, key: NODE_EXTRA_CA_CERTS, optional: true } }
+          valueFrom:
+            secretKeyRef:
+              name: kamiwaza-debug-bedrock
+              key: NODE_EXTRA_CA_CERTS
+              optional: true
       resources:
         requests:
           cpu: "100m"
@@ -109,7 +142,7 @@ spec:
           cpu: "2"
           memory: "2Gi"
       securityContext:
-        readOnlyRootFilesystem: false
+        readOnlyRootFilesystem: true
         allowPrivilegeEscalation: false
         # Pure drop-ALL capability boundary. The pod runs as uid 65532
         # (pod-level runAsNonRoot:true above), so any caps in `add`

@@ -1,0 +1,17 @@
+# Relationship decisions as tenant intent on the platform resource.
+#
+# Merge patch for `KamiwazaPlatform`. This is the whole platform-side surface:
+# whether relationship decisions are on, which store holds the relationships,
+# and whether a fallback may decide access when the store cannot answer. Keep
+# the fallback off wherever the answer matters — a fallback that decides is a
+# second authorization path.
+#
+# Nothing here is a grant. Who may reach which resource is a bundle applied
+# through the grant service; see README.md.
+spec:
+  auth:
+    enabled: true
+    rebac:
+      enabled: true
+      backend: spicedb
+      allowCommunityFallback: false

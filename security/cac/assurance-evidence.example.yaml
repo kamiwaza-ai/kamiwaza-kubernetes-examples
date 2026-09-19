@@ -1,0 +1,24 @@
+# Shape of the protected assurance evidence named by `assurance.evidenceRef`.
+# This file documents the record; do not apply it.
+#
+# Do not copy these levels into a live record. An external conformance run must
+# derive them from a complete NIST evidence set. `evidenceDigest` identifies
+# that retained evidence without putting its contents in Kubernetes status.
+# The record is accepted only when `policyRevision` equals the immutable policy
+# revision that contains the selected authentication profile.
+#
+# Every value below is a placeholder.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cac-assurance-evidence
+  namespace: kamiwaza-security
+data:
+  evidence.json: |
+    {
+      "policyRevision": "example-policy-revision",
+      "evidenceClass": "ExternallyObserved",
+      "evidenceDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "authenticatorAAL": "AAL3",
+      "federationFAL": "FAL2"
+    }

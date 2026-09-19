@@ -1,0 +1,58 @@
+# Refused on purpose.
+#
+# A destination class requires an authority the policy never declares. The
+# loader accepts the shape and the policy is refused at cross-reference time:
+#
+#   every reference resolves:
+#   transport.egress.destinations[0].requiredAuthorities[0]: authority
+#   "enterprise-root-2028" is not declared
+#
+# The reason is EgressAuthorityMissing.
+#
+# This is the failure mode with the worst shape, which is why it is refused at
+# load rather than discovered later. The policy reads as complete, the
+# installation converges, and the missing anchor surfaces as a handshake
+# failure at the far end of the install -- against an identity provider, in
+# the middle of somebody's login, with nothing in the policy to point at.
+transport:
+  issuance:
+    mode: PlatformIssued
+
+  trust:
+    bundleConfigMapName: kamiwaza-trust-bundle
+    publicRoots: Include
+    additionalAuthorities:
+      - name: enterprise-root-2027
+        configMapRef:
+          name: enterprise-trust
+          key: root-2027.pem
+
+  floor:
+    minimumTLSVersion: TLS1.2
+    hostnameVerification: Required
+
+  internal:
+    defaultTransport: PlatformTLS
+    workloadIngressFloor: true
+
+  egress:
+    deniedNetworks:
+      - Loopback
+      - LinkLocal
+      - CloudMetadata
+      - PrivateRanges
+    destinations:
+      - name: enterprise-idp
+        kind: IdentityProvider
+        hosts:
+          - login.example.invalid
+        ports:
+          - 443
+        transport: TLS
+        authentication:
+          type: None
+        enforcementMode: PolicyAwareDialer
+        requiredAuthorities:
+          # The defect: nothing declares this authority. Note how plausible it
+          # looks beside the 2027 anchor that does exist.
+          - enterprise-root-2028

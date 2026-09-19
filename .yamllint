@@ -14,3 +14,10 @@ rules:
     min-spaces-from-content: 1
   indentation:
     spaces: 2
+  # Prettier is the formatter in this repository and it writes one space
+  # inside a non-empty flow mapping. Forbidding that spelling here would make
+  # the two tools contradict each other, so a flow mapping would fail one of
+  # them whichever way it is written.
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1

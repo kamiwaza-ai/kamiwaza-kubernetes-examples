@@ -1,3 +1,20 @@
+# Creates the two objects the auth origin and the administrator's Gateway
+# read, from local files this repository never carries.
+#
+#   mkdir -p security/cac/local-secrets
+#   openssl rand -base64 48 | tr -d '\n' > security/cac/local-secrets/edge-shared-secret
+#   openssl rand -base64 48 | tr -d '\n' > security/cac/local-secrets/principal-secret
+#   printf '["<issuer distinguished names your PKI publishes>"]' \
+#     > security/cac/local-secrets/allowed-issuers
+#   cp <your client authority bundle>.pem security/cac/local-secrets/client-authorities.pem
+#   kubectl apply -k security/cac
+#
+# Generate the two secrets; do not invent them by hand. Both must be at least
+# 32 characters, and the principal secret must outlive every certificate it
+# maps, because rotating it renames every CAC principal.
+#
+# `local-secrets/` is ignored by Git. Nothing in it belongs in a commit, a
+# values file, an Event, a log line, or platform status.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -7,10 +24,18 @@ generatorOptions:
   disableNameSuffixHash: true
 
 secretGenerator:
-  - name: auth-gateway-edge
+  - name: cac-edge-origin
     files:
-      - secret=local-secrets/auth-gateway-edge.secret
+      - edge-shared-secret=local-secrets/edge-shared-secret
+      - principal-secret=local-secrets/principal-secret
+      - allowed-issuers=local-secrets/allowed-issuers
 
-  - name: traefik-client-ca
+configMapGenerator:
+  # The approved client certificate authorities the Gateway references for
+  # frontend client-certificate validation, under the name the auth profile
+  # declares in `clientCARef`. Authorities are public material, but they stay
+  # in a local file so no certificate body is ever pasted into a tracked
+  # manifest.
+  - name: cac-client-authorities
     files:
-      - ca.crt=local-secrets/traefik-client-ca.crt
+      - ca.crt=local-secrets/client-authorities.pem

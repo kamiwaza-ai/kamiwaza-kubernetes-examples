@@ -1,0 +1,71 @@
+# Health assessment for the two kinds this scenario's ordering depends on.
+#
+# Argo CD has no built-in health for a custom resource, so without the first
+# entry a `KamiwazaPlatform` is Healthy the moment the API server accepts it:
+# the Application reports success while the operator has not yet pulled an
+# image. Without the second entry a child Application is Healthy as soon as it
+# exists, and the sync waves in `applications/` stop ordering anything.
+#
+# Apply as a patch against the existing ConfigMap rather than replacing it:
+#
+#   kubectl -n argocd patch configmap argocd-cm --patch-file argocd-cm-health.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+data:
+  resource.customizations.health.platform.kamiwaza.ai_KamiwazaPlatform: |
+    -- The platform publishes metav1 conditions with observedGeneration, so
+    -- this is an answer about the revision that was applied rather than
+    -- about whatever the operator last finished.
+    local hs = {}
+    if obj.status == nil or obj.status.conditions == nil then
+      hs.status = "Progressing"
+      hs.message = "waiting for the operator to observe this platform"
+      return hs
+    end
+    -- Blocked is the operator's terminal answer: immutable policy, an
+    -- administrator-owned prerequisite, or intent it will not act on.
+    -- Reported as Degraded so it surfaces as a result instead of a sync that
+    -- never finishes.
+    for _, condition in ipairs(obj.status.conditions) do
+      if condition.type == "Blocked" and condition.status == "True"
+        and condition.observedGeneration == obj.metadata.generation then
+        hs.status = "Degraded"
+        hs.message = condition.reason .. ": " .. condition.message
+        return hs
+      end
+    end
+    for _, condition in ipairs(obj.status.conditions) do
+      if condition.type == "Ready"
+        and condition.observedGeneration == obj.metadata.generation then
+        if condition.status == "True" then
+          hs.status = "Healthy"
+        else
+          hs.status = "Progressing"
+        end
+        hs.message = condition.reason .. ": " .. condition.message
+        return hs
+      end
+    end
+    hs.status = "Progressing"
+    hs.message = "waiting for the operator to observe generation " .. obj.metadata.generation
+    return hs
+  resource.customizations.health.argoproj.io_Application: |
+    -- Restores the health assessment Argo CD removed in 1.8. The app-of-apps
+    -- in `applications/` needs it: a wave advances when the previous wave is
+    -- Healthy, and a child Application with no health assessment is Healthy
+    -- immediately.
+    local hs = {}
+    hs.status = "Progressing"
+    hs.message = ""
+    if obj.status ~= nil then
+      if obj.status.health ~= nil then
+        hs.status = obj.status.health.status
+        if obj.status.health.message ~= nil then
+          hs.message = obj.status.health.message
+        end
+      end
+    end
+    return hs

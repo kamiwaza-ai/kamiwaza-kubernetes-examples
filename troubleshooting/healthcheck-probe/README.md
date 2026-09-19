@@ -50,7 +50,7 @@ A `failureThreshold: 1` startup probe with a short delay kills the container on 
 
 ## Step 2 — reproduce the probe by hand (the decisive step)
 
-Probes run *inside* the container. Reproduce the exact check during a `Running` window.
+Probes run _inside_ the container. Reproduce the exact check during a `Running` window.
 If the pod is in a 5-minute backoff, force a fresh start first:
 
 ```bash
@@ -80,7 +80,7 @@ app doesn't serve.
 
 ---
 
-## Step 3 — find what the app *does* serve
+## Step 3 — find what the app _does_ serve
 
 Probe the likely real endpoints to find the one that returns `2xx`:
 
@@ -100,10 +100,10 @@ done
 
 ## The two failure classes and their fixes
 
-| Class | Tell | Fix surface |
-| --- | --- | --- |
-| **Wrong target** (path/port/scheme) | hand-run probe returns 404/refused; a different path returns 200 | point the probe at the correct path/port |
-| **Too aggressive** (cold start) | hand-run probe returns 200 when run late, but the app needs > the probe's grace to first respond | raise `failureThreshold` / `initialDelaySeconds` / add `startPeriod` |
+| Class                               | Tell                                                                                             | Fix surface                                                          |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| **Wrong target** (path/port/scheme) | hand-run probe returns 404/refused; a different path returns 200                                 | point the probe at the correct path/port                             |
+| **Too aggressive** (cold start)     | hand-run probe returns 200 when run late, but the app needs > the probe's grace to first respond | raise `failureThreshold` / `initialDelaySeconds` / add `startPeriod` |
 
 ---
 
@@ -145,23 +145,20 @@ kubectl -n kamiwaza-extensions patch kamiwazaextension <cr> --type=json -p '[
 ]'
 ```
 
-### B. Helm-deployed service (chart-owned)
+### B. Platform component (operator-owned)
 
-Set the probe in values and re-sync — never `kubectl edit` the Deployment:
-
-```yaml
-<component>:
-  livenessProbe:
-    httpGet: { path: /<basePath>/health, port: http }
-    initialDelaySeconds: 15
-    failureThreshold: 3
-  readinessProbe:
-    httpGet: { path: /<basePath>/health, port: http }
-```
+Platform component probes come from the operator's rendered desired state, so a
+live edit is reverted on the next reconcile. Change the tenant intent on
+`KamiwazaPlatform`, or the administrator-owned immutable policy when the field
+is policy-governed, and let reconciliation roll the workload:
 
 ```bash
-helmfile -f cluster/helmfile.yaml.gotmpl -e <env> sync
+kubectl -n "$PLATFORM_NAMESPACE" get kamiwazaplatform kamiwaza \
+  -o jsonpath='{range .status.conditions[*]}{.type}{"\t"}{.status}{"\t"}{.reason}{"\n"}{end}'
 ```
+
+A probe field the platform API does not expose is not tenant intent. Report it
+rather than patching the Deployment the operator owns.
 
 ### C. Plain Deployment you own
 
@@ -216,5 +213,5 @@ remediation; the durable fix is in the extension image.
 ## Related
 
 - [`../diagnostic-commands/`](../diagnostic-commands/) — the general triage this branches off.
-- [`../../operations/apply-overrides-reinstall/`](../../operations/apply-overrides-reinstall/) — apply config changes (overrides) and roll workloads safely.
-- [`../../security/tls-trust/extensions/`](../../security/tls-trust/extensions/) — extension trust/egress patterns.
+- [`../../operator/upgrades/`](../../operator/upgrades/) — change platform intent and roll workloads through the operator.
+- [`../../security/tls-trust/`](../../security/tls-trust/) — administrator-approved outbound trust for platform workloads.

@@ -1,0 +1,9 @@
+# Envoy Gateway ships no GatewayClass of its own, unlike Istio, so the
+# administrator declares the class this environment's Gateway selects.
+# The controller name is the one the envoy-gateway chart's controller watches.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller

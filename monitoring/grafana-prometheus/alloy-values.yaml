@@ -2,8 +2,8 @@
 #
 # Install (after Loki is running):
 #   helm repo add grafana https://grafana.github.io/helm-charts
-#   helm upgrade --install alloy grafana/alloy \
-#     -n monitoring --create-namespace -f alloy-values.yaml
+#   helm upgrade --install alloy grafana/alloy --version 1.12.1 \
+#   -n monitoring --create-namespace -f alloy-values.yaml
 
 alloy:
   mounts:

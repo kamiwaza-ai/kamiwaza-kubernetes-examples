@@ -1,0 +1,27 @@
+# Stage 1 of the migration: the smallest transport policy that is a complete,
+# working, encrypted installation.
+#
+# This is the whole document. Every plane it does not mention takes its
+# published default: platform-issued authorities with key rotation on renewal,
+# the trust distribution published under the platform bundle name into the
+# namespaces installation already grants, minimum TLS 1.2 with host-name
+# verification required, a platform-issued listener certificate with redirect
+# and backend TLS emitted where the implementation advertises support, every
+# internal hop `PlatformTLS`, and egress closed because no destination class is
+# declared.
+#
+# Two things this stage does not do, both deliberate:
+#
+#   * It declares no edge client certificate, so no Gateway API floor applies
+#     and nothing is refused on a v1.4 bundle.
+#   * It declares no destination class, so no external egress is permitted.
+#     Closed is the safe direction to start from; stage 2 opens exactly what
+#     the installation needs.
+#
+# Apply it by merging this section into the AdminCapabilityPolicy document the
+# operator chart mounts and bumping `adminPolicy.revision`. Until this section
+# exists, the installation reports no hop plane and no transport floor at all,
+# which is exactly what an unmigrated installation should report.
+transport:
+  issuance:
+    mode: PlatformIssued

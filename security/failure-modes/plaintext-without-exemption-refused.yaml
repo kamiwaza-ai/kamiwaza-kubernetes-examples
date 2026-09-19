@@ -1,0 +1,49 @@
+# Refused on purpose, and refused earlier than the others: this one does not
+# even load.
+#
+# A hop declares plaintext transport and states no exemption. The loader
+# refuses the document itself rather than the policy's cross-references:
+#
+#   transport.internal.hops[0].exemption: plaintext transport requires an
+#   exemption (PlaintextDenied)
+#
+# Plaintext is expressible, because pretending it never happens produces
+# hidden exceptions instead of named ones. What is not expressible is an
+# unjustified one. The justification is a required string of at least eight
+# characters that appears in status while the exception is active, so an
+# unprotected hop is something an audit reads rather than something it has to
+# discover. `defaultTransport` cannot be plaintext at all: an exception is
+# per hop, by name, with a reason, and the profile decides whether it is
+# admissible.
+#
+# Compare stage-2-named-exceptions.yaml under ../migration/, which declares
+# the same posture correctly and is accepted in a Full profile and refused in
+# a regulated one.
+transport:
+  issuance:
+    mode: PlatformIssued
+
+  trust:
+    bundleConfigMapName: kamiwaza-trust-bundle
+    publicRoots: Include
+
+  floor:
+    minimumTLSVersion: TLS1.2
+    hostnameVerification: Required
+
+  internal:
+    defaultTransport: PlatformTLS
+    workloadIngressFloor: true
+    hops:
+      # The defect: plaintext with no exemption block.
+      - name: CoreToObjectStorage
+        transport: Plaintext
+        authentication:
+          type: None
+
+  egress:
+    deniedNetworks:
+      - Loopback
+      - LinkLocal
+      - CloudMetadata
+      - PrivateRanges

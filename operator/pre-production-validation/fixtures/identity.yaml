@@ -1,0 +1,366 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: identity-bootstrap
+  namespace: platform-validation-dependencies
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: identity-metadata
+  namespace: platform-validation-dependencies
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [enterprise-oidc-metadata, enterprise-saml-metadata]
+    verbs: [get, patch, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: identity-metadata
+  namespace: platform-validation-dependencies
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: identity-metadata
+subjects:
+  - kind: ServiceAccount
+    name: identity-bootstrap
+    namespace: platform-validation-dependencies
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: enterprise-oidc-metadata
+  namespace: platform-validation-dependencies
+data:
+  metadata.json: ""
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: enterprise-saml-metadata
+  namespace: platform-validation-dependencies
+data:
+  metadata.xml: ""
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: external-idp-realm
+  namespace: platform-validation-dependencies
+data:
+  enterprise-realm.json: |
+    {
+      "realm": "enterprise",
+      "enabled": true,
+      "registrationAllowed": false,
+      "resetPasswordAllowed": false,
+      "clients": [
+        {
+          "clientId": "kamiwaza-broker",
+          "protocol": "openid-connect",
+          "publicClient": false,
+          "standardFlowEnabled": true,
+          "redirectUris": ["https://kamiwaza.example.com/api/auth/oidc/callback"]
+        },
+        {
+          "clientId": "https://kamiwaza.example.com/api/auth/saml/metadata",
+          "protocol": "saml",
+          "redirectUris": ["https://kamiwaza.example.com/api/auth/saml/callback"],
+          "attributes": {
+            "saml.assertion.signature": "true",
+            "saml.server.signature": "true",
+            "saml.client.signature": "true",
+            "saml_name_id_format": "persistent"
+          }
+        }
+      ],
+      "users": [
+        {
+          "username": "lab-user",
+          "enabled": true,
+          "email": "lab-user@users.example.invalid",
+          "emailVerified": true,
+          "attributes": {"tenant_id": ["example-tenant"]},
+          "realmRoles": ["offline_access"]
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-idp
+  namespace: platform-validation-dependencies
+  labels:
+    app.kubernetes.io/name: external-idp
+    app.kubernetes.io/part-of: platform-validation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: external-idp
+      app.kubernetes.io/part-of: platform-validation
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: external-idp
+        app.kubernetes.io/part-of: platform-validation
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.7.4@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
+          args:
+            - start-dev
+            - --import-realm
+            - --http-enabled=true
+            - --http-port=8080
+            - --https-port=8443
+            - --https-certificate-file=/tls/tls.crt
+            - --https-certificate-key-file=/tls/tls.key
+            - --hostname=https://login.example.com
+            - --hostname-backchannel-dynamic=true
+          env:
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: admin
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: platform-validation-credentials
+                  key: idp-admin-password
+          ports:
+            - name: admin
+              containerPort: 8080
+            - name: https
+              containerPort: 8443
+          readinessProbe:
+            httpGet:
+              path: /realms/master
+              port: admin
+          volumeMounts:
+            - name: realm
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+            - name: tls
+              mountPath: /tls
+              readOnly: true
+      volumes:
+        - name: realm
+          configMap:
+            name: external-idp-realm
+        - name: tls
+          secret:
+            secretName: platform-validation-server-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-idp
+  namespace: platform-validation-dependencies
+spec:
+  selector:
+    app.kubernetes.io/name: external-idp
+    app.kubernetes.io/part-of: platform-validation
+  ports:
+    - name: https
+      port: 8443
+      targetPort: https
+    - name: admin
+      port: 8080
+      targetPort: admin
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: external-idp-bootstrap
+  namespace: platform-validation-dependencies
+spec:
+  backoffLimit: 4
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: external-idp-bootstrap
+        app.kubernetes.io/part-of: platform-validation
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: identity-bootstrap
+      containers:
+        - name: bootstrap
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command: [python, /scripts/bootstrap-idp.py]
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: IDP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: platform-validation-credentials
+                  key: idp-admin-password
+            - name: LAB_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: platform-validation-credentials
+                  key: lab-user-password
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: platform-validation-credentials
+                  key: oidc-client-secret
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: platform-validation-idp-bootstrap
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-directory
+  namespace: platform-validation-dependencies
+  labels:
+    app.kubernetes.io/name: external-directory
+    app.kubernetes.io/part-of: platform-validation
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: external-directory
+      app.kubernetes.io/part-of: platform-validation
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: external-directory
+        app.kubernetes.io/part-of: platform-validation
+    spec:
+      # This image chowns its certificate directory on startup, so a Secret or
+      # projected volume mounted straight onto that path fails with
+      # "Read-only file system" and the container crash-loops before slapd
+      # starts. The init container copies the same material into a writable
+      # emptyDir instead, which is the only reason it exists.
+      initContainers:
+        - name: stage-certificates
+          image: docker.io/osixia/openldap:1.5.0@sha256:18742e9c449c9c1afe129d3f2f3ee15fb34cc43e5f940a20f3399728f41d7c28
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              cp /source/tls.crt /source/tls.key /source/ca.crt /certs/
+              chown 911:911 /certs/tls.crt /certs/tls.key /certs/ca.crt
+              chmod 0600 /certs/tls.key
+          volumeMounts:
+            - name: tls-source
+              mountPath: /source
+              readOnly: true
+            - name: certs
+              mountPath: /certs
+      containers:
+        - name: openldap
+          image: docker.io/osixia/openldap:1.5.0@sha256:18742e9c449c9c1afe129d3f2f3ee15fb34cc43e5f940a20f3399728f41d7c28
+          env:
+            - name: LDAP_ORGANISATION
+              value: Kamiwaza Validation Lab
+            - name: LDAP_DOMAIN
+              value: kamiwaza.local
+            - name: LDAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: platform-validation-credentials
+                  key: ldap-admin-password
+            - name: LDAP_CONFIG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: platform-validation-credentials
+                  key: ldap-admin-password
+            - name: LDAP_TLS
+              value: "true"
+            - name: LDAP_TLS_CRT_FILENAME
+              value: tls.crt
+            - name: LDAP_TLS_KEY_FILENAME
+              value: tls.key
+            - name: LDAP_TLS_CA_CRT_FILENAME
+              value: ca.crt
+            - name: LDAP_TLS_VERIFY_CLIENT
+              value: never
+          ports:
+            - name: ldaps
+              containerPort: 636
+          readinessProbe:
+            tcpSocket:
+              port: ldaps
+          volumeMounts:
+            - name: certs
+              mountPath: /container/service/slapd/assets/certs
+      volumes:
+        - name: tls-source
+          projected:
+            sources:
+              - secret:
+                  name: platform-validation-server-tls
+              - configMap:
+                  name: platform-validation-ca
+        - name: certs
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-directory
+  namespace: platform-validation-dependencies
+spec:
+  selector:
+    app.kubernetes.io/name: external-directory
+    app.kubernetes.io/part-of: platform-validation
+  ports:
+    - name: ldaps
+      port: 636
+      targetPort: ldaps
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: external-directory-bootstrap
+  namespace: platform-validation-dependencies
+spec:
+  backoffLimit: 4
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: external-directory-bootstrap
+        app.kubernetes.io/part-of: platform-validation
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: docker.io/osixia/openldap:1.5.0@sha256:18742e9c449c9c1afe129d3f2f3ee15fb34cc43e5f940a20f3399728f41d7c28
+          command: [/bin/sh, /scripts/bootstrap-directory.sh]
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+            - name: credentials
+              mountPath: /credentials
+              readOnly: true
+            - name: ca
+              mountPath: /ca
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: platform-validation-directory-bootstrap
+            defaultMode: 0555
+        - name: credentials
+          secret:
+            secretName: platform-validation-credentials
+        - name: ca
+          configMap:
+            name: platform-validation-ca

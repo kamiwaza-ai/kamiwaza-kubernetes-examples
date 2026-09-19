@@ -1,0 +1,180 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cac-piv-edge
+  namespace: platform-validation-dependencies
+  labels:
+    app.kubernetes.io/name: cac-piv-edge
+    app.kubernetes.io/part-of: platform-validation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cac-piv-edge
+      app.kubernetes.io/part-of: platform-validation
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cac-piv-edge
+        app.kubernetes.io/part-of: platform-validation
+    spec:
+      containers:
+        - name: edge
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command: [python, /scripts/server.py]
+          env:
+            - { name: FIXTURE_MODE, value: edge }
+            - { name: PORT, value: "8443" }
+          ports: [{ name: https, containerPort: 8443 }]
+          readinessProbe: { tcpSocket: { port: https } }
+          volumeMounts:
+            - { name: scripts, mountPath: /scripts, readOnly: true }
+            - { name: tls, mountPath: /tls, readOnly: true }
+            - { name: ca, mountPath: /ca, readOnly: true }
+      volumes:
+        - { name: scripts, configMap: { name: platform-validation-server } }
+        - { name: tls, secret: { secretName: platform-validation-server-tls } }
+        - { name: ca, configMap: { name: platform-validation-ca } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: cac-piv-edge, namespace: platform-validation-dependencies }
+spec:
+  selector:
+    app.kubernetes.io/name: cac-piv-edge
+    app.kubernetes.io/part-of: platform-validation
+  ports: [{ name: https, port: 8443, targetPort: https }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: egress-proxy
+  namespace: platform-validation-dependencies
+  labels:
+    app.kubernetes.io/name: egress-proxy
+    app.kubernetes.io/part-of: platform-validation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: egress-proxy
+      app.kubernetes.io/part-of: platform-validation
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: egress-proxy
+        app.kubernetes.io/part-of: platform-validation
+    spec:
+      containers:
+        - name: proxy
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command: [python, /scripts/server.py]
+          env:
+            - { name: FIXTURE_MODE, value: proxy }
+            - name: PROXY_ALLOWED_TARGET
+              value: mutual-tls-destination.platform-validation-dependencies.svc.cluster.local:8443
+          ports: [{ name: proxy, containerPort: 3128 }]
+          readinessProbe: { tcpSocket: { port: proxy } }
+          volumeMounts:
+            - { name: scripts, mountPath: /scripts, readOnly: true }
+      volumes:
+        - { name: scripts, configMap: { name: platform-validation-server } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: egress-proxy, namespace: platform-validation-dependencies }
+spec:
+  selector:
+    app.kubernetes.io/name: egress-proxy
+    app.kubernetes.io/part-of: platform-validation
+  ports: [{ name: proxy, port: 3128, targetPort: proxy }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mutual-tls-destination
+  namespace: platform-validation-dependencies
+  labels:
+    app.kubernetes.io/name: mutual-tls-destination
+    app.kubernetes.io/part-of: platform-validation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mutual-tls-destination
+      app.kubernetes.io/part-of: platform-validation
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mutual-tls-destination
+        app.kubernetes.io/part-of: platform-validation
+    spec:
+      containers:
+        - name: destination
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command: [python, /scripts/server.py]
+          env:
+            - { name: FIXTURE_MODE, value: mtls }
+            - { name: PORT, value: "8443" }
+          ports: [{ name: https, containerPort: 8443 }]
+          readinessProbe: { tcpSocket: { port: https } }
+          volumeMounts:
+            - { name: scripts, mountPath: /scripts, readOnly: true }
+            - { name: tls, mountPath: /tls, readOnly: true }
+            - { name: ca, mountPath: /ca, readOnly: true }
+      volumes:
+        - { name: scripts, configMap: { name: platform-validation-server } }
+        - { name: tls, secret: { secretName: platform-validation-server-tls } }
+        - { name: ca, configMap: { name: platform-validation-ca } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: mutual-tls-destination, namespace: platform-validation-dependencies }
+spec:
+  selector:
+    app.kubernetes.io/name: mutual-tls-destination
+    app.kubernetes.io/part-of: platform-validation
+  ports: [{ name: https, port: 8443, targetPort: https }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: resumable-stream
+  namespace: platform-validation-dependencies
+  labels:
+    app.kubernetes.io/name: resumable-stream
+    app.kubernetes.io/part-of: platform-validation
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: resumable-stream
+      app.kubernetes.io/part-of: platform-validation
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: resumable-stream
+        app.kubernetes.io/part-of: platform-validation
+    spec:
+      containers:
+        - name: stream
+          image: docker.io/library/python@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+          command: [python, /scripts/server.py]
+          env:
+            - { name: FIXTURE_MODE, value: stream }
+            - { name: PORT, value: "8080" }
+          ports: [{ name: http, containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /healthz, port: http } }
+          volumeMounts:
+            - { name: scripts, mountPath: /scripts, readOnly: true }
+      volumes:
+        - { name: scripts, configMap: { name: platform-validation-server } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: resumable-stream, namespace: platform-validation-dependencies }
+spec:
+  selector:
+    app.kubernetes.io/name: resumable-stream
+    app.kubernetes.io/part-of: platform-validation
+  ports: [{ name: http, port: 8080, targetPort: http }]
