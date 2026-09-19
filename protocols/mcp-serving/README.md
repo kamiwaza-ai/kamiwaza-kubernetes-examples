@@ -8,11 +8,11 @@ MCP client connects to one it did not start itself.
 The same server code runs in all three shapes. What changes is who authenticates the
 caller, and therefore what has to be published for a client to find its way in.
 
-| Shape | Who runs it | Who authenticates | MCP endpoint |
-| --- | --- | --- | --- |
-| **A. Platform extension** | The extension controller, from a pinned package | The platform edge | `https://<domain>/extensions/<name>/mcp` |
-| **B. Raw workload** | You, as an ordinary Deployment | The platform edge, or the server itself | `https://<domain>/<your prefix>/mcp` |
-| **C. Local process** | The MCP host on your machine | Nobody — one member, one pipe | standard input and output |
+| Shape                     | Who runs it                                     | Who authenticates                       | MCP endpoint                             |
+| ------------------------- | ----------------------------------------------- | --------------------------------------- | ---------------------------------------- |
+| **A. Platform extension** | The extension controller, from a pinned package | The platform edge                       | `https://<domain>/extensions/<name>/mcp` |
+| **B. Raw workload**       | You, as an ordinary Deployment                  | The platform edge, or the server itself | `https://<domain>/<your prefix>/mcp`     |
+| **C. Local process**      | The MCP host on your machine                    | Nobody — one member, one pipe           | standard input and output                |
 
 Related scenarios: [operator/extensions](../../operator/extensions) for the extension
 lifecycle itself, and [operator/protocol-data-plane](../../operator/protocol-data-plane)
@@ -27,12 +27,12 @@ for the governed endpoint that fronts tool, agent, and model protocols.
 
 ## Files
 
-| File | Purpose |
-| --- | --- |
-| [extension-kamiwaza-mcp.yaml](extension-kamiwaza-mcp.yaml) | Shape A — the Kamiwaza MCP as a `KamiwazaExtension` |
-| [raw-mcp-server.yaml](raw-mcp-server.yaml) | Shape B — an ordinary workload published on the platform domain |
-| [stdio-launcher.py](stdio-launcher.py) | Shape C — one member, one credential, over a pipe |
-| [check-discovery.sh](check-discovery.sh) | Proves a client can discover how to authenticate |
+| File                                                       | Purpose                                                         |
+| ---------------------------------------------------------- | --------------------------------------------------------------- |
+| [extension-kamiwaza-mcp.yaml](extension-kamiwaza-mcp.yaml) | Shape A — the Kamiwaza MCP as a `KamiwazaExtension`             |
+| [raw-mcp-server.yaml](raw-mcp-server.yaml)                 | Shape B — an ordinary workload published on the platform domain |
+| [stdio-launcher.py](stdio-launcher.py)                     | Shape C — one member, one credential, over a pipe               |
+| [check-discovery.sh](check-discovery.sh)                   | Proves a client can discover how to authenticate                |
 
 ---
 
@@ -52,10 +52,10 @@ kubectl -n kamiwaza-examples get kamiwazaextensions.extensions.kamiwaza.ai kamiw
 
 Two settings are yours, both in the manifest:
 
-| Variable | Effect |
-| --- | --- |
-| `KAMIWAZA_MCP_READ_ONLY` | `true` serves the read-only surface. A value that is neither on nor off is refused at startup rather than read as off. |
-| `KAMIWAZA_MCP_CONTINUATION_KEYS` | The ring that seals multi-round exchanges — an approval, a task handle. 32 bytes minimum, newest first. |
+| Variable                         | Effect                                                                                                                 |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `KAMIWAZA_MCP_READ_ONLY`         | `true` serves the read-only surface. A value that is neither on nor off is refused at startup rather than read as off. |
+| `KAMIWAZA_MCP_CONTINUATION_KEYS` | The ring that seals multi-round exchanges — an approval, a task handle. 32 bytes minimum, newest first.                |
 
 Read the published route rather than assuming the path:
 
