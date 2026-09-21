@@ -66,7 +66,6 @@ Category indexes:
 | Application compute scaling                            | [scheduling/application-compute-scaling](scheduling/application-compute-scaling)   | #operator #autoscaling #hpa                                 |
 | Multi-zone application compute                         | [scheduling/multi-zone](scheduling/multi-zone)                                     | #operator #scheduling #availability                         |
 | Reviewed image inventory for platform intent           | [operator/reviewed-image-inventory](operator/reviewed-image-inventory)             | #operator #images #supply-chain #fips                       |
-| Pre-production platform validation                     | [operator/pre-production-validation](operator/pre-production-validation)           | #operator #identity #transport #gateway-api #validation     |
 | Operator namespace scopes                              | [operator/namespace-scopes](operator/namespace-scopes)                             | #operator #rbac #multi-tenant                               |
 | Operator Helm chart upgrade                            | [operator/chart-upgrades](operator/chart-upgrades)                                 | #operator #helm #crd                                        |
 | Declarative model serving                              | [operator/model-serving](operator/model-serving)                                   | #operator #models #serving #drift-repair                    |
