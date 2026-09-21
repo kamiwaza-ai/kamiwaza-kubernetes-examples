@@ -6,11 +6,11 @@ Choose where the shared manager runs and which namespaces it can watch. Placemen
 
 ## Choose one scope
 
-| File                         | Cache scope           | Target authorization                                 | Use                                                                       |
-| ---------------------------- | --------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------- |
+| File                         | Cache scope           | Target authorization                                  | Use                                                                      |
+| ---------------------------- | --------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------ |
 | `same-namespace-values.yaml` | Platform plus runtime | Platform and dedicated Extension runtime RoleBindings | Manager and platform share `kamiwaza-examples`; Extensions stay separate |
-| `bounded-values.yaml`        | Explicit list         | One target RoleBinding per listed namespace          | Recommended for a separately managed example control namespace           |
-| `all-namespaces-values.yaml` | Cluster-wide          | ClusterRole plus sensitive allowlist Roles           | Central platform team testing a reviewed cluster-wide watch requirement  |
+| `bounded-values.yaml`        | Explicit list         | One target RoleBinding per listed namespace           | Recommended for a separately managed example control namespace           |
+| `all-namespaces-values.yaml` | Cluster-wide          | ClusterRole plus sensitive allowlist Roles            | Central platform team testing a reviewed cluster-wide watch requirement  |
 
 `manager.watchAnyNamespace: false` requires a non-empty `watchNamespaces` list. `manager.watchAnyNamespace: true` requires that list to be empty and still requires explicit `adminPolicy.allowedTargetNamespaces` entries.
 
