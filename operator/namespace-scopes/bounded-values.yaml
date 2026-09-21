@@ -2,6 +2,7 @@ manager:
   watchNamespaces:
     - kamiwaza-examples
     - kamiwaza-examples-tenant
+    - kamiwaza-examples-extensions
   watchAnyNamespace: false
 
 adminPolicy:
@@ -11,6 +12,7 @@ adminPolicy:
     - kamiwaza-examples-tenant
   extensions:
     enabled: true
+    platformNamespace: kamiwaza-examples
+    runtimeNamespace: kamiwaza-examples-extensions
     allowedNamespaces:
-      - kamiwaza-examples
-      - kamiwaza-examples-tenant
+      - kamiwaza-examples-extensions

@@ -49,48 +49,40 @@ kubectl --context "${context}" -n "${namespace}" create configmap "${bundle_obje
   --from-file=bundle.yaml="${tmp}/bundle.yaml" \
   --dry-run=client -o yaml | kubectl --context "${context}" apply --server-side -f - >/dev/null
 
-# The runtime that hosts the extension. It is a separate kind because its
-# fields have a different owner: an administrator states the domain, storage,
-# and sandbox capacity, and an extension never edits them. There is no default
-# runtime to fall back to, which is why one is declared here rather than
-# assumed.
+# The clean Extension API carries instance intent. Runtime topology remains in
+# the digest-pinned artifact and administrator policy; no separate runtime
+# object or selector exists.
 kubectl --context "${context}" apply --server-side -f - >/dev/null <<EOF
-apiVersion: extensions.kamiwaza.ai/v1alpha1
-kind: ExtensionRuntime
-metadata:
-  name: validation
-  namespace: ${namespace}
-spec:
-  domain: ${domain}
-  storage:
-    className: example-rwo
----
 apiVersion: extensions.kamiwaza.ai/v1alpha1
 kind: Extension
 metadata:
   name: callback-matrix
   namespace: ${namespace}
-  labels:
-    # An extension names the runtime that hosts it.
-    kamiwaza.ai/runtime: validation
 spec:
+  type: app
+  domain: ${domain}
+  storage:
+    className: example-rwo
   package:
-    repository: examples/callback-matrix
     digest: ${digest}
 EOF
 
 for component in api background-worker document-worker; do
+  selector="kamiwaza.ai/extension=callback-matrix,kamiwaza.ai/component=${component}"
   kubectl --context "${context}" -n "${namespace}" wait --for=create \
-    "deployment/callback-matrix-${component}" --timeout=2m
+    deployment -l "${selector}" --timeout=2m
+  deployment="$(kubectl --context "${context}" -n "${namespace}" get deployment \
+    -l "${selector}" -o jsonpath='{.items[0].metadata.name}')"
   kubectl --context "${context}" -n "${namespace}" rollout status \
-    "deployment/callback-matrix-${component}" --timeout=5m
+    "deployment/${deployment}" --timeout=5m
 done
 
 origins="${tmp}/origins"
 : >"${origins}"
 for component in api background-worker document-worker; do
   pod="$(kubectl --context "${context}" -n "${namespace}" get pod \
-    -l "app.kubernetes.io/component=${component}" -o jsonpath='{.items[0].metadata.name}')"
+    -l "kamiwaza.ai/extension=callback-matrix,kamiwaza.ai/component=${component}" \
+    -o jsonpath='{.items[0].metadata.name}')"
   record="$(kubectl --context "${context}" -n "${namespace}" logs "${pod}" --tail=20 |
     grep -m1 '"results"')" || {
     echo "${component} produced no callback record" >&2

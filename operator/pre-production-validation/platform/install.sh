@@ -35,15 +35,17 @@ chart="${operator_root}/charts/kamiwaza-platform-operator"
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
 
-for name in "${namespace}" "${namespace}-system"; do
+for name in "${namespace}" "${namespace}-extensions" "${namespace}-system"; do
   kubectl --context "${context}" create namespace "${name}" \
     --dry-run=client -o yaml | kubectl --context "${context}" apply -f - >/dev/null
 done
 
-kubectl --context "${context}" -n "${namespace}" create secret generic registry-pull \
-  --from-file=.dockerconfigjson="${REGISTRY_CREDENTIALS_FILE}" \
-  --type=kubernetes.io/dockerconfigjson \
-  --dry-run=client -o yaml | kubectl --context "${context}" apply --server-side -f - >/dev/null
+for name in "${namespace}" "${namespace}-extensions"; do
+  kubectl --context "${context}" -n "${name}" create secret generic registry-pull \
+    --from-file=.dockerconfigjson="${REGISTRY_CREDENTIALS_FILE}" \
+    --type=kubernetes.io/dockerconfigjson \
+    --dry-run=client -o yaml | kubectl --context "${context}" apply --server-side -f - >/dev/null
+done
 
 # The checked-in platform intent names a dynamic RWO class, which this
 # environment provides under that name rather than by editing the example.

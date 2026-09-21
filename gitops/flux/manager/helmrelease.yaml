@@ -59,9 +59,18 @@ spec:
       adoptWithheldKinds: true
       watchNamespaces:
         - kamiwaza-examples
+        - kamiwaza-examples-extensions
       watchAnyNamespace: false
     adminPolicy:
       revision: examples-gitops-r1
+      allowedTargetNamespaces:
+        - kamiwaza-examples
+      extensions:
+        enabled: true
+        platformNamespace: kamiwaza-examples
+        runtimeNamespace: kamiwaza-examples-extensions
+        allowedNamespaces:
+          - kamiwaza-examples-extensions
       storage:
         allowedClassNames:
           - example-rwo

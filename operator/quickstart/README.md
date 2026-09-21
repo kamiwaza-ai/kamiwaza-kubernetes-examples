@@ -69,16 +69,19 @@ If your release selects external trust, change the chart policy and the matching
 
 ## 3. Create namespaces and image credentials
 
-The cluster administrator creates both dedicated example namespaces. The platform Secret remains local to `kamiwaza-examples`.
+The cluster administrator creates platform, Extension runtime, and manager namespaces. Create the named pull Secret in both workload namespaces.
 
 ```bash
 kubectl create namespace kamiwaza-examples --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace kamiwaza-examples-extensions --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace kamiwaza-examples-system --dry-run=client -o yaml | kubectl apply -f -
 
-kubectl -n kamiwaza-examples create secret generic registry-pull \
-  --from-file=.dockerconfigjson="${HOME}/.docker/config.json" \
-  --type=kubernetes.io/dockerconfigjson \
-  --dry-run=client -o yaml | kubectl apply --server-side -f -
+for namespace in kamiwaza-examples kamiwaza-examples-extensions; do
+  kubectl -n "${namespace}" create secret generic registry-pull \
+    --from-file=.dockerconfigjson="${HOME}/.docker/config.json" \
+    --type=kubernetes.io/dockerconfigjson \
+    --dry-run=client -o yaml | kubectl apply --server-side -f -
+done
 ```
 
 Do not commit the generated Secret or Docker configuration. The platform resource carries no pull-secret field: the Secret's name is administrator policy, in `adminPolicy.images.pullSecretNames` in `operator-values.yaml`, so credential ownership is stated in one place.

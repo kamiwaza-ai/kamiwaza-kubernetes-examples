@@ -11,7 +11,7 @@ The operator is under release verification. Run this workflow on a disposable or
 - All [operator prerequisites](../../operator/README.md#common-prerequisites) and the [GitOps prerequisites](../README.md#prerequisites).
 - Argo CD v3.1 or later for OCI sources. A Git source works on any supported version: replace `repoURL` and `targetRevision`, and nothing else changes.
 - A signed, version-pinned release chart published to a registry the cluster can read.
-- The platform namespace `kamiwaza-examples`, the manager namespace `kamiwaza-examples-system`, and the image pull Secret, all created by the administrator beforehand. `CreateNamespace` is deliberately not set: the operator never creates a target namespace, and neither should its delivery.
+- Platform namespace `kamiwaza-examples`, Extension runtime namespace `kamiwaza-examples-extensions`, manager namespace `kamiwaza-examples-system`, and the image pull Secret in both workload namespaces, all created by the administrator beforehand. `CreateNamespace` is deliberately not set: the operator never creates a target namespace, and neither should its delivery.
 
 ## 1. Publish the sources
 

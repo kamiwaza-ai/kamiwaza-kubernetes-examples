@@ -4,14 +4,19 @@ manager:
   adoptWithheldKinds: true
   watchNamespaces:
     - kamiwaza-examples
+    - kamiwaza-examples-extensions
   watchAnyNamespace: false
 
 adminPolicy:
   revision: examples-bounded-r1
-  # allowedTargetNamespaces is deliberately absent. It defaults to the
-  # manager's watch set above, which is this installation's one namespace, and
-  # a value stated twice is a value the two copies can disagree about. State a
-  # list only to narrow within the watch set.
+  allowedTargetNamespaces:
+    - kamiwaza-examples
+  extensions:
+    enabled: true
+    platformNamespace: kamiwaza-examples
+    runtimeNamespace: kamiwaza-examples-extensions
+    allowedNamespaces:
+      - kamiwaza-examples-extensions
   storage:
     # Replace with a dynamic RWO StorageClass available in the target cluster.
     allowedClassNames:

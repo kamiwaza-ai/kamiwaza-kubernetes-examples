@@ -34,15 +34,16 @@ spec:
             topologyKey: kubernetes.io/hostname
             whenUnsatisfiable: ScheduleAnyway
       disruption:
-        maxUnavailable: 0
+        maxUnavailable: 1
       compute:
-        autoscaling:
-          minReplicas: 1
-          maxReplicas: 4
-          targetCPUUtilizationPercentage: 60
+        replicas: 1
     webInterface: {}
     protocolDataPlane:
       enabled: true
+  scaling:
+    components:
+      - name: applicationCompute
+        authority: External
   images:
     pinned:
       - capability: durableData

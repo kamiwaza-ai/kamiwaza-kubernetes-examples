@@ -6,11 +6,11 @@ Choose where the shared manager runs and which namespaces it can watch. Placemen
 
 ## Choose one scope
 
-| File                         | Cache scope             | Target authorization                                                       | Use                                                                     |
-| ---------------------------- | ----------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `same-namespace-values.yaml` | One namespace           | One target RoleBinding                                                     | Manager and platform share `kamiwaza-examples`                          |
-| `bounded-values.yaml`        | Explicit namespace list | One target RoleBinding per listed namespace                                | Recommended for a separately managed example control namespace          |
-| `all-namespaces-values.yaml` | Cluster-wide            | Non-sensitive ClusterRole plus sensitive namespaced Roles in the allowlist | Central platform team testing a reviewed cluster-wide watch requirement |
+| File                         | Cache scope           | Target authorization                                 | Use                                                                       |
+| ---------------------------- | --------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------- |
+| `same-namespace-values.yaml` | Platform plus runtime | Platform and dedicated Extension runtime RoleBindings | Manager and platform share `kamiwaza-examples`; Extensions stay separate |
+| `bounded-values.yaml`        | Explicit list         | One target RoleBinding per listed namespace          | Recommended for a separately managed example control namespace           |
+| `all-namespaces-values.yaml` | Cluster-wide          | ClusterRole plus sensitive allowlist Roles           | Central platform team testing a reviewed cluster-wide watch requirement  |
 
 `manager.watchAnyNamespace: false` requires a non-empty `watchNamespaces` list. `manager.watchAnyNamespace: true` requires that list to be empty and still requires explicit `adminPolicy.allowedTargetNamespaces` entries.
 
@@ -24,6 +24,10 @@ Set `OPERATOR_IMAGE_DIGEST` to the release-published `sha256:` digest. Every
 install below passes it with `--set-string image.digest`.
 
 ## Same-namespace manager
+
+```bash
+kubectl create namespace kamiwaza-examples-extensions --dry-run=client -o yaml | kubectl apply -f -
+```
 
 ```bash
 helm upgrade --install kamiwaza-platform-operator "${OPERATOR_CHART}" \
@@ -45,6 +49,7 @@ The cluster administrator creates every target namespace first:
 ```bash
 kubectl create namespace kamiwaza-examples --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace kamiwaza-examples-tenant --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace kamiwaza-examples-extensions --dry-run=client -o yaml | kubectl apply -f -
 
 helm upgrade --install kamiwaza-platform-operator "${OPERATOR_CHART}" \
   --namespace kamiwaza-examples-system \
@@ -61,6 +66,8 @@ The chart creates one RoleBinding in each watched namespace. The manager has no 
 ## All-namespace watch
 
 Use only after reviewing the expanded read authority:
+
+Create `kamiwaza-examples`, `kamiwaza-examples-tenant`, and `kamiwaza-examples-extensions` before installing this cluster-wide mode.
 
 ```bash
 helm upgrade --install kamiwaza-platform-operator "${OPERATOR_CHART}" \

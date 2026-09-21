@@ -1,0 +1,19 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: application-compute
+  namespace: kw-compute-scale
+spec:
+  scaleTargetRef:
+    apiVersion: platform.kamiwaza.ai/v1alpha1
+    kind: PlatformScaleTarget
+    name: kamiwaza-application-compute
+  minReplicas: 1
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60

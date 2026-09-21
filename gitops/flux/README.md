@@ -11,7 +11,7 @@ The operator is under release verification. Run this workflow on a disposable or
 - All [operator prerequisites](../../operator/README.md#common-prerequisites) and the [GitOps prerequisites](../README.md#prerequisites).
 - Flux v2.5 or later. `.spec.healthCheckExprs` does not exist before it, and without it this scenario has no way to tell whether a platform is healthy.
 - A signed, version-pinned release chart published to a registry the cluster can read.
-- The platform namespace `kamiwaza-examples`, the manager namespace `kamiwaza-examples-system`, and the image pull Secret, all created by the administrator beforehand. Delivery does not create them: the operator never creates a target namespace, and a credential does not belong in a delivery source.
+- Platform namespace `kamiwaza-examples`, Extension runtime namespace `kamiwaza-examples-extensions`, manager namespace `kamiwaza-examples-system`, and the image pull Secret in both workload namespaces, all created by the administrator beforehand. Delivery does not create them: the operator never creates a target namespace, and a credential does not belong in a delivery source.
 
 ## 1. Publish the sources
 

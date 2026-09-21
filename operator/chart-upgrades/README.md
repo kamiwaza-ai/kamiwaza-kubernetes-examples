@@ -27,11 +27,10 @@ kubectl -n kamiwaza-examples-system get deployment kamiwaza-platform-operator \
   -o custom-columns=IMAGE:.spec.template.spec.containers[0].image,AVAILABLE:.status.availableReplicas
 kubectl get crd \
   kamiwazaplatforms.platform.kamiwaza.ai \
-  kamiwazaextensions.extensions.kamiwaza.ai \
+  platformscaletargets.platform.kamiwaza.ai \
   extensions.extensions.kamiwaza.ai \
-  extensionruntimes.extensions.kamiwaza.ai \
+  extensionscaletargets.extensions.kamiwaza.ai \
   sandboxpools.extensions.kamiwaza.ai \
-  modeldeployments.serving.kamiwaza.ai \
   -o custom-columns=NAME:.metadata.name,STORED_VERSIONS:.status.storedVersions
 ```
 

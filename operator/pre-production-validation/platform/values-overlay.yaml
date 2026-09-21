@@ -8,20 +8,23 @@
 manager:
   watchNamespaces:
     - ${PLATFORM_NAMESPACE}
+    - ${PLATFORM_NAMESPACE}-extensions
 
 adminPolicy:
   revision: ${POLICY_REVISION}
   allowedTargetNamespaces:
     - ${PLATFORM_NAMESPACE}
   extensions:
+    platformNamespace: ${PLATFORM_NAMESPACE}
+    runtimeNamespace: ${PLATFORM_NAMESPACE}-extensions
     allowedNamespaces:
-      - ${PLATFORM_NAMESPACE}
-    # Namespaced, because an extension gets its own Role in its own namespace.
-    # The shipped default disables it, and an extension cannot run at all
-    # while it is off: sharing one Role across extensions is the isolation
-    # failure the setting exists to prevent, so the platform refuses rather
-    # than sharing.
-    dynamicRBAC: Namespaced
+      - ${PLATFORM_NAMESPACE}-extensions
+    # Clean Extension workloads use tokenless ServiceAccounts and receive no
+    # Kubernetes API Role or RoleBinding.
+    dynamicRBAC: Disabled
+    sandboxPoolRef: ""
+    sandboxMaxClaims: 1
+    sandboxMaxLifetimeSeconds: 3600
   routing:
     gateway:
       name: kamiwaza-gateway
