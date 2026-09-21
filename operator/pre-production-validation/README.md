@@ -21,6 +21,10 @@ Nothing here is a production identity system, certificate authority, proxy, or r
 
 The administrator policy fragments use reserved documentation hosts. Replace those hosts with the reviewed addresses that expose these fixtures in your lab. Do not weaken `deniedNetworks` to make a private endpoint pass.
 
+## Prerequisites
+
+Use Helm 4 or later. The Gateway installer passes `--force-conflicts` so the reviewed controller chart and the pinned Gateway API bundle can transfer CRD field ownership safely; Helm 3 does not support that option.
+
 ## Repository validation
 
 ```bash
@@ -97,4 +101,5 @@ These clusters are disposable:
 ```bash
 kind delete cluster --name kamiwaza-validation-envoy
 kind delete cluster --name kamiwaza-validation-istio
+kind delete cluster --name kamiwaza-validation-kong
 ```

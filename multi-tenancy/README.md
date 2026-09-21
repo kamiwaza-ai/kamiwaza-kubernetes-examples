@@ -10,8 +10,8 @@ platform does not expose.
 
 ## Current Kubernetes API boundary
 
-`KamiwazaPlatform.spec.models` remains administrator-owned platform intent.
-`ModelDeployment` is subordinate controller-owned state, not a tenant resource.
+`KamiwazaPlatform` contains no model intent. Authorized application workflows
+create controller-owned `ModelDeployment` resources; tenants do not author them.
 `KamiwazaExtension` supports owner and workroom attribution through the
 authenticated platform extension API, but its Kubernetes namespace is selected
 by platform installation configuration rather than by an arbitrary tenant.

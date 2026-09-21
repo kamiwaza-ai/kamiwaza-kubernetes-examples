@@ -78,7 +78,7 @@ kubectl -n kamiwaza-examples get gateway kamiwaza-gateway \
 
 # The transport outcome and every advisory attached to it.
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
-  -o jsonpath='{range .status.components[?(@.name=="trust")]}{.phase}{"\t"}{.reason}{"\t"}{.message}{"\n"}{end}'
+  -o jsonpath='{range .status.components[?(@.name=="trust")]}{.state}{"\t"}{.reason}{"\t"}{.message}{"\n"}{end}'
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
   -o jsonpath='{range .status.advisories[?(@.capability=="trust")]}{.reason}{"\t"}{.message}{"\n"}{end}'
 

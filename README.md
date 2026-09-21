@@ -108,7 +108,7 @@ Category indexes:
 - **Kubernetes resources** use `kubectl diff` before server-side apply with an explicit field manager. Do not force field conflicts.
 - **Secrets stay out of Git, custom resources, command output, and status.** Examples create only Secret references or interactive lab inputs.
 - **Use real shipped components.** When a release includes an application such as Tomo, deploy that catalog artifact and inspect its generated resources instead of inventing a demonstration extension.
-- **Do not demonstrate unsupported APIs.** Record the boundary explicitly; for example, tenant-authored model intent is not available while models remain in `KamiwazaPlatform.spec.models`.
+- **Do not demonstrate unsupported APIs.** Record the boundary explicitly; for example, tenants cannot author model intent and must use an authorized application workflow that creates controller-owned `ModelDeployment` resources.
 
 ---
 

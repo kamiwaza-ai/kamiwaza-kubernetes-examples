@@ -55,4 +55,4 @@ kubectl -n "${flux_namespace}" get kustomization kamiwaza-platform \
 
 echo "Platform components"
 kubectl -n "${namespace}" get kamiwazaplatform "${platform}" \
-  -o jsonpath='{range .status.components[*]}{.name}{"\t"}{.phase}{"\t"}{.reason}{"\n"}{end}'
+  -o jsonpath='{range .status.components[*]}{.name}{"\t"}{.state}{"\t"}{.reason}{"\n"}{end}'

@@ -17,7 +17,7 @@ The current catalog identifier is `kaizen`; the displayed product name may be To
 ## Prerequisites
 
 1. A Full, auth-enabled platform with ReBAC enabled and community fallback disabled. The [operator quickstart](../../operator/quickstart/) provides this posture.
-2. At least one Ready model published through `KamiwazaPlatform.spec.models`. The quickstart publishes `tinyllama`; production environments should use the release-approved model set.
+2. At least one Ready `ModelDeployment` created through the authorized application model workflow. The operator quickstart does not publish a model; select a release-approved model before this scenario.
 3. Tomo present in the application catalog for the selected release.
 4. Three test identities:
    - Tenant A owner
@@ -35,12 +35,11 @@ The commands use the dedicated example namespace:
 kubectl -n kamiwaza-examples wait \
   --for=condition=Ready kamiwazaplatform/kamiwaza \
   --timeout=45m
-kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
-  -o jsonpath='{range .status.models[*]}{.name}{"\t"}{.phase}{"\t"}{.deploymentId}{"\n"}{end}'
-kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.ai
+kubectl -n kamiwaza-examples get modeldeployments.serving.kamiwaza.ai \
+  -o custom-columns=NAME:.metadata.name,DEPLOYMENT_ID:.spec.deploymentId,MODEL:.spec.modelId,ENGINE:.spec.engineName,PHASE:.status.phase,READY:.status.readyReplicas
 ```
 
-Require at least one Ready model. `ModelDeployment` is inspection-only for tenant users; desired model intent remains on the main platform.
+Require at least one Ready model. `ModelDeployment` is inspection-only for tenant users; the authorized application control plane owns desired model intent.
 
 ## 2. Verify tenant claims before deploying Tomo
 

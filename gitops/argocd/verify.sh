@@ -25,7 +25,7 @@ echo "Health customization"
 # script for the kind's name would fail on a correct entry: the kind appears
 # in the key, not in the Lua.
 customization="$(kubectl -n "${argocd_namespace}" get configmap argocd-cm \
-  -o jsonpath='{.data.resource\.customizations\.health\.platform\.kamiwaza\.io_KamiwazaPlatform}')"
+  -o jsonpath='{.data.resource\.customizations\.health\.platform\.kamiwaza\.ai_KamiwazaPlatform}')"
 if [[ -z ${customization} ]]; then
   # Without it every KamiwazaPlatform is Healthy on creation, so the waits
   # below would pass against a platform that has not started.
@@ -53,4 +53,4 @@ fi
 
 echo "Platform components"
 kubectl -n "${namespace}" get kamiwazaplatform "${platform}" \
-  -o jsonpath='{range .status.components[*]}{.name}{"\t"}{.phase}{"\t"}{.reason}{"\n"}{end}'
+  -o jsonpath='{range .status.components[*]}{.name}{"\t"}{.state}{"\t"}{.reason}{"\n"}{end}'

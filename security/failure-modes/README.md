@@ -58,7 +58,7 @@ The runtime half is proven in the operator's own conformance suite, which exerci
 # The reason and message on the transport component, which is where a terminal
 # refusal lands.
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
-  -o jsonpath='{range .status.components[?(@.name=="trust")]}{.phase}{"\t"}{.reason}{"\t"}{.message}{"\n"}{end}'
+  -o jsonpath='{range .status.components[?(@.name=="trust")]}{.state}{"\t"}{.reason}{"\t"}{.message}{"\n"}{end}'
 
 # Advisories: one line per unproven or exempt control, so every open action is
 # visible at once rather than one per reconcile in the log.

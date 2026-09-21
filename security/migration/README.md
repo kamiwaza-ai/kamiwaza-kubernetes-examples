@@ -70,7 +70,7 @@ Rotation is not revocation. An identity issued under the retiring authority stay
 
 # 3. Watch the plane converge, and read what it says about itself.
 kubectl -n kamiwaza-examples get kamiwazaplatform kamiwaza \
-  -o jsonpath='{range .status.components[?(@.name=="trust")]}{.phase}{"\t"}{.reason}{"\t"}{.message}{"\n"}{end}'
+  -o jsonpath='{range .status.components[?(@.name=="trust")]}{.state}{"\t"}{.reason}{"\t"}{.message}{"\n"}{end}'
 
 # 4. Read every active exception and attested hop. This is the migration
 #    backlog: each line is either a fix or a decision.
