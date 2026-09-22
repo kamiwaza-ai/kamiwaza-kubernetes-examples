@@ -2,8 +2,8 @@
 #
 # Install:
 #   helm repo add grafana https://grafana.github.io/helm-charts
-#   helm upgrade --install loki grafana/loki \
-#     -n monitoring --create-namespace -f loki-values.yaml
+#   helm upgrade --install loki grafana/loki --version 7.3.0 \
+#   -n monitoring --create-namespace -f loki-values.yaml
 
 deploymentMode: SingleBinary
 
@@ -59,8 +59,9 @@ monitoring:
     enabled: true
   selfMonitoring:
     enabled: false
-  lokiCanary:
-    enabled: false
+
+lokiCanary:
+  enabled: false
 
 test:
   enabled: false

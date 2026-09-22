@@ -1,0 +1,98 @@
+# The manager layer: one chart source and one release.
+#
+# Immutable administrator policy is chart input, so in a GitOps installation
+# it lives here rather than in a command someone ran once. Changing it is a
+# release upgrade with a diff and a history, which is the property that makes
+# this worth doing at all. The field-by-field rationale for this policy is in
+# ../../../operator/quickstart/operator-values.yaml; it is restated rather
+# than referenced because a delivery source has to carry what it delivers.
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: kamiwaza-platform-operator
+  namespace: kamiwaza-examples-system
+spec:
+  interval: 30m
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+  # The signed, version-pinned release chart. `helm push` publishes a chart to
+  # an OCI registry under its own name, so the repository path ends in the
+  # chart name and the version is the tag.
+  url: oci://registry.example.com/kamiwaza/charts/kamiwaza-platform-operator
+  ref:
+    tag: "0.1.0"
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kamiwaza-platform-operator
+  namespace: kamiwaza-examples-system
+spec:
+  interval: 30m
+  timeout: 15m
+  chartRef:
+    kind: OCIRepository
+    name: kamiwaza-platform-operator
+  install:
+    # A failed install stays in place. This scenario exists to read why a
+    # manager did not start, and an automatic rollback deletes exactly that
+    # evidence. The release is retried on the next interval either way.
+    remediation:
+      retries: 0
+  upgrade:
+    remediation:
+      retries: 0
+  values:
+    image:
+      # Replace with the manager digest from your signed release metadata.
+      # The all-zero value is the placeholder the release record itself uses
+      # for an image a release renders but has not published: it matches the
+      # chart's digest schema, and it can never resolve to bytes, so an
+      # unedited copy fails at pull time instead of quietly running a tag.
+      digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    manager:
+      # This scenario starts on an empty cluster and publishes the APIs that
+      # coexistence mode withholds. Never set it while an incumbent operator
+      # still serves those kinds.
+      adoptWithheldKinds: true
+      watchNamespaces:
+        - kamiwaza-examples
+        - kamiwaza-examples-extensions
+      watchAnyNamespace: false
+    adminPolicy:
+      revision: examples-gitops-r1
+      allowedTargetNamespaces:
+        - kamiwaza-examples
+      extensions:
+        enabled: true
+        platformNamespace: kamiwaza-examples
+        runtimeNamespace: kamiwaza-examples-extensions
+        allowedNamespaces:
+          - kamiwaza-examples-extensions
+      storage:
+        allowedClassNames:
+          - example-rwo
+        allowedSharedClassNames: []
+      domains:
+        allocationMode: ExplicitAllowlist
+        allowedDomains:
+          - kamiwaza-examples.example.com
+        allowedSuffixes: []
+      images:
+        requireDigests: true
+        allowedRepositoryPrefixes:
+          - ghcr.io/kamiwaza-internal/
+          - ghcr.io/authzed/
+          - ghcr.io/agentgateway/
+        # The Secret an administrator creates in the platform namespace. It
+        # stays a name here: no registry credential belongs in a delivery
+        # source, and nothing in this scenario puts one there.
+        pullSecretNames:
+          - registry-pull
+      operations:
+        adoptionAllowed: false
+        deleteAllAllowed: false
+        genericSecretRotationAllowed: false
+        approvedForwardOnlyUpgradeTargets: []

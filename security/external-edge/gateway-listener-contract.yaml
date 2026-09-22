@@ -1,0 +1,68 @@
+# The listener contract, as a reference shape for the administrator-owned
+# Gateway. The platform never creates this object.
+#
+# Listener TLS termination is the one edge surface the platform can require
+# unconditionally: it is a Core Gateway API feature and mandatory for a
+# conformant implementation. Everything else at the edge is Extended and
+# therefore feature-gated and reported.
+#
+# The client-certificate half of the contract is not here. It lives in
+# `spec.tls.frontend.default.validation`, needs Gateway API >= 1.5.0, and is
+# shown in ../cac/gateway-frontend-validation.yaml. Keeping it out of this
+# file is deliberate: these listener fields work on every supported bundle,
+# and the frontend fields are silently pruned below 1.5.0, so mixing them
+# would produce one manifest that half-applies without saying so.
+#
+# What the platform proves before it credits this listener, per listener it
+# depends on: Programmed=True and ResolvedRefs=True and Accepted=True, each
+# with observedGeneration equal to the object's generation. Programmed alone
+# is not enough -- it reports that configuration was generated, not that the
+# references resolved. Until all three hold the platform reports
+# EdgeListenerUnverified and asserts nothing about edge TLS, because an
+# identity provider that derives its issuer from such an assertion would
+# derive it from a listener that may be plaintext.
+#
+# Gateway API exposes no revocation check anywhere, so nothing in this object
+# performs one. Revocation stays an origin-side requirement.
+#
+# Placeholder class, host, and namespace. The listener Secret name must match
+# `transport.edge.listenerCertificateSecretName` in administrator policy --
+# the platform writes that Secret and the Gateway reads it.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: kamiwaza-gateway
+  namespace: kamiwaza-examples
+spec:
+  gatewayClassName: example-gateway-class
+  listeners:
+    # The redirect source. `httpsRedirect: RequireWhenSupported` in policy
+    # emits the redirect filter on the platform's own HTTPRoutes where the
+    # GatewayClass advertises the feature; this listener is what gives those
+    # requests somewhere to arrive.
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: kamiwaza.example.com
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: kamiwaza.example.com
+      allowedRoutes:
+        namespaces:
+          from: Same
+      tls:
+        # Terminate is required. The platform verifies this from status rather
+        # than assuming it.
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            # Written by the platform, read by the Gateway. A reference the
+            # Gateway cannot resolve -- wrong name, or cross-namespace with no
+            # ReferenceGrant -- reports EdgeListenerUnverified naming the
+            # resolution failure.
+            name: kamiwaza-gateway-tls

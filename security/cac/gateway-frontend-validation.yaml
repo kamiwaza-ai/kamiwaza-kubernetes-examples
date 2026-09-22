@@ -1,0 +1,54 @@
+# Reference shape for the administrator-owned Gateway. The platform never
+# creates this object; it publishes the listener contract and then verifies it
+# from the Gateway's own status.
+#
+# Requires Gateway API >= 1.5.0. `spec.tls.frontend` moved from the
+# per-listener position in v1.4.0 and reaches the standard channel in v1.5.0.
+# On a standard-channel v1.4 install the API server prunes these fields
+# silently, so an older install has no client-certificate requirement at all
+# no matter what this manifest says.
+#
+# Validation binds to the port rather than the listener because TLS connection
+# coalescing can otherwise reuse one connection across listeners and skip
+# per-listener validation.
+#
+# Placeholder gateway class, domain, and listener Secret name. Replace all
+# three with the values your own administrator policy declares.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: kamiwaza-gateway
+  namespace: kamiwaza
+spec:
+  gatewayClassName: example-gateway-class
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: kamiwaza.example.com
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            # The listener Secret named by administrator policy
+            # (`transport.edge.listenerCertificateSecretName`).
+            name: example-listener-tls
+  # `default` is required. Add `perPort` entries as well when listeners
+  # differ by port.
+  tls:
+    frontend:
+      default:
+        validation:
+          # AllowValidOnly is the only mode that satisfies the contract.
+          # AllowInsecureFallback admits an absent certificate and an invalid
+          # certificate alike, so it is not a "verify if presented" option; a
+          # Gateway reporting that mode is treated as contract failure and
+          # certificate login stays closed.
+          mode: AllowValidOnly
+          caCertificateRefs:
+            - group: ""
+              kind: ConfigMap
+              # The client-authority ConfigMap the selected profile names in
+              # `clientCARef`.
+              name: cac-client-authorities

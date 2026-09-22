@@ -1,0 +1,37 @@
+# Wave 1: platform intent, applied only after wave 0 is Healthy.
+#
+# The wave is what keeps the first sync honest: wave 0 installs the API this
+# resource is written against, and a child Application only counts as Healthy
+# once the health customization in ../argocd-cm-health.yaml says so.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kamiwaza-platform
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: oci://registry.example.com/kamiwaza/kubernetes-examples
+    targetRevision: "1.3.0"
+    # The same intent layer the Flux scenario delivers. Only the delivery
+    # differs between the two scenarios; the platform does not.
+    path: gitops/platform
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kamiwaza-examples
+  syncPolicy:
+    automated:
+      # Deliberately false. Pruning this layer deletes the platform, and
+      # deleting the platform runs the finalizer's retention behavior. That
+      # decision has a workflow of its own (../../../operator/deletion/); it
+      # should not be a side effect of a file disappearing from a source.
+      prune: false
+      # Safe here, and worth having: the operator owns the platform's
+      # children and repairs their drift itself, while this layer owns only
+      # the platform resource. Nothing edits the platform's spec after it is
+      # applied, so self-heal has nothing to fight.
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

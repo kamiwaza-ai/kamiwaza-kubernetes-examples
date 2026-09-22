@@ -1,0 +1,87 @@
+# The shape of the conformance result the external edge publishes. This file
+# documents the record; it is not something to apply.
+#
+# Do not apply a `Pass` record the edge did not produce. The platform reads
+# this object to decide whether certificate login may be admitted at all, so a
+# hand-written pass tells the platform an unproven edge is proven, and the
+# platform will publish the forwarding route on the strength of it. The
+# records belong to the conformance run, which is the administrator's, not
+# this example's.
+#
+# The object is read by exact name in the namespace administrator policy
+# names, and the platform never lists or watches it.
+#
+# One record per required outcome. All five are mandatory: an outcome the
+# document says nothing about is reported as unproven rather than as success,
+# and each gap carries its own failure reason so the reported action is the one
+# to take.
+#
+# The record shape is closed and edge-neutral. There is no field for a
+# provider resource kind, a route name, a private endpoint, a certificate
+# byte, a distinguished name, a serial, an email, or a user identifier,
+# because a CAC/PIV certificate subject identifies a person and this object is
+# readable by everyone who can read the namespace.
+#
+# `evidenceClass` admits `ExternallyObserved` and `AdminAttested` only.
+# External enforcement is never credited as platform-observed: the platform
+# cannot see it. A record whose `policyRevision` is not the running revision
+# is downgraded to attested, and a regulated profile refuses attestation
+# outright, so re-record the evidence when policy changes.
+#
+# Every value below is a placeholder.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cac-edge-conformance
+  # The security namespace administrator policy names, not the platform
+  # namespace.
+  namespace: kamiwaza-security
+data:
+  result.json: |
+    [
+      {
+        "type": "ClientCertificateEnforced",
+        "status": "Pass",
+        "reason": "",
+        "policyRevision": "example-policy-revision",
+        "evidenceClass": "ExternallyObserved",
+        "evidenceDigest": "example-conformance-run-0001",
+        "observedAt": "2026-01-01T00:00:00Z"
+      },
+      {
+        "type": "HeadersSanitized",
+        "status": "Pass",
+        "reason": "",
+        "policyRevision": "example-policy-revision",
+        "evidenceClass": "ExternallyObserved",
+        "evidenceDigest": "example-conformance-run-0002",
+        "observedAt": "2026-01-01T00:00:00Z"
+      },
+      {
+        "type": "BackendAuthenticated",
+        "status": "Pass",
+        "reason": "",
+        "policyRevision": "example-policy-revision",
+        "evidenceClass": "ExternallyObserved",
+        "evidenceDigest": "example-conformance-run-0003",
+        "observedAt": "2026-01-01T00:00:00Z"
+      },
+      {
+        "type": "PathRestricted",
+        "status": "Pass",
+        "reason": "",
+        "policyRevision": "example-policy-revision",
+        "evidenceClass": "ExternallyObserved",
+        "evidenceDigest": "example-conformance-run-0004",
+        "observedAt": "2026-01-01T00:00:00Z"
+      },
+      {
+        "type": "DirectOriginDenied",
+        "status": "Pass",
+        "reason": "",
+        "policyRevision": "example-policy-revision",
+        "evidenceClass": "ExternallyObserved",
+        "evidenceDigest": "example-conformance-run-0005",
+        "observedAt": "2026-01-01T00:00:00Z"
+      }
+    ]

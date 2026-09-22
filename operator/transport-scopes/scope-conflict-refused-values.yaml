@@ -1,0 +1,39 @@
+# Refused on purpose, by the operator chart's own template gate.
+#
+#   helm template kamiwaza-platform-operator <chart> \
+#     --namespace kamiwaza-examples-system \
+#     --values operator/transport-scopes/scope-conflict-refused-values.yaml
+#
+#   Error: execution error at (kamiwaza-platform-operator/templates/deployment.yaml:1:4):
+#   manager.watchAnyNamespace=true requires manager.watchNamespaces to be empty
+#
+# The values below ask for both scopes at once: a cluster-wide cache and an
+# explicit watch list. There is no sensible merge of the two, and the chart
+# refuses rather than picking one -- because either choice would be an
+# authority boundary nobody selected. A cluster-wide cache is an explicit
+# relaxed authority boundary, not a fallback that engages when a bounded watch
+# is inconvenient.
+#
+# Two neighbouring refusals from the same gate, worth knowing before you meet
+# them:
+#
+#   manager.watchAnyNamespace=true requires explicit
+#   adminPolicy.allowedTargetNamespaces
+#       -- a cluster-wide cache still needs the mutation targets named. Read
+#          authority and write authority are separate decisions.
+#
+#   adminPolicy target namespace <name> is outside manager.watchNamespaces
+#       -- a bounded manager cannot be given a target it cannot watch, which
+#          would otherwise install a RoleBinding for a namespace the manager
+#          never reconciles.
+manager:
+  # The conflict: a cluster-wide cache ...
+  watchAnyNamespace: true
+  # ... and an explicit watch list at the same time.
+  watchNamespaces:
+    - kamiwaza-examples
+
+adminPolicy:
+  revision: examples-scope-conflict-r1
+  allowedTargetNamespaces:
+    - kamiwaza-examples

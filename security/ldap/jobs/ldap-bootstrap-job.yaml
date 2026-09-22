@@ -1,4 +1,14 @@
-# Imports openldap-bootstrap ConfigMap into slapd. Optional manual path: ldap-samples/bootstrap.ldif (OPERATOR_GUIDE §4).
+# Loads the lab directory content, creates the read-only bind account the
+# federation uses, and sets every lab credential from Secret
+# `openldap-secret`. It is the only writer of the directory tree.
+#
+# The Job is idempotent: an entry that already exists is skipped, and the
+# passwords are set on every run so a rotated Secret takes effect.
+#
+# It finishes by proving the claim the example makes: the federation bind
+# account can read the user branch and cannot write to it. If a write
+# succeeds, the Job fails rather than report a read-only federation it does
+# not have.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -10,43 +20,132 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      # Reduce ndots so the trailing-dot cluster FQDN below resolves
+      # absolutely on clusters whose node search domain has a wildcard record.
       dnsConfig:
         options:
           - name: ndots
             value: "1"
       containers:
         - name: bootstrap
-          image: osixia/openldap:1.5.0
+          image: docker.io/osixia/openldap:1.5.0@sha256:18742e9c449c9c1afe129d3f2f3ee15fb34cc43e5f940a20f3399728f41d7c28
           command:
             - sh
             - -lc
             - |
               set -eu
-              echo "Waiting for OpenLDAP service..."
-              until ldapsearch -x -H ldap://openldap.ldap.svc.cluster.local.:389 \
-                -D "cn=admin,dc=kamiwaza,dc=local" -w "$LDAP_ADMIN_PASSWORD" \
-                -b "dc=kamiwaza,dc=local" -s base "(objectClass=*)" dn >/dev/null 2>&1; do
+
+              BASE="dc=kamiwaza,dc=local"
+              DIR="ldap://openldap.ldap.svc.cluster.local.:389"
+              ADMIN="cn=admin,${BASE}"
+              READER="cn=federation-reader,ou=services,${BASE}"
+
+              import_ldif() {
+                file="$1"
+                set +e
+                out="$(ldapadd -x -c -H "$DIR" -D "$ADMIN" -w "$LDAP_ADMIN_PASSWORD" -f "$file" 2>&1)"
+                rc=$?
+                set -e
+                echo "$out"
+                # 68 is "already exists", which is the second run of an
+                # idempotent import rather than a failure.
+                if [ "$rc" -ne 0 ] && [ "$rc" -ne 68 ]; then
+                  echo "ldapadd $file failed with exit code $rc" >&2
+                  exit "$rc"
+                fi
+              }
+
+              echo "Waiting for the directory to answer..."
+              until ldapsearch -x -H "$DIR" -D "$ADMIN" -w "$LDAP_ADMIN_PASSWORD" \
+                -b "$BASE" -s base "(objectClass=*)" dn >/dev/null 2>&1; do
                 sleep 3
               done
-              echo "Importing bootstrap LDIF (idempotent)..."
-              set +e
-              OUT="$(ldapadd -x -c -H ldap://openldap.ldap.svc.cluster.local.:389 \
-                -D "cn=admin,dc=kamiwaza,dc=local" -w "$LDAP_ADMIN_PASSWORD" \
-                -f /bootstrap/bootstrap.ldif 2>&1)"
-              RC=$?
-              set -e
-              echo "$OUT"
-              if [ "$RC" -ne 0 ] && [ "$RC" -ne 68 ]; then
-                echo "ldapadd failed with exit code $RC" >&2
-                exit "$RC"
+
+              echo "Importing directory content..."
+              import_ldif /bootstrap/bootstrap.ldif
+
+              echo "Creating the read-only federation bind account..."
+              umask 077
+              cat >/tmp/federation-reader.ldif <<LDIF
+              dn: ${READER}
+              objectClass: organizationalRole
+              objectClass: simpleSecurityObject
+              cn: federation-reader
+              description: Read-only bind account for directory federation.
+              userPassword: ${FEDERATION_BIND_PASSWORD}
+              LDIF
+              import_ldif /tmp/federation-reader.ldif
+              rm -f /tmp/federation-reader.ldif
+
+              echo "Setting credentials from the referenced Secret..."
+              ldappasswd -x -H "$DIR" -D "$ADMIN" -w "$LDAP_ADMIN_PASSWORD" \
+                -s "$FEDERATION_BIND_PASSWORD" "$READER" >/dev/null
+              for uid in alice bob carol; do
+                ldappasswd -x -H "$DIR" -D "$ADMIN" -w "$LDAP_ADMIN_PASSWORD" \
+                  -s "$DEMO_USER_PASSWORD" "uid=${uid},ou=people,${BASE}" >/dev/null
+              done
+
+              # The shipped access control grants read to the directory
+              # manager and to an entry itself, and nothing to anyone else, so
+              # the bind account cannot read the user branch until it is
+              # granted. The rule is inserted ahead of the catch-all and grants
+              # read only; the password rule already ahead of it keeps
+              # userPassword unreadable, so the federation reads accounts and
+              # never their password hashes.
+              #
+              # `by * break` matches every other identity, grants nothing, and
+              # hands evaluation to the next rule, which keeps manager and
+              # self behaviour exactly as shipped.
+              if ! ldapsearch -x -H "$DIR" -D "$READER" -w "$FEDERATION_BIND_PASSWORD" \
+                -b "ou=people,${BASE}" -s base dn >/dev/null 2>&1; then
+                echo "Granting the bind account read access..."
+                ldapmodify -x -H "$DIR" -D "cn=admin,cn=config" -w "$LDAP_CONFIG_PASSWORD" <<LDIF
+              dn: olcDatabase={1}mdb,cn=config
+              changetype: modify
+              add: olcAccess
+              olcAccess: {2}to dn.subtree="${BASE}" by dn.exact="${READER}" read by * break
+              LDIF
               fi
-              echo "LDAP bootstrap import finished."
+
+              echo "Proving the federation bind account is read-only..."
+              ldapsearch -x -H "$DIR" -D "$READER" -w "$FEDERATION_BIND_PASSWORD" \
+                -b "ou=people,${BASE}" "(objectClass=inetOrgPerson)" dn >/dev/null
+              if ldapmodify -x -H "$DIR" -D "$READER" -w "$FEDERATION_BIND_PASSWORD" \
+                >/dev/null 2>&1 <<LDIF
+              dn: uid=alice,ou=people,${BASE}
+              changetype: modify
+              replace: description
+              description: read-only probe
+              LDIF
+              then
+                echo "the federation bind account can write to the directory," \
+                  "so this is not a read-only federation" >&2
+                exit 1
+              fi
+
+              echo "Directory bootstrap finished."
           env:
             - name: LDAP_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: openldap-secret
                   key: admin-password
+            # Used once, to grant the bind account read access.
+            - name: LDAP_CONFIG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openldap-secret
+                  key: config-password
+            - name: FEDERATION_BIND_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openldap-secret
+                  key: federation-bind-password
+            - name: DEMO_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openldap-secret
+                  key: demo-user-password
           volumeMounts:
             - name: bootstrap-ldif
               mountPath: /bootstrap

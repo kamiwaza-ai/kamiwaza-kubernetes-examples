@@ -1,0 +1,156 @@
+# Complete Helm values for the governed protocol data plane. Apply this file
+# with --reuse-values so the chart keeps the selected manager image, watch
+# scope, storage class, and registry settings.
+#
+# The Core workload hops are included because a Helm values file replaces the
+# entire hop list. The protocol data-plane hops add a bounded, authenticated
+# configuration channel and independently authenticated backend connections.
+adminPolicy:
+  revision: examples-protocol-data-plane-r1
+  transport:
+    issuance:
+      mode: PlatformIssued
+      platformIssued:
+        workloadIdentity:
+          source: PlatformIssued
+          trustDomain: kamiwaza-examples.example.com
+          attestation: OfflineTokenReview
+          identityLifetime: 24h
+          identityRenewBefore: 8h
+
+    trust:
+      bundleConfigMapName: kamiwaza-trust-bundle
+      publicRoots: Include
+      targetNamespaces:
+        - kamiwaza-examples
+      maximumBundleBytes: 900000
+
+    floor:
+      minimumTLSVersion: TLS1.2
+      hostnameVerification: Required
+
+    internal:
+      defaultTransport: PlatformTLS
+      workloadIngressFloor: true
+      hops:
+        - name: CoreToApplicationDatabase
+          transport: PlatformTLS
+          authentication:
+            type: MutualTLS
+            maxConnectionAge: 30m
+            mutualTLS:
+              clientIdentityRef: core-client
+        - name: CoreToKeyValueStore
+          transport: PlatformTLS
+          authentication:
+            type: WorkloadIdentityX509
+            maxConnectionAge: 30m
+            workloadIdentityX509:
+              trustDomain: kamiwaza-examples.example.com
+              acceptedIdentities:
+                - "spiffe://kamiwaza-examples.example.com/ns/kamiwaza-examples/sa/core-scheduler"
+        - name: CoreToDistributedCompute
+          transport: ProxyTerminated
+          authentication:
+            type: WorkloadIdentityX509
+            maxConnectionAge: 30m
+            workloadIdentityX509:
+              trustDomain: kamiwaza-examples.example.com
+              acceptedIdentities:
+                - "spiffe://kamiwaza-examples.example.com/ns/kamiwaza-examples/sa/core-scheduler"
+        - name: DistributedComputeInternal
+          transport: ProxyTerminated
+          authentication:
+            type: WorkloadIdentityX509
+            maxConnectionAge: 30m
+            workloadIdentityX509:
+              trustDomain: kamiwaza-examples.example.com
+              acceptedIdentities:
+                - "spiffe://kamiwaza-examples.example.com/ns/kamiwaza-examples/sa/core-ray"
+        # This bound is the maximum lifetime of an admitted configuration.
+        # The plane closes protected routes after 30 minutes without a fresh,
+        # authenticated commit.
+        - name: ControlPlaneToProtocolDataPlane
+          transport: PlatformTLS
+          authentication:
+            type: MutualTLS
+            maxConnectionAge: 30m
+            mutualTLS:
+              clientIdentityRef: control-plane-channel
+        - name: ProtocolDataPlaneToDecisionService
+          transport: PlatformTLS
+          authentication:
+            type: WorkloadIdentityX509
+            maxConnectionAge: 15m
+            workloadIdentityX509:
+              trustDomain: kamiwaza-examples.example.com
+              acceptedIdentities:
+                - "spiffe://kamiwaza-examples.example.com/ns/kamiwaza-examples/sa/kamiwaza-dataplane"
+        - name: GatewayToProtocolDataPlane
+          transport: PlatformTLS
+          authentication:
+            type: None
+        - name: ProtocolDataPlaneToServedModel
+          transport: PlatformTLS
+          authentication:
+            type: WorkloadIdentityJWT
+            maxConnectionAge: 30m
+            workloadIdentityJWT:
+              audience: kamiwaza-workload-sts
+              attestationProfiles:
+                - kubernetes-offline-v1
+              ttlSeconds: 3600
+        - name: ProtocolDataPlaneToUpstreamServer
+          transport: PlatformTLS
+          authentication:
+            type: WorkloadIdentityJWT
+            maxConnectionAge: 30m
+            workloadIdentityJWT:
+              audience: kamiwaza-workload-sts
+              attestationProfiles:
+                - kubernetes-offline-v1
+              ttlSeconds: 3600
+        - name: ProtocolDataPlaneToStateStore
+          transport: PlatformTLS
+          authentication:
+            type: MutualTLS
+            maxConnectionAge: 30m
+            mutualTLS:
+              clientIdentityRef: dataplane-state
+        - name: CoreToServedModel
+          transport: PlatformTLS
+          authentication:
+            type: WorkloadIdentityJWT
+            maxConnectionAge: 30m
+            workloadIdentityJWT:
+              audience: kamiwaza-workload-sts
+              attestationProfiles:
+                - kubernetes-offline-v1
+              ttlSeconds: 3600
+
+    clientIdentities:
+      - name: core-client
+        secretRef:
+          name: kamiwaza-core-client
+        commonName: core-client
+        validity: 2160h
+        renewBefore: 360h
+      - name: control-plane-channel
+        secretRef:
+          name: kamiwaza-control-plane-channel
+        commonName: control-plane-channel
+        validity: 2160h
+        renewBefore: 360h
+      - name: dataplane-state
+        secretRef:
+          name: kamiwaza-dataplane-state
+        commonName: dataplane-state
+        validity: 2160h
+        renewBefore: 360h
+
+    egress:
+      deniedNetworks:
+        - Loopback
+        - LinkLocal
+        - CloudMetadata
+        - PrivateRanges

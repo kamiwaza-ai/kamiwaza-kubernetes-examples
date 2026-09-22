@@ -1,0 +1,18 @@
+manager:
+  watchNamespaces:
+    - kamiwaza-examples
+    - kamiwaza-examples-tenant
+    - kamiwaza-examples-extensions
+  watchAnyNamespace: false
+
+adminPolicy:
+  revision: examples-bounded-list-r1
+  allowedTargetNamespaces:
+    - kamiwaza-examples
+    - kamiwaza-examples-tenant
+  extensions:
+    enabled: true
+    platformNamespace: kamiwaza-examples
+    runtimeNamespace: kamiwaza-examples-extensions
+    allowedNamespaces:
+      - kamiwaza-examples-extensions

@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# The platform intent alone. `operator-values.yaml` is Helm input for the
+# manager installation, not a cluster resource, so it is not listed here.
+#
+# This exists so other packages can use the published intent as a base and
+# patch only what their environment owns, instead of keeping a second copy of
+# it that drifts.
+resources: [kamiwaza-platform.yaml]

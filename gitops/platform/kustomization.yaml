@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Platform intent, taken from the published quickstart package rather than
+# copied. The quickstart's kustomization exists for exactly this: a second
+# copy of the intent is a second thing to keep current, and the first symptom
+# of failing to is a scenario that applies a field the API no longer serves.
+#
+# An installation patches what its environment owns here -- `spec.domain`,
+# `spec.storage.statefulClassName`, and the image pins from its own signed
+# release metadata -- so the diff a reviewer reads is the environment's
+# decisions, not a whole resource.
+resources: [../../operator/quickstart]

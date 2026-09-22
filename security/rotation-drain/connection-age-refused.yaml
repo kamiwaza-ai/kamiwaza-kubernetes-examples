@@ -1,0 +1,57 @@
+# Refused on purpose.
+#
+# The hop permits a connection to live for 4000h and the certificate that
+# authenticates it lives for 2160h. The loader accepts the shape and the
+# policy is refused at cross-reference time:
+#
+#   connection age within credential lifetime:
+#   transport.internal.hops[0].authentication.maxConnectionAge: connection age
+#   4000h exceeds the 2160h lifetime of client identity "core-client"
+#
+# The reason is ClientIdentityInvalid.
+#
+# 4000h is not an obviously wrong number, which is the point of publishing
+# this file: the two values live in different sections and nobody notices that
+# one crossed the other. What the refusal prevents is a connection that
+# outlives the certificate presented in its handshake -- an authenticated
+# session whose authentication expired while it was open, which no drain can
+# fix after the fact because the connection was never scheduled to end.
+transport:
+  issuance:
+    mode: PlatformIssued
+
+  trust:
+    bundleConfigMapName: kamiwaza-trust-bundle
+    publicRoots: Include
+
+  floor:
+    minimumTLSVersion: TLS1.2
+    hostnameVerification: Required
+
+  internal:
+    defaultTransport: PlatformTLS
+    workloadIngressFloor: true
+    hops:
+      - name: CoreToApplicationDatabase
+        transport: PlatformTLS
+        authentication:
+          type: MutualTLS
+          # The defect: longer than the identity below.
+          maxConnectionAge: 4000h
+          mutualTLS:
+            clientIdentityRef: core-client
+
+  clientIdentities:
+    - name: core-client
+      secretRef:
+        name: kamiwaza-core-client
+      commonName: core-client
+      validity: 2160h
+      renewBefore: 360h
+
+  egress:
+    deniedNetworks:
+      - Loopback
+      - LinkLocal
+      - CloudMetadata
+      - PrivateRanges
