@@ -1,0 +1,35 @@
+# Scrape the platform's authorization decision service.
+#
+# The decision service serves Prometheus metrics on 9090 but declares only its
+# `grpc` and `http` container ports. The Prometheus Operator keeps a target
+# only for a declared port, so this monitor selects the pod through `grpc` and
+# then rewrites the address to the metrics port. The gRPC and HTTP API ports
+# are never scraped.
+#
+# ponytail: IPv4 address rewrite; an IPv6-only cluster needs `[$1]:9090`.
+#
+# `scrape-networkpolicies.yaml` admits Prometheus to port 9090 only.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: authorization
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: spicedb
+    app.kubernetes.io/part-of: kamiwaza
+spec:
+  namespaceSelector:
+    matchNames:
+      - kamiwaza
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spicedb
+  podMetricsEndpoints:
+    - port: grpc
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_ip]
+          targetLabel: __address__
+          replacement: $1:9090

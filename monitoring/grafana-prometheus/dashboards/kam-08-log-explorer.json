@@ -1,672 +1,1055 @@
 {
-  "uid": "kam-08",
-  "title": "Unified Log Explorer",
-  "description": "Pre-built LogQL queries for all Kamiwaza services. Use the variables to filter by service, level, and namespace. Click a pre-built query panel title to explore in Grafana Explore.",
-  "tags": [
-    "kamiwaza",
-    "logs",
-    "loki"
-  ],
-  "schemaVersion": 38,
-  "version": 1,
-  "editable": false,
-  "fiscalYearStartMonth": 0,
-  "weekStart": "",
-  "refresh": "30s",
-  "time": {
-    "from": "now-1h",
-    "to": "now"
+  "apiVersion": "dashboard.grafana.app/v2",
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "kam-08"
   },
-  "timepicker": {},
-  "timezone": "browser",
-  "graphTooltip": 1,
-  "links": [
-    {
-      "title": "\u2190 Platform Overview",
-      "url": "/d/kam-01",
-      "type": "link",
-      "targetBlank": false
-    }
-  ],
-  "annotations": {
-    "list": [
+  "spec": {
+    "title": "Kamiwaza · Log Explorer",
+    "description": "What are the workloads saying?",
+    "tags": ["kamiwaza"],
+    "editable": false,
+    "cursorSync": "Crosshair",
+    "liveNow": false,
+    "preload": false,
+    "links": [
       {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
+        "title": "Kamiwaza dashboards",
+        "type": "dashboards",
+        "icon": "external link",
+        "tooltip": "",
+        "tags": ["kamiwaza"],
+        "asDropdown": true,
+        "targetBlank": false,
+        "includeVars": true,
+        "keepTime": true
       }
-    ]
-  },
-  "templating": {
-    "list": [
+    ],
+    "annotations": [
       {
-        "name": "loki_datasource",
-        "type": "datasource",
-        "query": "loki",
-        "current": {},
-        "hide": 0,
-        "label": "Loki",
-        "multi": false,
-        "refresh": 1
-      },
-      {
-        "name": "datasource",
-        "type": "datasource",
-        "query": "prometheus",
-        "current": {},
-        "hide": 0,
-        "label": "Prometheus",
-        "multi": false,
-        "refresh": 1
-      },
-      {
-        "name": "service",
-        "type": "custom",
-        "label": "Service",
-        "hide": 0,
-        "current": {
-          "text": "all-services",
-          "value": ".+"
-        },
-        "options": [
-          {
-            "text": "all-services",
-            "value": ".+"
+        "kind": "AnnotationQuery",
+        "spec": {
+          "query": {
+            "kind": "DataQuery",
+            "group": "grafana",
+            "version": "v0",
+            "datasource": {
+              "name": "-- Grafana --"
+            },
+            "spec": {}
           },
-          {
-            "text": "core-scheduler",
-            "value": "core"
-          },
-          {
-            "text": "ray",
-            "value": "ray"
-          },
-          {
-            "text": "core-etcd",
-            "value": "core-etcd"
-          },
-          {
-            "text": "core-postgres",
-            "value": "core-postgres"
-          },
-          {
-            "text": "keycloak",
-            "value": "keycloak"
-          },
-          {
-            "text": "extension-operator",
-            "value": "manager"
-          },
-          {
-            "text": "kaizen-backend",
-            "value": "kaizenv3-backend"
-          },
-          {
-            "text": "kaizen-frontend",
-            "value": "kaizenv3-frontend"
-          },
-          {
-            "text": "kaizen-sandbox-controller",
-            "value": "kaizenv3-sandbox-controller"
-          },
-          {
-            "text": "argocd",
-            "value": "argocd-application-controller"
-          },
-          {
-            "text": "grafana",
-            "value": "grafana"
-          },
-          {
-            "text": "prometheus",
-            "value": "prometheus"
-          },
-          {
-            "text": "loki",
-            "value": "loki"
-          },
-          {
-            "text": "alloy",
-            "value": "alloy"
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "builtIn": true,
+          "legacyOptions": {
+            "type": "dashboard"
           }
-        ],
-        "multi": false,
-        "includeAll": false
+        }
+      }
+    ],
+    "timeSettings": {
+      "timezone": "browser",
+      "from": "now-3h",
+      "to": "now",
+      "autoRefresh": "1m",
+      "autoRefreshIntervals": ["30s", "1m", "5m", "15m"],
+      "hideTimepicker": false,
+      "fiscalYearStartMonth": 0
+    },
+    "variables": [
+      {
+        "kind": "DatasourceVariable",
+        "spec": {
+          "name": "datasource",
+          "pluginId": "prometheus",
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "options": [],
+          "multi": false,
+          "includeAll": false,
+          "label": "Metrics",
+          "hide": "dontHide",
+          "skipUrlSync": false,
+          "allowCustomValue": false
+        }
       },
       {
-        "name": "namespace",
-        "type": "custom",
-        "label": "Namespace",
-        "hide": 0,
-        "current": {
-          "text": "kamiwaza",
-          "value": "kamiwaza"
-        },
-        "options": [
-          {
+        "kind": "DatasourceVariable",
+        "spec": {
+          "name": "loki_datasource",
+          "pluginId": "loki",
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "options": [],
+          "multi": false,
+          "includeAll": false,
+          "label": "Logs",
+          "hide": "dontHide",
+          "skipUrlSync": false,
+          "allowCustomValue": false
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "name": "namespace",
+          "label": "Namespace",
+          "hide": "dontHide",
+          "refresh": "onTimeRangeChanged",
+          "skipUrlSync": false,
+          "current": {
             "text": "kamiwaza",
             "value": "kamiwaza"
           },
-          {
-            "text": "kamiwaza-extensions",
-            "value": "kamiwaza-extensions"
-          },
-          {
-            "text": "kamiwaza-sandboxes",
-            "value": "kamiwaza-sandboxes"
-          },
-          {
-            "text": "kamiwaza-system",
-            "value": "kamiwaza-system"
-          },
-          {
-            "text": "monitoring",
-            "value": "monitoring"
-          },
-          {
-            "text": "argocd",
-            "value": "argocd"
+          "options": [],
+          "multi": false,
+          "includeAll": false,
+          "allowCustomValue": false,
+          "regex": "",
+          "sort": "alphabeticalAsc",
+          "definition": "label_values(namespace)",
+          "query": {
+            "kind": "DataQuery",
+            "group": "loki",
+            "version": "v0",
+            "datasource": {
+              "name": "${loki_datasource}"
+            },
+            "spec": {
+              "label": "namespace",
+              "type": 1,
+              "refId": "LokiVariableQueryEditor-VariableQuery"
+            }
           }
-        ],
-        "multi": false,
-        "includeAll": false
+        }
       },
       {
-        "name": "level",
-        "type": "custom",
-        "label": "Min Level",
-        "hide": 0,
-        "current": {
-          "text": "error",
-          "value": "(?i)(error|critical|fatal|panic)"
-        },
-        "options": [
-          {
-            "text": "all",
-            "value": ""
+        "kind": "QueryVariable",
+        "spec": {
+          "name": "app",
+          "label": "Workload",
+          "hide": "dontHide",
+          "refresh": "onTimeRangeChanged",
+          "skipUrlSync": false,
+          "current": {
+            "text": "All",
+            "value": "$__all"
           },
-          {
-            "text": "error",
-            "value": "(?i)(error|critical|fatal|panic)"
-          },
-          {
-            "text": "warn+error",
+          "options": [],
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "allowCustomValue": false,
+          "regex": "",
+          "sort": "alphabeticalAsc",
+          "definition": "label_values({namespace=\"$namespace\"}, app)",
+          "query": {
+            "kind": "DataQuery",
+            "group": "loki",
+            "version": "v0",
+            "datasource": {
+              "name": "${loki_datasource}"
+            },
+            "spec": {
+              "label": "app",
+              "stream": "{namespace=\"$namespace\"}",
+              "type": 1,
+              "refId": "LokiVariableQueryEditor-VariableQuery"
+            }
+          }
+        }
+      },
+      {
+        "kind": "CustomVariable",
+        "spec": {
+          "name": "level",
+          "label": "Minimum level",
+          "hide": "dontHide",
+          "skipUrlSync": false,
+          "multi": false,
+          "includeAll": false,
+          "allowCustomValue": false,
+          "query": "all : .*, warning : (?i)(warn|error|critical|fatal|panic), error : (?i)(error|critical|fatal|panic)",
+          "current": {
+            "text": "warning",
             "value": "(?i)(warn|error|critical|fatal|panic)"
           },
-          {
-            "text": "info+",
-            "value": "(?i)(info|warn|error|critical|fatal)"
-          }
-        ],
-        "multi": false,
-        "includeAll": false
-      }
-    ]
-  },
-  "panels": [
-    {
-      "id": 1,
-      "type": "row",
-      "title": "Log Volume Overview",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 0,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
-    },
-    {
-      "id": 2,
-      "type": "timeseries",
-      "title": "Log Rate by Namespace (lines/sec)",
-      "description": "Volume of log lines over time \u2014 spikes indicate activity bursts or log storms. Automatically includes all Kamiwaza namespaces and argocd.",
-      "gridPos": {
-        "x": 0,
-        "y": 1,
-        "w": 12,
-        "h": 6
-      },
-      "datasource": {
-        "type": "loki",
-        "uid": "${loki_datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "loki",
-            "uid": "${loki_datasource}"
-          },
-          "expr": "sum by (namespace) (rate({namespace=~\"kamiwaza|kamiwaza-extensions|kamiwaza-sandboxes|kamiwaza-system|argocd|monitoring\"}[5m]))",
-          "legendFormat": "{{namespace}}"
-        }
-      ],
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": [
-            "mean"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 20,
-            "gradientMode": "opacity",
-            "stacking": {
-              "mode": "normal"
+          "options": [
+            {
+              "selected": false,
+              "text": "all",
+              "value": ".*"
             },
-            "spanNulls": false,
-            "showPoints": "never",
-            "drawStyle": "line"
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 3,
-      "type": "timeseries",
-      "title": "Error Log Rate by Service",
-      "description": "How many error lines each service is producing per second",
-      "gridPos": {
-        "x": 12,
-        "y": 1,
-        "w": 12,
-        "h": 6
-      },
-      "datasource": {
-        "type": "loki",
-        "uid": "${loki_datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "loki",
-            "uid": "${loki_datasource}"
-          },
-          "expr": "sum(rate({namespace=\"kamiwaza\"} |~ \"(?i)(error|fatal|critical)\" [5m])) by (container)",
-          "legendFormat": "{{container}}"
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "loki",
-            "uid": "${loki_datasource}"
-          },
-          "expr": "sum(rate({namespace=~\"kamiwaza-extensions|kamiwaza-sandboxes\"} |~ \"(?i)(error|fatal|critical)\" [5m])) by (namespace)",
-          "legendFormat": "{{namespace}}"
-        }
-      ],
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "mean",
-            "max"
+            {
+              "selected": true,
+              "text": "warning",
+              "value": "(?i)(warn|error|critical|fatal|panic)"
+            },
+            {
+              "selected": false,
+              "text": "error",
+              "value": "(?i)(error|critical|fatal|panic)"
+            }
           ]
         }
+      }
+    ],
+    "elements": {
+      "volume": {
+        "kind": "Panel",
+        "spec": {
+          "id": 1,
+          "title": "Log volume",
+          "description": "Lines per second by workload",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${loki_datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum by (app) (rate({namespace=\"$namespace\", app=~\"$app\"} | label_format app=\"{{ or .app .container .job }}\" [$__auto]))",
+                        "legendFormat": "{{app}}"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc",
+                  "hideZeros": false
+                },
+                "legend": {
+                  "showLegend": true,
+                  "displayMode": "table",
+                  "placement": "right",
+                  "calcs": ["sum"],
+                  "limit": 8,
+                  "sortBy": "Total",
+                  "sortDesc": true
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short",
+                  "custom": {
+                    "drawStyle": "bars",
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "fillOpacity": 60,
+                    "gradientMode": "opacity",
+                    "showPoints": "never",
+                    "spanNulls": true,
+                    "axisSoftMin": 0,
+                    "axisBorderShow": false,
+                    "stacking": {
+                      "mode": "normal",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
       },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "drawStyle": "line"
+      "errors": {
+        "kind": "Panel",
+        "spec": {
+          "id": 2,
+          "title": "Error lines",
+          "description": "Error-level lines per second by workload",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${loki_datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum by (app) (rate({namespace=\"$namespace\", app=~\"$app\"} |~ \"(?i)(error|fatal|critical)\" | label_format app=\"{{ or .app .container .job }}\" [$__auto]))",
+                        "legendFormat": "{{app}}"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
           },
-          "color": {
-            "mode": "palette-classic"
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc",
+                  "hideZeros": false
+                },
+                "legend": {
+                  "showLegend": true,
+                  "displayMode": "table",
+                  "placement": "right",
+                  "calcs": ["sum"],
+                  "limit": 8,
+                  "sortBy": "Total",
+                  "sortDesc": true
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short",
+                  "custom": {
+                    "drawStyle": "bars",
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "fillOpacity": 60,
+                    "gradientMode": "opacity",
+                    "showPoints": "never",
+                    "spanNulls": true,
+                    "axisSoftMin": 0,
+                    "axisBorderShow": false,
+                    "stacking": {
+                      "mode": "normal",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "stream": {
+        "kind": "Panel",
+        "spec": {
+          "id": 3,
+          "title": "Log stream",
+          "description": "Lines from the selected workloads at or above the selected level",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${loki_datasource}"
+                      },
+                      "spec": {
+                        "expr": "{namespace=\"$namespace\", app=~\"$app\"} |~ \"${level}\" | drop service_name, stream",
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
+            }
           },
-          "unit": "short"
-        },
-        "overrides": []
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "logs",
+            "version": "",
+            "spec": {
+              "options": {
+                "showTime": true,
+                "showLabels": true,
+                "showCommonLabels": false,
+                "wrapLogMessage": true,
+                "prettifyLogMessage": false,
+                "enableLogDetails": true,
+                "enableInfiniteScrolling": true,
+                "sortOrder": "Descending",
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "all-errors": {
+        "kind": "Panel",
+        "spec": {
+          "id": 4,
+          "title": "All errors",
+          "description": "Error-level lines across the namespace",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${loki_datasource}"
+                      },
+                      "spec": {
+                        "expr": "{namespace=\"$namespace\"} |~ \"(?i)(error|fatal|critical|panic|exception|traceback)\" | drop service_name, stream",
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "logs",
+            "version": "",
+            "spec": {
+              "options": {
+                "showTime": true,
+                "showLabels": true,
+                "showCommonLabels": false,
+                "wrapLogMessage": true,
+                "prettifyLogMessage": false,
+                "enableLogDetails": true,
+                "enableInfiniteScrolling": true,
+                "sortOrder": "Descending",
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "auth-failures": {
+        "kind": "Panel",
+        "spec": {
+          "id": 5,
+          "title": "Authentication failures",
+          "description": "401, 403, and unauthorized lines",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${loki_datasource}"
+                      },
+                      "spec": {
+                        "expr": "{namespace=\"$namespace\"} |~ \"(?i)( 401 | 403 |status[=: \\\"]*40[13]|unauthorized|forbidden|authentication.failed|invalid.token)\" | drop service_name, stream",
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "logs",
+            "version": "",
+            "spec": {
+              "options": {
+                "showTime": true,
+                "showLabels": true,
+                "showCommonLabels": false,
+                "wrapLogMessage": true,
+                "prettifyLogMessage": false,
+                "enableLogDetails": true,
+                "enableInfiniteScrolling": true,
+                "sortOrder": "Descending",
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "elections": {
+        "kind": "Panel",
+        "spec": {
+          "id": 6,
+          "title": "Coordination store elections",
+          "description": "etcd leader election lines",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${loki_datasource}"
+                      },
+                      "spec": {
+                        "expr": "{namespace=\"$namespace\", container=\"etcd\"} |~ \"(?i)(became.leader|election|campaign)\" | drop service_name, stream",
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "logs",
+            "version": "",
+            "spec": {
+              "options": {
+                "showTime": true,
+                "showLabels": true,
+                "showCommonLabels": false,
+                "wrapLogMessage": true,
+                "prettifyLogMessage": false,
+                "enableLogDetails": true,
+                "enableInfiniteScrolling": true,
+                "sortOrder": "Descending",
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "crashes": {
+        "kind": "Panel",
+        "spec": {
+          "id": 7,
+          "title": "Delegated compute crashes",
+          "description": "Ray head and worker crash lines",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${loki_datasource}"
+                      },
+                      "spec": {
+                        "expr": "{namespace=\"$namespace\", app=\"core-raycluster\"} |~ \"(?i)(fatal|crash|traceback|oom|out of memory|worker died|worker failed)\" | drop service_name, stream",
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "logs",
+            "version": "",
+            "spec": {
+              "options": {
+                "showTime": true,
+                "showLabels": true,
+                "showCommonLabels": false,
+                "wrapLogMessage": true,
+                "prettifyLogMessage": false,
+                "enableLogDetails": true,
+                "enableInfiniteScrolling": true,
+                "sortOrder": "Descending",
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "oom": {
+        "kind": "Panel",
+        "spec": {
+          "id": 8,
+          "title": "OOM kill events",
+          "description": "Out-of-memory kills",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${loki_datasource}"
+                      },
+                      "spec": {
+                        "expr": "{job=\"integrations/kubernetes/eventhandler\", namespace=\"$namespace\"} |= \"OOMKill\" | drop service_name, stream",
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "logs",
+            "version": "",
+            "spec": {
+              "options": {
+                "showTime": true,
+                "showLabels": true,
+                "showCommonLabels": false,
+                "wrapLogMessage": true,
+                "prettifyLogMessage": false,
+                "enableLogDetails": true,
+                "enableInfiniteScrolling": true,
+                "sortOrder": "Descending",
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "operator": {
+        "kind": "Panel",
+        "spec": {
+          "id": 9,
+          "title": "Platform operator errors",
+          "description": "Manager error lines",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${loki_datasource}"
+                      },
+                      "spec": {
+                        "expr": "{app=\"kamiwaza-platform-operator\"} |= \"\\\"level\\\":\\\"error\\\"\" | drop service_name, stream",
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "logs",
+            "version": "",
+            "spec": {
+              "options": {
+                "showTime": true,
+                "showLabels": true,
+                "showCommonLabels": false,
+                "wrapLogMessage": true,
+                "prettifyLogMessage": false,
+                "enableLogDetails": true,
+                "enableInfiniteScrolling": true,
+                "sortOrder": "Descending",
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "about": {
+        "kind": "Panel",
+        "spec": {
+          "id": 10,
+          "title": "About this dashboard",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "text",
+            "version": "",
+            "spec": {
+              "options": {
+                "mode": "markdown",
+                "content": "**What are the workloads saying?**\n\nPick a namespace, one or more workloads (`app.kubernetes.io/name`), and a minimum level. The namespace selector lists every namespace Alloy collects from, not only the platform's. **Diagnostics** holds ready-made queries for the selected namespace; an empty panel means nothing matched.",
+                "code": {
+                  "language": "plaintext",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                }
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
       }
     },
-    {
-      "id": 4,
-      "type": "row",
-      "title": "Filtered Log Stream",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 7,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
-    },
-    {
-      "id": 5,
-      "type": "logs",
-      "title": "Log Stream (namespace=${namespace}, service filter=${service}, level=${level})",
-      "description": "Main log stream \u2014 adjust variables above to filter. Empty 'service' shows all containers.",
-      "gridPos": {
-        "x": 0,
-        "y": 8,
-        "w": 24,
-        "h": 12
-      },
-      "datasource": {
-        "type": "loki",
-        "uid": "${loki_datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "loki",
-            "uid": "${loki_datasource}"
-          },
-          "expr": "{namespace=\"${namespace}\", container=~\"${service}.*\"} |~ \"${level}\"",
-          "legendFormat": ""
-        }
-      ],
-      "options": {
-        "showTime": true,
-        "showLabels": true,
-        "showCommonLabels": false,
-        "wrapLogMessage": true,
-        "prettifyLogMessage": false,
-        "enableLogDetails": true,
-        "sortOrder": "Descending",
-        "dedupStrategy": "none"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "maxDataPoints": 200
-    },
-    {
-      "id": 6,
-      "type": "row",
-      "title": "Pre-Built Diagnostic Queries",
-      "collapsed": true,
-      "gridPos": {
-        "x": 0,
-        "y": 20,
-        "w": 24,
-        "h": 1
-      },
-      "panels": [
-        {
-          "id": 7,
-          "type": "logs",
-          "title": "All Errors \u2014 All Kamiwaza Namespaces",
-          "gridPos": {
-            "x": 0,
-            "y": 21,
-            "w": 12,
-            "h": 8
-          },
-          "datasource": {
-            "type": "loki",
-            "uid": "${loki_datasource}"
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "loki",
-                "uid": "${loki_datasource}"
-              },
-              "expr": "{namespace=~\"kamiwaza.*\"} |~ \"(?i)(error|fatal|critical|panic|exception|traceback)\"",
-              "legendFormat": ""
+    "layout": {
+      "kind": "TabsLayout",
+      "spec": {
+        "tabs": [
+          {
+            "kind": "TabsLayoutTab",
+            "spec": {
+              "title": "Explore",
+              "layout": {
+                "kind": "RowsLayout",
+                "spec": {
+                  "rows": [
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Volume",
+                        "collapse": false,
+                        "hideHeader": true,
+                        "fillScreen": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "maxColumnCount": 2,
+                            "columnWidthMode": "standard",
+                            "rowHeightMode": "standard",
+                            "fillScreen": false,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "volume"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "errors"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Stream",
+                        "collapse": false,
+                        "hideHeader": true,
+                        "fillScreen": false,
+                        "layout": {
+                          "kind": "GridLayout",
+                          "spec": {
+                            "items": [
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 24,
+                                  "height": 20,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "stream"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
             }
-          ],
-          "options": {
-            "showTime": true,
-            "showLabels": true,
-            "showCommonLabels": false,
-            "wrapLogMessage": true,
-            "prettifyLogMessage": false,
-            "enableLogDetails": true,
-            "sortOrder": "Descending",
-            "dedupStrategy": "none"
           },
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "maxDataPoints": 100
-        },
-        {
-          "id": 8,
-          "type": "logs",
-          "title": "Auth Failures (401 / 403 / unauthorized)",
-          "gridPos": {
-            "x": 12,
-            "y": 21,
-            "w": 12,
-            "h": 8
-          },
-          "datasource": {
-            "type": "loki",
-            "uid": "${loki_datasource}"
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "loki",
-                "uid": "${loki_datasource}"
-              },
-              "expr": "{namespace=~\"kamiwaza.*\"} |~ \"(?i)( 401 | 403 |status[=: \\\"]*40[13]|unauthorized|forbidden|invalid.token|authentication.failed)\"",
-              "legendFormat": ""
+          {
+            "kind": "TabsLayoutTab",
+            "spec": {
+              "title": "Diagnostics",
+              "layout": {
+                "kind": "AutoGridLayout",
+                "spec": {
+                  "maxColumnCount": 2,
+                  "columnWidthMode": "standard",
+                  "rowHeightMode": "tall",
+                  "fillScreen": false,
+                  "items": [
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "all-errors"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "auth-failures"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "elections"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "crashes"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "oom"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "operator"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
             }
-          ],
-          "options": {
-            "showTime": true,
-            "showLabels": true,
-            "showCommonLabels": false,
-            "wrapLogMessage": true,
-            "prettifyLogMessage": false,
-            "enableLogDetails": true,
-            "sortOrder": "Descending",
-            "dedupStrategy": "none"
           },
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "maxDataPoints": 100
-        },
-        {
-          "id": 9,
-          "type": "logs",
-          "title": "etcd Leader Changes & Elections",
-          "gridPos": {
-            "x": 0,
-            "y": 29,
-            "w": 12,
-            "h": 6
-          },
-          "datasource": {
-            "type": "loki",
-            "uid": "${loki_datasource}"
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "loki",
-                "uid": "${loki_datasource}"
-              },
-              "expr": "{namespace=\"kamiwaza\", container=\"etcd\"} |~ \"(?i)(became.leader|leader|election|campaign|raft)\"",
-              "legendFormat": ""
+          {
+            "kind": "TabsLayoutTab",
+            "spec": {
+              "title": "About",
+              "layout": {
+                "kind": "RowsLayout",
+                "spec": {
+                  "rows": [
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "About this dashboard",
+                        "collapse": true,
+                        "hideHeader": false,
+                        "fillScreen": false,
+                        "layout": {
+                          "kind": "GridLayout",
+                          "spec": {
+                            "items": [
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 24,
+                                  "height": 7,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "about"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
             }
-          ],
-          "options": {
-            "showTime": true,
-            "showLabels": true,
-            "showCommonLabels": false,
-            "wrapLogMessage": true,
-            "prettifyLogMessage": false,
-            "enableLogDetails": true,
-            "sortOrder": "Descending",
-            "dedupStrategy": "none"
-          },
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "maxDataPoints": 100
-        },
-        {
-          "id": 10,
-          "type": "logs",
-          "title": "Ray Worker Crashes & Fatal Errors",
-          "gridPos": {
-            "x": 12,
-            "y": 29,
-            "w": 12,
-            "h": 6
-          },
-          "datasource": {
-            "type": "loki",
-            "uid": "${loki_datasource}"
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "loki",
-                "uid": "${loki_datasource}"
-              },
-              "expr": "{namespace=\"kamiwaza\", container=~\"ray.*\"} |~ \"(?i)(fatal|crash|traceback|oom|out of memory|worker died|worker failed)\"",
-              "legendFormat": ""
-            }
-          ],
-          "options": {
-            "showTime": true,
-            "showLabels": true,
-            "showCommonLabels": false,
-            "wrapLogMessage": true,
-            "prettifyLogMessage": false,
-            "enableLogDetails": true,
-            "sortOrder": "Descending",
-            "dedupStrategy": "none"
-          },
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "maxDataPoints": 100
-        },
-        {
-          "id": 11,
-          "type": "logs",
-          "title": "OOMKill Events (Kubernetes Events)",
-          "gridPos": {
-            "x": 0,
-            "y": 35,
-            "w": 12,
-            "h": 6
-          },
-          "datasource": {
-            "type": "loki",
-            "uid": "${loki_datasource}"
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "loki",
-                "uid": "${loki_datasource}"
-              },
-              "expr": "{job=\"integrations/kubernetes/eventhandler\"} |= \"OOMKill\"",
-              "legendFormat": ""
-            }
-          ],
-          "options": {
-            "showTime": true,
-            "showLabels": true,
-            "showCommonLabels": false,
-            "wrapLogMessage": true,
-            "prettifyLogMessage": false,
-            "enableLogDetails": true,
-            "sortOrder": "Descending",
-            "dedupStrategy": "none"
-          },
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "maxDataPoints": 100
-        },
-        {
-          "id": 12,
-          "type": "logs",
-          "title": "ArgoCD Sync Failures",
-          "gridPos": {
-            "x": 12,
-            "y": 35,
-            "w": 12,
-            "h": 6
-          },
-          "datasource": {
-            "type": "loki",
-            "uid": "${loki_datasource}"
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "loki",
-                "uid": "${loki_datasource}"
-              },
-              "expr": "{namespace=\"argocd\"} |~ \"(?i)(sync.failed|error|ComparisonError|hook.failed)\"",
-              "legendFormat": ""
-            }
-          ],
-          "options": {
-            "showTime": true,
-            "showLabels": true,
-            "showCommonLabels": false,
-            "wrapLogMessage": true,
-            "prettifyLogMessage": false,
-            "enableLogDetails": true,
-            "sortOrder": "Descending",
-            "dedupStrategy": "none"
-          },
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "maxDataPoints": 100
-        }
-      ]
+          }
+        ]
+      }
     }
-  ]
+  }
 }

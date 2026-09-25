@@ -4,6 +4,7 @@ Monitoring scenarios: each folder documents a complete observability stack for K
 
 ## Stack matrix
 
-| Stack | Metrics | Logs | Dashboards | Prerequisites |
-| --- | --- | --- | --- | --- |
-| [grafana-prometheus](grafana-prometheus) | Prometheus + ServiceMonitors | Loki + Alloy | 8 Kamiwaza Grafana dashboards | Helm, kubectl |
+| Stack                                            | Metrics                                                                                                                  | Logs         | Dashboards                       | Prerequisites                               |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | ------------ | -------------------------------- | ------------------------------------------- |
+| [grafana-prometheus](grafana-prometheus)         | Prometheus scrape of platform workloads, operator conditions through kube-state-metrics, and operator controller metrics | Loki + Alloy | 8 Kamiwaza Grafana dashboards    | Helm, kubectl, an operator-managed platform |
+| [platform-observability](platform-observability) | Platform OTLP export to an approved sink                                                                                 | OTLP         | Backend-neutral dashboard intent | An operator-managed platform                |

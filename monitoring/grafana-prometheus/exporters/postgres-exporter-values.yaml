@@ -3,10 +3,20 @@
 # Install:
 #   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 #   helm upgrade --install postgres-exporter prometheus-community/prometheus-postgres-exporter \
-#     --version 6.10.0 -n kamiwaza -f exporters/postgres-exporter-values.yaml
+#     --version 8.2.0 -n kamiwaza -f exporters/postgres-exporter-values.yaml
 #
-# Prerequisite: Secret `core-postgres` in namespace `kamiwaza` with key `password`
-# (created by the Kamiwaza Deploy Helm chart).
+# The platform operator creates Secret `core-postgres` (key `password`) in the
+# platform namespace for the durable-data database. The exporter reads it by
+# reference; the value never leaves the Secret.
+#
+# The exporter connects as the database owner `core`, because the operator
+# provisions no read-only monitoring role. Create a `pg_monitor` role and point
+# `user` and `passwordSecret` at it when the owner credential must stay with
+# Core alone.
+#
+# The platform's ingress floor admits only its own callers to PostgreSQL.
+# `servicemonitors/scrape-networkpolicies.yaml` admits this exporter by its
+# `app.kubernetes.io/name: prometheus-postgres-exporter` pod label.
 
 fullnameOverride: postgres-exporter
 
@@ -25,7 +35,7 @@ serviceMonitor:
   enabled: true
   namespace: monitoring
   interval: 30s
-  scrapeTimeout: 10s
+  timeout: 10s
   labels:
     app.kubernetes.io/part-of: kamiwaza
 

@@ -1,6 +1,11 @@
-# ServiceMonitor for etcd metrics.
-# etcd is started with --listen-metrics-urls=http://0.0.0.0:8080,
-# so the etcd-metrics port on the core-etcd service is always available.
+# Scrape the platform's coordination store.
+#
+# The operator starts etcd with a plaintext metrics listener on 8080 and names
+# it `etcd-metrics` on the headless `core-etcd` Service, so every member is
+# scraped individually. Client and peer traffic stay on their mutually
+# authenticated ports; Prometheus needs no etcd credential.
+#
+# `scrape-networkpolicies.yaml` admits Prometheus to this port.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:

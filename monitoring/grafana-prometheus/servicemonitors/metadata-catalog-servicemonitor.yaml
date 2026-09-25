@@ -1,0 +1,29 @@
+# Scrape the metadata catalog's JVM exporter.
+#
+# The operator labels every catalog Service `app.kubernetes.io/name:
+# metadata-catalog`, whichever implementation serves the capability. The API
+# and web Services each publish a `jmx` port whose `/metrics` path is an
+# unauthenticated Prometheus exporter. Do not scrape the `http` port: its
+# `/metrics` path sits behind catalog authentication and answers 401.
+#
+# `scrape-networkpolicies.yaml` admits Prometheus to this port.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: metadata-catalog
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: metadata-catalog
+    app.kubernetes.io/part-of: kamiwaza
+spec:
+  namespaceSelector:
+    matchNames:
+      - kamiwaza
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: metadata-catalog
+  endpoints:
+    - port: jmx
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

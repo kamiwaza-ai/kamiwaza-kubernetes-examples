@@ -1,0 +1,33 @@
+# Scrape cert-manager for certificate expiry.
+#
+# The platform's transport and serving certificates are cert-manager
+# `Certificate` objects, so their expiry is published by the cert-manager
+# controller rather than by the platform. kam-06 reads
+# `certmanager_certificate_expiration_timestamp_seconds` from this target.
+#
+# `honorLabels` keeps each Certificate's own `namespace` label, as
+# cert-manager's chart-managed monitor does.
+#
+# If cert-manager was installed with its own chart-managed ServiceMonitor
+# (`prometheus.servicemonitor.enabled=true`), omit this file.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cert-manager
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: cert-manager
+spec:
+  namespaceSelector:
+    matchNames:
+      - cert-manager
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cert-manager
+      app.kubernetes.io/component: controller
+  endpoints:
+    - port: tcp-prometheus-servicemonitor
+      honorLabels: true
+      path: /metrics
+      interval: 60s
+      scrapeTimeout: 10s
