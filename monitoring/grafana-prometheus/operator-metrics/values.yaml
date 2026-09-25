@@ -1,0 +1,31 @@
+# Operator Helm values that publish the manager's metrics to this stack.
+#
+# Pass this file as an additional `--values` to the operator's `helm upgrade
+# --install`, after `certificate.yaml` is Ready and after kube-prometheus-stack
+# has installed the Prometheus Operator CRDs:
+#
+#   helm upgrade --install kamiwaza-platform-operator <operator chart> \
+#     --namespace kamiwaza --values <your values> \
+#     --values monitoring/grafana-prometheus/operator-metrics/values.yaml
+#
+# The chart then serves metrics on 8443 over TLS, authenticates every scrape
+# with a TokenReview and SubjectAccessReview, grants `GET /metrics` to the one
+# scraper ServiceAccount named below, and creates its own ServiceMonitor and
+# PrometheusRule. Enabling metrics authentication binds the manager to
+# cluster-scoped TokenReview and SubjectAccessReview creation, so a cluster
+# administrator must run the install.
+manager:
+  metricsBindAddress: ":8443"
+  metricsTLSSecretName: kamiwaza-platform-operator-metrics-tls
+
+rbac:
+  metricsAuthentication:
+    enabled: true
+
+monitoring:
+  enabled: true
+  # The ServiceAccount kube-prometheus-stack runs Prometheus as, for release
+  # `kube-prometheus-stack` in namespace `monitoring`.
+  scraperServiceAccount:
+    name: kube-prometheus-stack-prometheus
+    namespace: monitoring

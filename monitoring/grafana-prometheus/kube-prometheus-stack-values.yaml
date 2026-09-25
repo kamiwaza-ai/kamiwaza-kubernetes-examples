@@ -3,7 +3,8 @@
 # Install:
 #   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 #   helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-#     -n monitoring --create-namespace -f kube-prometheus-stack-values.yaml
+#   --version 91.5.2 -n monitoring --create-namespace \
+#   -f kube-prometheus-stack-values.yaml
 
 crds:
   enabled: true
@@ -60,56 +61,183 @@ grafana:
       jsonData:
         maxLines: 5000
 
-  dashboardProviders:
-    dashboardproviders.yaml:
-      apiVersion: 1
-      providers:
-        - name: default
-          orgId: 1
-          folder: Kubernetes
-          type: file
-          disableDeletion: false
-          editable: true
-          options:
-            path: /var/lib/grafana/dashboards/default
-        - name: kamiwaza
-          orgId: 1
-          folder: Kamiwaza
-          type: file
-          disableDeletion: false
-          editable: true
-          options:
-            path: /var/lib/grafana/dashboards/kamiwaza
-
-  # Community dashboards from grafana.com.
-  dashboards:
-    default:
-      node-exporter-full:
-        gnetId: 1860
-        revision: 37
-        datasource: Prometheus
-      k8s-cluster-overview:
-        gnetId: 7249
-        revision: 1
-        datasource: Prometheus
-      pvc-usage:
-        gnetId: 13646
-        revision: 2
-        datasource: Prometheus
-
 nodeExporter:
   enabled: true
 
 kubeStateMetrics:
   enabled: true
+
+# The platform operator reports every outcome on its custom resources rather
+# than through a metrics endpoint of its own: each platform capability, served
+# model, extension, and sandbox pool carries standard conditions. Custom
+# resource state turns those conditions into series, so the dashboards show
+# what the operator decided rather than inferring it from pods.
+#
+# Each metric carries `namespace` and `name`. Reasons are the operator's stable
+# CamelCase condition reasons, so label cardinality stays bounded. Messages are
+# free text and are never exported.
 kube-state-metrics:
+  # Pod labels the dashboards group resource usage by: the platform workload,
+  # the served model, and the extension each pod belongs to. The operator sets
+  # all three on the pods it renders.
   metricLabelsAllowlist:
-    - configmaps=[kamiwaza.io/template-name,kamiwaza.io/template-version]
+    - pods=[app.kubernetes.io/name,serving.kamiwaza.ai/deployment-name,kamiwaza.ai/extension]
+  rbac:
+    extraRules:
+      - apiGroups: [platform.kamiwaza.ai]
+        resources: [kamiwazaplatforms]
+        verbs: [list, watch]
+      - apiGroups: [serving.kamiwaza.ai]
+        resources: [modeldeployments]
+        verbs: [list, watch]
+      - apiGroups: [extensions.kamiwaza.ai]
+        resources: [extensions, sandboxpools]
+        verbs: [list, watch]
+  customResourceState:
+    enabled: true
+    config:
+      kind: CustomResourceStateMetrics
+      spec:
+        resources:
+          - groupVersionKind:
+              group: platform.kamiwaza.ai
+              version: v1alpha1
+              kind: KamiwazaPlatform
+            metricNamePrefix: kamiwaza_platform
+            labelsFromPath:
+              namespace: [metadata, namespace]
+              name: [metadata, name]
+            metrics:
+              - name: condition
+                help: Platform condition status (1 = True) by type and reason.
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, conditions]
+                    labelsFromPath:
+                      type: [type]
+                      reason: [reason]
+                    valueFrom: [status]
+              - name: component_state
+                help: Current state of each platform capability (1 = active state).
+                each:
+                  type: StateSet
+                  stateSet:
+                    path: [status, components]
+                    labelsFromPath:
+                      component: [name]
+                    labelName: state
+                    valueFrom: [state]
+                    list: [Progressing, Ready, Blocked, DisabledByPlan, ExternalReady]
+              - name: component_reason
+                help: Stable reason each platform capability reports for its state.
+                each:
+                  type: Info
+                  info:
+                    path: [status, components]
+                    labelsFromPath:
+                      component: [name]
+                      reason: [reason]
+              - name: version_info
+                help: Desired and current platform release and the reconciling operator version.
+                each:
+                  type: Info
+                  info:
+                    labelsFromPath:
+                      desired_version: [status, desiredVersion]
+                      current_version: [status, currentVersion]
+                      operator_version: [status, operatorVersion]
+          - groupVersionKind:
+              group: serving.kamiwaza.ai
+              version: v1alpha1
+              kind: ModelDeployment
+            metricNamePrefix: kamiwaza_model_deployment
+            labelsFromPath:
+              namespace: [metadata, namespace]
+              name: [metadata, name]
+            metrics:
+              - name: condition
+                help: Model deployment condition status (1 = True) by type and reason.
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, conditions]
+                    labelsFromPath:
+                      type: [type]
+                      reason: [reason]
+                    valueFrom: [status]
+              - name: ready_replicas
+                help: Serving replicas that are ready.
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, readyReplicas]
+                    nilIsZero: true
+              - name: desired_replicas
+                help: Serving replicas the deployment asks for.
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, desiredReplicas]
+                    nilIsZero: true
+          - groupVersionKind:
+              group: extensions.kamiwaza.ai
+              version: v1alpha1
+              kind: Extension
+            metricNamePrefix: kamiwaza_extension
+            labelsFromPath:
+              namespace: [metadata, namespace]
+              name: [metadata, name]
+            metrics:
+              - name: condition
+                help: Extension condition status (1 = True) by type and reason.
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, conditions]
+                    labelsFromPath:
+                      type: [type]
+                      reason: [reason]
+                    valueFrom: [status]
+              - name: info
+                help: Requested extension state and type.
+                each:
+                  type: Info
+                  info:
+                    labelsFromPath:
+                      state: [spec, state]
+                      extension_type: [spec, type]
+          - groupVersionKind:
+              group: extensions.kamiwaza.ai
+              version: v1alpha1
+              kind: SandboxPool
+            metricNamePrefix: kamiwaza_sandbox_pool
+            labelsFromPath:
+              namespace: [metadata, namespace]
+              name: [metadata, name]
+            metrics:
+              - name: condition
+                help: Sandbox pool condition status (1 = True) by type and reason.
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, conditions]
+                    labelsFromPath:
+                      type: [type]
+                      reason: [reason]
+                    valueFrom: [status]
+              - name: ready_replicas
+                help: Warm sandboxes that are ready.
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, readyReplicas]
+                    nilIsZero: true
 
 kubelet:
   enabled: true
 
-# Not exposed on most lightweight distributions (k3s, k0s). Enable if your
+# Not exposed on most lightweight distributions (kind, k3s, k0s). Enable if your
 # cluster exposes these control-plane endpoints.
 kubeControllerManager:
   enabled: false

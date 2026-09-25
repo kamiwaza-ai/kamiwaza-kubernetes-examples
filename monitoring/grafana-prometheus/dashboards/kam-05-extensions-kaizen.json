@@ -1,11 +1,7 @@
 {
   "uid": "kam-05",
-  "title": "Extensions",
-  "tags": [
-    "kamiwaza",
-    "extensions",
-    "argocd"
-  ],
+  "title": "Extensions & Platform Operator",
+  "tags": ["kamiwaza"],
   "schemaVersion": 38,
   "version": 2,
   "editable": false,
@@ -13,7 +9,7 @@
   "weekStart": "",
   "refresh": "30s",
   "time": {
-    "from": "now-3h",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
@@ -21,34 +17,48 @@
   "graphTooltip": 1,
   "links": [
     {
-      "title": "\u2190 Platform Overview",
+      "title": "Platform Overview",
       "url": "/d/kam-01",
       "type": "link",
       "targetBlank": false
     },
     {
-      "title": "Log Explorer",
+      "title": "Inference & Compute",
+      "url": "/d/kam-02",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Application API",
+      "url": "/d/kam-03",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Data Infrastructure",
+      "url": "/d/kam-04",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Auth",
+      "url": "/d/kam-06",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "K8s Events",
+      "url": "/d/kam-07",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Logs",
       "url": "/d/kam-08",
       "type": "link",
       "targetBlank": false
     }
   ],
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      }
-    ]
-  },
   "templating": {
     "list": [
       {
@@ -72,610 +82,48 @@
         "refresh": 1
       },
       {
-        "name": "extension",
+        "name": "namespace",
         "type": "query",
+        "label": "Platform namespace",
+        "hide": 0,
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
+        "definition": "label_values(kamiwaza_platform_condition, namespace)",
         "query": {
-          "query": "label_values(kube_pod_info{namespace=~\"kamiwaza-extensions|kamiwaza-sandboxes\"}, pod)",
-          "refId": "StandardVariableQuery"
+          "query": "label_values(kamiwaza_platform_condition, namespace)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
-        "includeAll": true,
-        "allValue": ".*",
-        "multi": true,
         "refresh": 2,
-        "sort": 1,
-        "hide": 0,
-        "label": "Extension Pod"
+        "current": {},
+        "multi": false,
+        "includeAll": false,
+        "sort": 1
       }
     ]
   },
+  "annotations": {
+    "list": []
+  },
   "panels": [
-    {
-      "id": 20,
-      "type": "row",
-      "title": "ArgoCD Extension Status",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      }
-    },
-    {
-      "id": 21,
-      "type": "table",
-      "title": "ArgoCD Sync Status",
-      "description": "Live ArgoCD sync and health status for CMP-managed extensions.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 14,
-        "x": 0,
-        "y": 1
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "left"
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Value"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Time"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "name"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Extension"
-              },
-              {
-                "id": "custom.width",
-                "value": 200
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "sync_status"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Sync"
-              },
-              {
-                "id": "custom.width",
-                "value": 100
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-background",
-                  "mode": "basic"
-                }
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "Synced": {
-                        "text": "Synced",
-                        "color": "green"
-                      },
-                      "OutOfSync": {
-                        "text": "OutOfSync",
-                        "color": "yellow"
-                      },
-                      "Unknown": {
-                        "text": "Unknown",
-                        "color": "orange"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "health_status"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Health"
-              },
-              {
-                "id": "custom.width",
-                "value": 100
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-background",
-                  "mode": "basic"
-                }
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "Healthy": {
-                        "text": "Healthy",
-                        "color": "green"
-                      },
-                      "Degraded": {
-                        "text": "Degraded",
-                        "color": "red"
-                      },
-                      "Progressing": {
-                        "text": "Progressing",
-                        "color": "yellow"
-                      },
-                      "Missing": {
-                        "text": "Missing",
-                        "color": "orange"
-                      },
-                      "Suspended": {
-                        "text": "Suspended",
-                        "color": "purple"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "repo"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Repository"
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "showHeader": true,
-        "sortBy": [
-          {
-            "displayName": "Extension",
-            "desc": false
-          }
-        ]
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "argocd_app_info{project=\"kamiwaza-extensions\"}",
-          "format": "table",
-          "instant": true
-        }
-      ],
-      "transformations": [
-        {
-          "id": "filterFieldsByName",
-          "options": {
-            "include": {
-              "names": [
-                "name",
-                "sync_status",
-                "health_status",
-                "repo"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "id": 26,
-      "type": "table",
-      "title": "Catalog Versions",
-      "description": "Current version from garden ConfigMap template-version label. Updates when the CMP resolves a new version from the upstream repo.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 10,
-        "x": 14,
-        "y": 1
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "left"
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Value"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Time"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "label_kamiwaza_io_template_name"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Extension"
-              },
-              {
-                "id": "custom.width",
-                "value": 180
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "label_kamiwaza_io_template_version"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Version"
-              },
-              {
-                "id": "custom.width",
-                "value": 100
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "showHeader": true,
-        "sortBy": [
-          {
-            "displayName": "Extension",
-            "desc": false
-          }
-        ]
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "kube_configmap_labels{namespace=\"kamiwaza-extensions\", label_kamiwaza_io_template_name!=\"\"}",
-          "format": "table",
-          "instant": true
-        }
-      ],
-      "transformations": [
-        {
-          "id": "filterFieldsByName",
-          "options": {
-            "include": {
-              "names": [
-                "label_kamiwaza_io_template_name",
-                "label_kamiwaza_io_template_version"
-              ]
-            }
-          }
-        },
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "label_kamiwaza_io_template_name": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "label_kamiwaza_io_template_version": {
-                "aggregations": [],
-                "operation": "groupby"
-              }
-            }
-          }
-        }
-      ]
-    },
-    {
-      "id": 22,
-      "type": "stat",
-      "title": "Managed Extensions",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 0,
-        "y": 8
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "colorMode": "value",
-        "graphMode": "none"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "steps": [
-              {
-                "value": null,
-                "color": "blue"
-              }
-            ]
-          }
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "count(argocd_app_info{project=\"kamiwaza-extensions\"})",
-          "instant": true
-        }
-      ]
-    },
-    {
-      "id": 23,
-      "type": "stat",
-      "title": "Syncs (24h)",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 4,
-        "y": 8
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "colorMode": "value",
-        "graphMode": "none"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "steps": [
-              {
-                "value": null,
-                "color": "green"
-              },
-              {
-                "value": 10,
-                "color": "yellow"
-              },
-              {
-                "value": 50,
-                "color": "red"
-              }
-            ]
-          }
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(increase(argocd_app_sync_total{project=\"kamiwaza-extensions\", phase=\"Succeeded\"}[24h]))",
-          "instant": true
-        }
-      ]
-    },
-    {
-      "id": 24,
-      "type": "stat",
-      "title": "Failed Syncs (24h)",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 8
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "colorMode": "value",
-        "graphMode": "none"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "steps": [
-              {
-                "value": null,
-                "color": "green"
-              },
-              {
-                "value": 1,
-                "color": "red"
-              }
-            ]
-          }
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(increase(argocd_app_sync_total{project=\"kamiwaza-extensions\", phase=\"Failed\"}[24h])) or vector(0)",
-          "instant": true
-        }
-      ]
-    },
-    {
-      "id": 25,
-      "type": "timeseries",
-      "title": "Extension Sync Events",
-      "description": "Successful sync operations per extension. Each bump indicates an ArgoCD sync (upgrade, config change, or reconciliation).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "points",
-            "pointSize": 8,
-            "spanNulls": false,
-            "showPoints": "always",
-            "lineWidth": 1,
-            "fillOpacity": 0
-          },
-          "color": {
-            "mode": "palette-classic"
-          }
-        }
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "increase(argocd_app_sync_total{project=\"kamiwaza-extensions\", phase=\"Succeeded\"}[$__rate_interval])",
-          "legendFormat": "{{name}}"
-        }
-      ]
-    },
     {
       "id": 1,
       "type": "row",
-      "title": "Extension Operator",
+      "title": "Extensions",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 15,
+        "y": 0,
         "w": 24,
         "h": 1
-      }
+      },
+      "panels": []
     },
     {
-      "id": 2,
       "type": "stat",
-      "title": "Extension Operator Ready",
-      "gridPos": {
-        "x": 0,
-        "y": 16,
-        "w": 6,
-        "h": 3
-      },
+      "title": "Extensions Ready",
+      "description": "Extensions whose Ready condition is True",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -687,21 +135,22 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "kube_deployment_status_replicas_ready{namespace=\"kamiwaza-system\", deployment=\"extension-operator\"}",
-          "instant": true,
-          "legendFormat": "ready"
+          "expr": "count(kamiwaza_extension_condition{namespace=\"$namespace\", type=\"Ready\"} == 1) or vector(0)",
+          "legendFormat": "",
+          "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "values": false,
+          "calcs": ["lastNotNull"],
           "fields": ""
         },
+        "orientation": "auto",
+        "textMode": "auto",
         "colorMode": "background",
         "graphMode": "none",
-        "textMode": "auto"
+        "justifyMode": "auto"
       },
       "fieldConfig": {
         "defaults": {
@@ -712,61 +161,26 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
-                "value": null
-              },
-              {
                 "color": "green",
-                "value": 1
+                "value": null
               }
             ]
-          },
-          "mappings": [
-            {
-              "type": "range",
-              "options": {
-                "from": 1,
-                "to": 999,
-                "result": {
-                  "text": "UP",
-                  "color": "green"
-                }
-              }
-            },
-            {
-              "type": "special",
-              "options": {
-                "match": "null+nan",
-                "result": {
-                  "text": "DOWN",
-                  "color": "red"
-                }
-              }
-            },
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "DOWN",
-                  "color": "red"
-                }
-              }
-            }
-          ],
-          "noValue": "DOWN"
-        }
+          }
+        },
+        "overrides": []
+      },
+      "id": 2,
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 6,
+        "h": 4
       }
     },
     {
-      "id": 3,
       "type": "stat",
-      "title": "Operator Restarts (1h)",
-      "gridPos": {
-        "x": 6,
-        "y": 16,
-        "w": 6,
-        "h": 3
-      },
+      "title": "Extensions Not Ready",
+      "description": "Extensions whose Ready condition is False",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -778,25 +192,146 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(kube_pod_container_status_restarts_total{namespace=\"kamiwaza-system\", pod=~\"extension-operator.*\"}[1h])",
+          "expr": "count(kamiwaza_extension_condition{namespace=\"$namespace\", type=\"Ready\"} == 0) or vector(0)",
+          "legendFormat": "",
           "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
         },
+        "orientation": "auto",
+        "textMode": "auto",
         "colorMode": "background",
-        "graphMode": "none"
+        "graphMode": "none",
+        "justifyMode": "auto"
       },
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
-          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "id": 3,
+      "gridPos": {
+        "x": 6,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Sandbox Pools Ready",
+      "description": "Warm sandboxes ready across SandboxPools",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(kamiwaza_sandbox_pool_ready_replicas{namespace=\"$namespace\"}) or vector(0)",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "id": 4,
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Extension Restarts (1h)",
+      "description": "Container restarts in extension pods over the last hour",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "round(sum(increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\"}[1h]) * on (namespace, pod) group_left () max by (namespace, pod) (kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension!=\"\"}))) or vector(0)",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -807,26 +342,24 @@
               {
                 "color": "orange",
                 "value": 1
-              },
-              {
-                "color": "red",
-                "value": 3
               }
             ]
           }
-        }
+        },
+        "overrides": []
+      },
+      "id": 5,
+      "gridPos": {
+        "x": 18,
+        "y": 1,
+        "w": 6,
+        "h": 4
       }
     },
     {
-      "id": 4,
-      "type": "timeseries",
-      "title": "Extension Operator CPU",
-      "gridPos": {
-        "x": 12,
-        "y": 16,
-        "w": 6,
-        "h": 7
-      },
+      "type": "table",
+      "title": "Extension Conditions",
+      "description": "Every condition the operator reports on each Extension",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -838,8 +371,133 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"kamiwaza-system\", pod=~\"extension-operator.*\", container!=\"\"}[5m]))",
-          "legendFormat": "CPU"
+          "expr": "kamiwaza_extension_condition{namespace=\"$namespace\"}",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": ["name", "type", "Value", "reason"]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "name": 0,
+              "type": 1,
+              "Value": 2,
+              "reason": 3
+            },
+            "renameByName": {
+              "name": "Extension",
+              "type": "Condition",
+              "Value": "Status",
+              "reason": "Reason"
+            }
+          }
+        }
+      ],
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Extension",
+            "desc": false
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "displayMode": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "False"
+                      },
+                      "1": {
+                        "text": "True"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "id": 6,
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Extension CPU",
+      "description": "CPU cores used by each extension's pods",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (label_kamiwaza_ai_extension) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container!=\"\"}[5m]) * on (namespace, pod) group_left (label_kamiwaza_ai_extension) max by (namespace, pod, label_kamiwaza_ai_extension) (kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension!=\"\"}))",
+          "legendFormat": "{{label_kamiwaza_ai_extension}}"
         }
       ],
       "options": {
@@ -850,10 +508,7 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
+          "calcs": []
         }
       },
       "fieldConfig": {
@@ -862,6 +517,7 @@
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "fillOpacity": 10,
+            "gradientMode": "none",
             "spanNulls": false,
             "showPoints": "never",
             "drawStyle": "line"
@@ -869,20 +525,22 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "cores"
-        }
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "id": 7,
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 12,
+        "h": 8
       }
     },
     {
-      "id": 16,
       "type": "timeseries",
-      "title": "Extension Operator Memory",
-      "gridPos": {
-        "x": 18,
-        "y": 16,
-        "w": 6,
-        "h": 7
-      },
+      "title": "Extension Memory",
+      "description": "Working-set memory of each extension's pods",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -894,8 +552,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(container_memory_working_set_bytes{namespace=\"kamiwaza-system\", pod=~\"extension-operator.*\", container!=\"\"})",
-          "legendFormat": "Memory"
+          "expr": "sum by (label_kamiwaza_ai_extension) (container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\"} * on (namespace, pod) group_left (label_kamiwaza_ai_extension) max by (namespace, pod, label_kamiwaza_ai_extension) (kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension!=\"\"}))",
+          "legendFormat": "{{label_kamiwaza_ai_extension}}"
         }
       ],
       "options": {
@@ -906,10 +564,7 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
+          "calcs": []
         }
       },
       "fieldConfig": {
@@ -918,6 +573,7 @@
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "fillOpacity": 10,
+            "gradientMode": "none",
             "spanNulls": false,
             "showPoints": "never",
             "drawStyle": "line"
@@ -926,208 +582,34 @@
             "mode": "palette-classic"
           },
           "unit": "bytes"
-        }
-      }
-    },
-    {
-      "id": 5,
-      "type": "row",
-      "title": "Extension & Sandbox Pods",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 23,
-        "w": 24,
-        "h": 1
-      }
-    },
-    {
-      "id": 6,
-      "type": "stat",
-      "title": "Extension Pods Running",
-      "description": "Running pods in the kamiwaza-extensions namespace",
-      "gridPos": {
-        "x": 0,
-        "y": 24,
-        "w": 6,
-        "h": 3
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "count(kube_pod_status_phase{namespace=\"kamiwaza-extensions\", phase=\"Running\"} == 1) or vector(0)",
-          "instant": true
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
         },
-        "colorMode": "background",
-        "graphMode": "none"
+        "overrides": []
       },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "orange",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        }
-      }
-    },
-    {
-      "id": 7,
-      "type": "stat",
-      "title": "Extension Pods Not Running",
-      "gridPos": {
-        "x": 6,
-        "y": 24,
-        "w": 6,
-        "h": 3
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "count(kube_pod_status_phase{namespace=\"kamiwaza-extensions\", phase=~\"Pending|Failed|Unknown\"} == 1) or vector(0)",
-          "instant": true
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "colorMode": "background",
-        "graphMode": "none"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "0 (OK)",
-                  "color": "green"
-                }
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
       "id": 8,
-      "type": "stat",
-      "title": "Sandbox Pods (Active)",
-      "description": "Pods running in the kamiwaza-sandboxes namespace (agent runtimes)",
       "gridPos": {
         "x": 12,
-        "y": 24,
-        "w": 6,
-        "h": 3
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "count(kube_pod_status_phase{namespace=\"kamiwaza-sandboxes\", phase=\"Running\"} == 1) or vector(0)",
-          "instant": true
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "colorMode": "background",
-        "graphMode": "none"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        }
+        "y": 13,
+        "w": 12,
+        "h": 8
       }
     },
     {
       "id": 9,
-      "type": "stat",
-      "title": "Extension Restarts (1h)",
+      "type": "row",
+      "title": "Platform Operator",
+      "collapsed": false,
       "gridPos": {
-        "x": 18,
-        "y": 24,
-        "w": 6,
-        "h": 3
+        "x": 0,
+        "y": 21,
+        "w": 24,
+        "h": 1
       },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Operator Replicas Ready",
+      "description": "Ready manager replicas in any namespace",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1139,25 +621,165 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=~\"kamiwaza-extensions|kamiwaza-sandboxes\"}[1h])) or vector(0)",
+          "expr": "sum(kube_deployment_status_replicas_ready{deployment=\"kamiwaza-platform-operator\"}) or vector(0)",
+          "legendFormat": "",
           "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
         },
+        "orientation": "auto",
+        "textMode": "auto",
         "colorMode": "background",
-        "graphMode": "none"
+        "graphMode": "none",
+        "justifyMode": "auto"
       },
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
-          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "id": 10,
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 6,
+        "h": 4
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Leader Elected",
+      "description": "A manager replica holds the leader lease (requires operator metrics)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max(leader_election_master_status{name=~\"kamiwaza-platform-operator.*\"}) or vector(0)",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "NO LEADER",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "LEADER",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "id": 11,
+      "gridPos": {
+        "x": 6,
+        "y": 22,
+        "w": 6,
+        "h": 4
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Blocked Platforms",
+      "description": "Platform roots reporting a blocked condition (requires operator metrics)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max(kamiwaza_operator_blocked_platforms) or vector(0)",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1166,28 +788,26 @@
                 "value": null
               },
               {
-                "color": "orange",
-                "value": 1
-              },
-              {
                 "color": "red",
-                "value": 5
+                "value": 1
               }
             ]
           }
-        }
+        },
+        "overrides": []
+      },
+      "id": 12,
+      "gridPos": {
+        "x": 12,
+        "y": 22,
+        "w": 6,
+        "h": 4
       }
     },
     {
-      "id": 10,
-      "type": "timeseries",
-      "title": "Extension Namespace CPU Usage",
-      "gridPos": {
-        "x": 0,
-        "y": 27,
-        "w": 12,
-        "h": 8
-      },
+      "type": "stat",
+      "title": "Soonest CA Expiry",
+      "description": "Days until the earliest platform certificate authority expires (requires operator metrics)",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1199,8 +819,74 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"kamiwaza-extensions|kamiwaza-sandboxes\", pod=~\"$extension\", container!=\"\"}[5m])) by (namespace, pod)",
-          "legendFormat": "{{namespace}} / {{pod}}"
+          "expr": "min(kamiwaza_operator_certificate_authority_expiry_timestamp_seconds - time()) / 86400",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 14
+              },
+              {
+                "color": "green",
+                "value": 30
+              }
+            ]
+          },
+          "unit": "d"
+        },
+        "overrides": []
+      },
+      "id": 13,
+      "gridPos": {
+        "x": 18,
+        "y": 22,
+        "w": 6,
+        "h": 4
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Reconciliations by Result",
+      "description": "Reconcile passes per second by controller and result (requires operator metrics)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (controller, result) (rate(kamiwaza_operator_reconciliations_total[5m]))",
+          "legendFormat": "{{controller}} {{result}}"
         }
       ],
       "options": {
@@ -1209,12 +895,9 @@
           "sort": "desc"
         },
         "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "mean",
-            "max"
-          ]
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
         }
       },
       "fieldConfig": {
@@ -1223,6 +906,7 @@
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "fillOpacity": 10,
+            "gradientMode": "none",
             "spanNulls": false,
             "showPoints": "never",
             "drawStyle": "line"
@@ -1230,20 +914,22 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "cores"
-        }
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "id": 14,
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 8,
+        "h": 8
       }
     },
     {
-      "id": 11,
       "type": "timeseries",
-      "title": "Extension Namespace Memory Usage",
-      "gridPos": {
-        "x": 12,
-        "y": 27,
-        "w": 12,
-        "h": 8
-      },
+      "title": "Reconcile Duration (p95)",
+      "description": "95th percentile reconcile duration by controller (requires operator metrics)",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1255,8 +941,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(container_memory_working_set_bytes{namespace=~\"kamiwaza-extensions|kamiwaza-sandboxes\", pod=~\"$extension\", container!=\"\"}) by (namespace, pod)",
-          "legendFormat": "{{namespace}} / {{pod}}"
+          "expr": "histogram_quantile(0.95, sum by (le, controller) (rate(kamiwaza_operator_reconcile_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{controller}}"
         }
       ],
       "options": {
@@ -1265,12 +951,9 @@
           "sort": "desc"
         },
         "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "mean",
-            "max"
-          ]
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
         }
       },
       "fieldConfig": {
@@ -1279,6 +962,175 @@
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "id": 15,
+      "gridPos": {
+        "x": 8,
+        "y": 26,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Condition Transitions",
+      "description": "Condition changes per second by controller, condition, and reason (requires operator metrics)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (controller, condition, reason) (rate(kamiwaza_operator_condition_transitions_total[5m])) > 0",
+          "legendFormat": "{{controller}} {{condition}} {{reason}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "id": 16,
+      "gridPos": {
+        "x": 16,
+        "y": 26,
+        "w": 8,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Manager CPU",
+      "description": "CPU cores used by manager replicas",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{pod=~\"kamiwaza-platform-operator-.*\", container=\"manager\"}[5m]))",
+          "legendFormat": "{{pod}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "id": 17,
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 12,
+        "h": 7
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Manager Memory",
+      "description": "Working-set memory of manager replicas",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (pod) (container_memory_working_set_bytes{pod=~\"kamiwaza-platform-operator-.*\", container=\"manager\"})",
+          "legendFormat": "{{pod}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
             "spanNulls": false,
             "showPoints": "never",
             "drawStyle": "line"
@@ -1287,141 +1139,113 @@
             "mode": "palette-classic"
           },
           "unit": "bytes"
-        }
+        },
+        "overrides": []
+      },
+      "id": 18,
+      "gridPos": {
+        "x": 12,
+        "y": 34,
+        "w": 12,
+        "h": 7
       }
     },
     {
-      "id": 12,
+      "id": 19,
       "type": "row",
-      "title": "Extension Logs",
-      "collapsed": true,
+      "title": "Logs",
+      "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 35,
+        "y": 41,
         "w": 24,
         "h": 1
       },
-      "panels": [
+      "panels": []
+    },
+    {
+      "type": "logs",
+      "title": "Operator Logs (ERROR / WARNING)",
+      "description": "Manager log lines at error or warning level",
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki_datasource}"
+      },
+      "targets": [
         {
-          "id": 13,
-          "type": "logs",
-          "title": "Extension Operator Logs (ERROR / WARNING)",
-          "gridPos": {
-            "x": 0,
-            "y": 36,
-            "w": 12,
-            "h": 8
-          },
+          "refId": "A",
           "datasource": {
             "type": "loki",
             "uid": "${loki_datasource}"
           },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "loki",
-                "uid": "${loki_datasource}"
-              },
-              "expr": "{namespace=\"kamiwaza-system\", container=\"manager\"} |~ \"(?i)(error|warning|fail)\""
-            }
-          ],
-          "options": {
-            "showTime": true,
-            "showLabels": true,
-            "showCommonLabels": false,
-            "wrapLogMessage": true,
-            "prettifyLogMessage": false,
-            "enableLogDetails": true,
-            "sortOrder": "Descending",
-            "dedupStrategy": "none"
-          },
-          "fieldConfig": {
-            "defaults": {}
-          },
-          "maxDataPoints": 100
-        },
-        {
-          "id": 14,
-          "type": "logs",
-          "title": "Extension Logs \u2014 $extension",
-          "description": "Error/warning logs from extension pods. Use the Extension Pod variable above to filter.",
-          "gridPos": {
-            "x": 12,
-            "y": 36,
-            "w": 12,
-            "h": 8
-          },
-          "datasource": {
-            "type": "loki",
-            "uid": "${loki_datasource}"
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "loki",
-                "uid": "${loki_datasource}"
-              },
-              "expr": "{namespace=~\"kamiwaza-extensions|kamiwaza-sandboxes\", pod=~\"$extension\"} |~ \"(?i)(error|warning|fail|exception|traceback)\""
-            }
-          ],
-          "options": {
-            "showTime": true,
-            "showLabels": true,
-            "showCommonLabels": false,
-            "wrapLogMessage": true,
-            "prettifyLogMessage": false,
-            "enableLogDetails": true,
-            "sortOrder": "Descending",
-            "dedupStrategy": "none"
-          },
-          "fieldConfig": {
-            "defaults": {}
-          },
-          "maxDataPoints": 100
-        },
-        {
-          "id": 15,
-          "type": "logs",
-          "title": "Extension Logs \u2014 All (unfiltered)",
-          "description": "All logs from extension and sandbox namespaces. High volume \u2014 check time range if slow.",
-          "gridPos": {
-            "x": 0,
-            "y": 44,
-            "w": 24,
-            "h": 8
-          },
-          "maxDataPoints": 100,
-          "datasource": {
-            "type": "loki",
-            "uid": "${loki_datasource}"
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "loki",
-                "uid": "${loki_datasource}"
-              },
-              "expr": "{namespace=~\"kamiwaza-extensions|kamiwaza-sandboxes\"}"
-            }
-          ],
-          "options": {
-            "showTime": true,
-            "showLabels": true,
-            "showCommonLabels": false,
-            "wrapLogMessage": true,
-            "prettifyLogMessage": false,
-            "enableLogDetails": true,
-            "sortOrder": "Descending",
-            "dedupStrategy": "none"
-          },
-          "fieldConfig": {
-            "defaults": {}
-          }
+          "expr": "{app=\"kamiwaza-platform-operator\"} |~ \"(?i)(\\\"level\\\":\\\"(error|warn)|error|fail)\"",
+          "legendFormat": ""
         }
-      ]
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "maxDataPoints": 100,
+      "id": 20,
+      "gridPos": {
+        "x": 0,
+        "y": 42,
+        "w": 12,
+        "h": 10
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Extension Logs (ERROR / WARNING)",
+      "description": "Error and warning lines from extension pods",
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki_datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "expr": "{namespace=\"$namespace\", extension=~\".+\"} |~ \"(?i)(error|warning|fail|exception|traceback)\"",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "maxDataPoints": 100,
+      "id": 21,
+      "gridPos": {
+        "x": 12,
+        "y": 42,
+        "w": 12,
+        "h": 10
+      }
     }
   ]
 }

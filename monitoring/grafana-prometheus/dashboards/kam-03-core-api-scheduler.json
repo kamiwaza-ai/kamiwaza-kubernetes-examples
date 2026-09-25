@@ -1,13 +1,9 @@
 {
   "uid": "kam-03",
-  "title": "Core API & Scheduler",
-  "tags": [
-    "kamiwaza",
-    "api",
-    "scheduler"
-  ],
+  "title": "Application API & Web Interface",
+  "tags": ["kamiwaza"],
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "editable": false,
   "fiscalYearStartMonth": 0,
   "weekStart": "",
@@ -21,40 +17,48 @@
   "graphTooltip": 1,
   "links": [
     {
-      "title": "\u2190 Platform Overview",
+      "title": "Platform Overview",
       "url": "/d/kam-01",
       "type": "link",
       "targetBlank": false
     },
     {
-      "title": "Inference & Ray (cluster detail)",
+      "title": "Inference & Compute",
       "url": "/d/kam-02",
       "type": "link",
       "targetBlank": false
     },
     {
-      "title": "Log Explorer",
+      "title": "Data Infrastructure",
+      "url": "/d/kam-04",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Extensions & Operator",
+      "url": "/d/kam-05",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Auth",
+      "url": "/d/kam-06",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "K8s Events",
+      "url": "/d/kam-07",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Logs",
       "url": "/d/kam-08",
       "type": "link",
       "targetBlank": false
     }
   ],
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      }
-    ]
-  },
   "templating": {
     "list": [
       {
@@ -76,14 +80,37 @@
         "label": "Loki",
         "multi": false,
         "refresh": 1
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "label": "Platform namespace",
+        "hide": 0,
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kamiwaza_platform_condition, namespace)",
+        "query": {
+          "query": "label_values(kamiwaza_platform_condition, namespace)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "current": {},
+        "multi": false,
+        "includeAll": false,
+        "sort": 1
       }
     ]
+  },
+  "annotations": {
+    "list": []
   },
   "panels": [
     {
       "id": 1,
       "type": "row",
-      "title": "API Health (Ray Serve)",
+      "title": "Capabilities",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -94,16 +121,125 @@
       "panels": []
     },
     {
+      "type": "table",
+      "title": "Application Capabilities",
+      "description": "Capabilities served by the application workloads",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(kamiwaza_platform_component_state{namespace=\"$namespace\", component=~\"applicationAPI|webInterface|protocolDataPlane|relationshipStore\"} == 1) * on (namespace, name, component) group_left (reason) kamiwaza_platform_component_reason{namespace=\"$namespace\"}",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": ["component", "state", "reason"]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "component": 0,
+              "state": 1,
+              "reason": 2
+            },
+            "renameByName": {
+              "component": "Capability",
+              "state": "State",
+              "reason": "Reason"
+            }
+          }
+        }
+      ],
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Capability",
+            "desc": false
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "displayMode": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "State"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Ready": {
+                        "color": "green"
+                      },
+                      "ExternalReady": {
+                        "color": "green"
+                      },
+                      "DisabledByPlan": {
+                        "color": "text"
+                      },
+                      "Progressing": {
+                        "color": "orange"
+                      },
+                      "Blocked": {
+                        "color": "red"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          }
+        ]
+      },
       "id": 2,
-      "type": "timeseries",
-      "title": "Request Rate by Deployment (RPS)",
-      "description": "API-level request throughput. For Ray cluster internals see Inference & Ray dashboard.",
       "gridPos": {
         "x": 0,
         "y": 1,
-        "w": 8,
+        "w": 12,
         "h": 8
-      },
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Core API Ready",
+      "description": "Ready core-api replicas",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -115,109 +251,56 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(ray_serve_deployment_request_counter_requests_total[5m])) by (deployment_name)",
-          "legendFormat": "{{deployment_name}}"
+          "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"core-api\"}) or vector(0)",
+          "legendFormat": "",
+          "instant": true
         }
       ],
       "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
         },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": [
-            "mean"
-          ]
-        }
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "drawStyle": "line"
-          },
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
-          "unit": "reqps"
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
         },
         "overrides": []
-      }
-    },
-    {
+      },
       "id": 3,
-      "type": "timeseries",
-      "title": "Error Rate by Deployment",
       "gridPos": {
-        "x": 8,
+        "x": 12,
         "y": 1,
-        "w": 8,
-        "h": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(rate(ray_serve_deployment_error_counter_requests_total[5m])) by (deployment_name)",
-          "legendFormat": "{{deployment_name}}"
-        }
-      ],
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": [
-            "mean"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "drawStyle": "line"
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "ops"
-        },
-        "overrides": []
+        "w": 6,
+        "h": 4
       }
     },
     {
-      "id": 4,
-      "type": "timeseries",
-      "title": "In-flight Serve Requests",
-      "gridPos": {
-        "x": 16,
-        "y": 1,
-        "w": 8,
-        "h": 8
-      },
+      "type": "stat",
+      "title": "Retrieval Streamer Ready",
+      "description": "Ready core-retrieval-streamer replicas",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -229,8 +312,204 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(ray_serve_num_ongoing_requests) by (deployment_name)",
-          "legendFormat": "{{deployment_name}}"
+          "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"core-retrieval-streamer\"}) or vector(0)",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "id": 4,
+      "gridPos": {
+        "x": 18,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Protocol Data Plane Ready",
+      "description": "Ready kamiwaza-dataplane replicas",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"kamiwaza-dataplane\"}) or vector(0)",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "id": 5,
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 6,
+        "h": 4
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Web Interface Ready",
+      "description": "Ready frontend replicas",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"frontend\"}) or vector(0)",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "id": 6,
+      "gridPos": {
+        "x": 18,
+        "y": 5,
+        "w": 6,
+        "h": 4
+      }
+    },
+    {
+      "id": 7,
+      "type": "row",
+      "title": "Workload Resources",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU by Container",
+      "description": "CPU cores by pod and container, including transport sidecars",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (pod, container) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", pod=~\"(core-api|core-retrieval-streamer|kamiwaza-dataplane|frontend)-.*\", container!=\"\"}[5m]))",
+          "legendFormat": "{{pod}}/{{container}}"
         }
       ],
       "options": {
@@ -241,10 +520,7 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
+          "calcs": []
         }
       },
       "fieldConfig": {
@@ -264,126 +540,19 @@
           "unit": "short"
         },
         "overrides": []
-      }
-    },
-    {
-      "id": 14,
-      "type": "row",
-      "title": "API Latency",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 9,
-        "w": 24,
-        "h": 1
       },
-      "panels": []
-    },
-    {
-      "id": 15,
-      "type": "timeseries",
-      "title": "Request Processing Latency (p50 / p95 / p99)",
-      "description": "End-to-end processing latency for API requests handled by Ray Serve deployments",
+      "id": 8,
       "gridPos": {
         "x": 0,
         "y": 10,
         "w": 12,
         "h": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "histogram_quantile(0.5, sum(rate(ray_serve_deployment_processing_latency_ms_bucket[5m])) by (le, deployment_name))",
-          "legendFormat": "p50 {{deployment_name}}"
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(ray_serve_deployment_processing_latency_ms_bucket[5m])) by (le, deployment_name))",
-          "legendFormat": "p95 {{deployment_name}}"
-        },
-        {
-          "refId": "C",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "histogram_quantile(0.99, sum(rate(ray_serve_deployment_processing_latency_ms_bucket[5m])) by (le, deployment_name))",
-          "legendFormat": "p99 {{deployment_name}}"
-        }
-      ],
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 5,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "drawStyle": "line"
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "ms",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1000
-              },
-              {
-                "color": "red",
-                "value": 5000
-              }
-            ]
-          }
-        },
-        "overrides": []
       }
     },
     {
-      "id": 11,
       "type": "timeseries",
-      "title": "Ray Serve Queue Wait Time (p95)",
-      "description": "How long requests wait in the Ray Serve queue before processing starts",
-      "gridPos": {
-        "x": 12,
-        "y": 10,
-        "w": 12,
-        "h": 8
-      },
+      "title": "Memory by Container",
+      "description": "Working-set memory by pod and container",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -395,8 +564,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(ray_serve_deployment_queue_wait_time_s_bucket[5m])) by (le, deployment_name))",
-          "legendFormat": "p95 {{deployment_name}}"
+          "expr": "sum by (pod, container) (container_memory_working_set_bytes{namespace=\"$namespace\", pod=~\"(core-api|core-retrieval-streamer|kamiwaza-dataplane|frontend)-.*\", container!=\"\"})",
+          "legendFormat": "{{pod}}/{{container}}"
         }
       ],
       "options": {
@@ -407,155 +576,7 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": [
-            "mean"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "drawStyle": "line"
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "s",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 2
-              },
-              {
-                "color": "red",
-                "value": 5
-              }
-            ]
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 5,
-      "type": "row",
-      "title": "Scheduler Process",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 18,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
-    },
-    {
-      "id": 6,
-      "type": "timeseries",
-      "title": "Scheduler CPU Usage",
-      "gridPos": {
-        "x": 0,
-        "y": 19,
-        "w": 8,
-        "h": 7
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"kamiwaza\", pod=~\"core-scheduler.*\", container!=\"\"}[5m])) by (pod)",
-          "legendFormat": "{{pod}}"
-        }
-      ],
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "drawStyle": "line"
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "cores"
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 7,
-      "type": "timeseries",
-      "title": "Scheduler Memory Usage",
-      "gridPos": {
-        "x": 8,
-        "y": 19,
-        "w": 8,
-        "h": 7
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(container_memory_working_set_bytes{namespace=\"kamiwaza\", pod=~\"core-scheduler.*\", container!=\"\"}) by (pod)",
-          "legendFormat": "{{pod}}"
-        }
-      ],
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
+          "calcs": []
         }
       },
       "fieldConfig": {
@@ -575,18 +596,19 @@
           "unit": "bytes"
         },
         "overrides": []
+      },
+      "id": 9,
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 12,
+        "h": 8
       }
     },
     {
-      "id": 8,
       "type": "timeseries",
-      "title": "Scheduler Pod Restarts",
-      "gridPos": {
-        "x": 16,
-        "y": 19,
-        "w": 8,
-        "h": 7
-      },
+      "title": "Pod Restarts (1h)",
+      "description": "Container restarts per pod over the last hour",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -598,8 +620,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(kube_pod_container_status_restarts_total{namespace=\"kamiwaza\", pod=~\"core-scheduler.*\"}[1h])",
-          "legendFormat": "{{pod}} restarts/h"
+          "expr": "round(increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\", pod=~\"(core-api|core-retrieval-streamer|kamiwaza-dataplane|frontend)-.*\"}[1h]))",
+          "legendFormat": "{{pod}}/{{container}}"
         }
       ],
       "options": {
@@ -617,68 +639,44 @@
         "defaults": {
           "custom": {
             "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 20,
+            "lineWidth": 1,
+            "fillOpacity": 10,
             "gradientMode": "none",
             "spanNulls": false,
-            "showPoints": "auto",
+            "showPoints": "never",
             "drawStyle": "line"
           },
           "color": {
-            "fixedColor": "orange",
-            "mode": "fixed"
-          },
-          "unit": "short"
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
+      },
+      "id": 10,
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 12,
+        "h": 8
       }
     },
     {
-      "id": 9,
-      "type": "row",
-      "title": "Core API Health",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 26,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
-    },
-    {
-      "id": 10,
       "type": "timeseries",
-      "title": "Core Scheduler Error Log Rate",
-      "description": "Log lines matching error/warn/exception in the core-scheduler container \u2014 proxy for HTTP error activity",
-      "gridPos": {
-        "x": 0,
-        "y": 27,
-        "w": 24,
-        "h": 8
-      },
+      "title": "CPU Throttling %",
+      "description": "Share of CFS periods throttled per container",
       "datasource": {
-        "type": "loki",
-        "uid": "${loki_datasource}"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "targets": [
         {
           "refId": "A",
           "datasource": {
-            "type": "loki",
-            "uid": "${loki_datasource}"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
-          "expr": "sum(rate({namespace=\"kamiwaza\", container=\"core\"} |~ \"(?i)(error|exception|traceback)\" [5m]))",
-          "legendFormat": "error rate"
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "loki",
-            "uid": "${loki_datasource}"
-          },
-          "expr": "sum(rate({namespace=\"kamiwaza\", container=\"core\"} |~ \"(?i)(warn)\" [5m]))",
-          "legendFormat": "warning rate"
+          "expr": "100 * sum by (pod, container) (rate(container_cpu_cfs_throttled_periods_total{namespace=\"$namespace\", pod=~\"(core-api|core-retrieval-streamer|kamiwaza-dataplane|frontend)-.*\", container!=\"\"}[5m])) / sum by (pod, container) (rate(container_cpu_cfs_periods_total{namespace=\"$namespace\", pod=~\"(core-api|core-retrieval-streamer|kamiwaza-dataplane|frontend)-.*\", container!=\"\"}[5m]))",
+          "legendFormat": "{{pod}}/{{container}}"
         }
       ],
       "options": {
@@ -689,9 +687,7 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": [
-            "mean"
-          ]
+          "calcs": []
         }
       },
       "fieldConfig": {
@@ -708,96 +704,137 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "cps"
+          "unit": "percent"
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "error rate"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "warning rate"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "orange",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
+      },
+      "id": 11,
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 12,
+        "h": 8
       }
     },
     {
       "id": 12,
       "type": "row",
-      "title": "Scheduler Logs",
-      "collapsed": true,
+      "title": "Application Logs",
+      "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 35,
+        "y": 26,
         "w": 24,
         "h": 1
       },
-      "panels": [
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Error Log Rate",
+      "description": "Error and warning lines per second from the application workloads",
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki_datasource}"
+      },
+      "targets": [
         {
-          "id": 13,
-          "type": "logs",
-          "title": "Core Scheduler Logs (ERROR / WARNING)",
-          "gridPos": {
-            "x": 0,
-            "y": 36,
-            "w": 24,
-            "h": 10
-          },
+          "refId": "A",
           "datasource": {
             "type": "loki",
             "uid": "${loki_datasource}"
           },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "loki",
-                "uid": "${loki_datasource}"
-              },
-              "expr": "{namespace=\"kamiwaza\", container=\"core\"} |~ \"(?i)(error|warning|exception|traceback|critical)\"",
-              "legendFormat": ""
-            }
-          ],
-          "options": {
-            "showTime": true,
-            "showLabels": true,
-            "showCommonLabels": false,
-            "wrapLogMessage": true,
-            "prettifyLogMessage": false,
-            "enableLogDetails": true,
-            "sortOrder": "Descending",
-            "dedupStrategy": "none"
+          "expr": "sum by (app) (rate({namespace=\"$namespace\", app=~\"core-api|core-retrieval-streamer|dataplane|frontend\"} |~ \"(?i)(error|exception|traceback)\" [5m]))",
+          "legendFormat": "{{app}} errors"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
           },
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "maxDataPoints": 100
+          "expr": "sum by (app) (rate({namespace=\"$namespace\", app=~\"core-api|core-retrieval-streamer|dataplane|frontend\"} |~ \"(?i)warn\" [5m]))",
+          "legendFormat": "{{app}} warnings"
         }
-      ]
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "id": 13,
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 24,
+        "h": 7
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Core API Logs (ERROR / WARNING)",
+      "description": "Application API container logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki_datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "expr": "{namespace=\"$namespace\", app=\"core-api\", container=\"core\"} |~ \"(?i)(error|warning|exception|traceback|critical)\"",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "maxDataPoints": 100,
+      "id": 14,
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 24,
+        "h": 10
+      }
     }
   ]
 }

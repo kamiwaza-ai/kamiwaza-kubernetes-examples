@@ -1,20 +1,15 @@
 {
   "uid": "kam-07",
   "title": "Kubernetes Events & Stability",
-  "tags": [
-    "kamiwaza",
-    "kubernetes",
-    "events",
-    "stability"
-  ],
+  "tags": ["kamiwaza"],
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "editable": false,
   "fiscalYearStartMonth": 0,
   "weekStart": "",
   "refresh": "30s",
   "time": {
-    "from": "now-3h",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
@@ -22,34 +17,48 @@
   "graphTooltip": 1,
   "links": [
     {
-      "title": "\u2190 Platform Overview",
+      "title": "Platform Overview",
       "url": "/d/kam-01",
       "type": "link",
       "targetBlank": false
     },
     {
-      "title": "Log Explorer",
+      "title": "Inference & Compute",
+      "url": "/d/kam-02",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Application API",
+      "url": "/d/kam-03",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Data Infrastructure",
+      "url": "/d/kam-04",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Extensions & Operator",
+      "url": "/d/kam-05",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Auth",
+      "url": "/d/kam-06",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Logs",
       "url": "/d/kam-08",
       "type": "link",
       "targetBlank": false
     }
   ],
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      }
-    ]
-  },
   "templating": {
     "list": [
       {
@@ -75,26 +84,33 @@
       {
         "name": "namespace",
         "type": "query",
+        "label": "Platform namespace",
+        "hide": 0,
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "query": "label_values(kube_pod_info{namespace=~\"kamiwaza.*\"}, namespace)",
+        "definition": "label_values(kamiwaza_platform_condition, namespace)",
+        "query": {
+          "query": "label_values(kamiwaza_platform_condition, namespace)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
         "current": {},
-        "hide": 0,
-        "label": "Namespace",
-        "multi": true,
-        "includeAll": true,
-        "allValue": "kamiwaza|kamiwaza-extensions|kamiwaza-sandboxes|kamiwaza-system",
-        "refresh": 2
+        "multi": false,
+        "includeAll": false,
+        "sort": 1
       }
     ]
+  },
+  "annotations": {
+    "list": []
   },
   "panels": [
     {
       "id": 1,
       "type": "row",
-      "title": "Instability Signals",
+      "title": "Pod Stability",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -105,16 +121,9 @@
       "panels": []
     },
     {
-      "id": 2,
       "type": "stat",
       "title": "Pod Restarts (1h)",
-      "description": "Total container restarts across all Kamiwaza namespaces in the last hour",
-      "gridPos": {
-        "x": 0,
-        "y": 1,
-        "w": 5,
-        "h": 3
-      },
+      "description": "Container restarts over the last hour",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -126,17 +135,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=~\"${namespace}\"}[1h])) or vector(0)",
-          "instant": true,
-          "legendFormat": ""
+          "expr": "round(sum(increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\"}[1h]))) or vector(0)",
+          "legendFormat": "",
+          "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": ""
         },
         "orientation": "auto",
@@ -150,7 +157,6 @@
           "color": {
             "mode": "thresholds"
           },
-          "unit": "short",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -160,102 +166,86 @@
               },
               {
                 "color": "orange",
-                "value": 3
-              },
-              {
-                "color": "red",
-                "value": 10
+                "value": 1
               }
             ]
           }
         },
         "overrides": []
+      },
+      "id": 2,
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 5,
+        "h": 4
       }
     },
     {
-      "id": 3,
       "type": "stat",
-      "title": "OOMKilled (24h)",
+      "title": "OOMKilled",
+      "description": "Containers whose last termination was OOMKilled",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count(kube_pod_container_status_last_terminated_reason{namespace=\"$namespace\", reason=\"OOMKilled\"}) or vector(0)",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "id": 3,
       "gridPos": {
         "x": 5,
         "y": 1,
-        "w": 4,
-        "h": 3
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "count(kube_pod_container_status_last_terminated_reason{namespace=~\"${namespace}\", reason=\"OOMKilled\"}) or vector(0)",
-          "instant": true,
-          "legendFormat": ""
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "0 (OK)",
-                  "color": "green"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
+        "w": 5,
+        "h": 4
       }
     },
     {
-      "id": 4,
       "type": "stat",
       "title": "CrashLoopBackOff",
-      "gridPos": {
-        "x": 9,
-        "y": 1,
-        "w": 4,
-        "h": 3
-      },
+      "description": "Containers waiting in CrashLoopBackOff",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -267,17 +257,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count(kube_pod_container_status_waiting_reason{namespace=~\"${namespace}\", reason=\"CrashLoopBackOff\"}) or vector(0)",
-          "instant": true,
-          "legendFormat": ""
+          "expr": "count(kube_pod_container_status_waiting_reason{namespace=\"$namespace\", reason=\"CrashLoopBackOff\"}) or vector(0)",
+          "legendFormat": "",
+          "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": ""
         },
         "orientation": "auto",
@@ -291,7 +279,6 @@
           "color": {
             "mode": "thresholds"
           },
-          "unit": "short",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -304,33 +291,22 @@
                 "value": 1
               }
             ]
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "0 (OK)",
-                  "color": "green"
-                }
-              }
-            }
-          ]
+          }
         },
         "overrides": []
-      }
-    },
-    {
-      "id": 5,
-      "type": "stat",
-      "title": "Pods Pending",
-      "description": "Pods currently in Pending phase across selected namespaces",
+      },
+      "id": 4,
       "gridPos": {
-        "x": 13,
+        "x": 10,
         "y": 1,
         "w": 5,
-        "h": 3
-      },
+        "h": 4
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Pods Pending",
+      "description": "Pods in Pending phase",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -342,17 +318,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count(kube_pod_status_phase{namespace=~\"${namespace}\", phase=\"Pending\"}) or vector(0)",
-          "instant": true,
-          "legendFormat": ""
+          "expr": "count(kube_pod_status_phase{namespace=\"$namespace\", phase=\"Pending\"} == 1) or vector(0)",
+          "legendFormat": "",
+          "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": ""
         },
         "orientation": "auto",
@@ -366,7 +340,6 @@
           "color": {
             "mode": "thresholds"
           },
-          "unit": "short",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -377,27 +350,24 @@
               {
                 "color": "orange",
                 "value": 1
-              },
-              {
-                "color": "red",
-                "value": 3
               }
             ]
           }
         },
         "overrides": []
+      },
+      "id": 5,
+      "gridPos": {
+        "x": 15,
+        "y": 1,
+        "w": 5,
+        "h": 4
       }
     },
     {
-      "id": 6,
       "type": "stat",
       "title": "ImagePullBackOff",
-      "gridPos": {
-        "x": 18,
-        "y": 1,
-        "w": 6,
-        "h": 3
-      },
+      "description": "Containers that cannot pull their image",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -409,17 +379,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count(kube_pod_container_status_waiting_reason{namespace=~\"${namespace}\", reason=~\"ImagePullBackOff|ErrImagePull\"}) or vector(0)",
-          "instant": true,
-          "legendFormat": ""
+          "expr": "count(kube_pod_container_status_waiting_reason{namespace=\"$namespace\", reason=~\"ImagePullBackOff|ErrImagePull\"}) or vector(0)",
+          "legendFormat": "",
+          "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": ""
         },
         "orientation": "auto",
@@ -433,7 +401,6 @@
           "color": {
             "mode": "thresholds"
           },
-          "unit": "short",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -446,191 +413,22 @@
                 "value": 1
               }
             ]
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "0 (OK)",
-                  "color": "green"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 7,
-      "type": "row",
-      "title": "Restart & Stability Timeline",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 4,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
-    },
-    {
-      "id": 8,
-      "type": "timeseries",
-      "title": "Container Restart Rate (top 10 pods)",
-      "gridPos": {
-        "x": 0,
-        "y": 5,
-        "w": 24,
-        "h": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "topk(10, increase(kube_pod_container_status_restarts_total{namespace=~\"${namespace}\"}[30m]))",
-          "legendFormat": "{{namespace}}/{{pod}}/{{container}}"
-        }
-      ],
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "sum"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "auto",
-            "drawStyle": "line"
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 9,
-      "type": "row",
-      "title": "Resource Pressure",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 13,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
-    },
-    {
-      "id": 10,
-      "type": "timeseries",
-      "title": "CPU Throttling % (top 10 containers)",
-      "description": "High throttling means containers are hitting CPU limits",
-      "gridPos": {
-        "x": 0,
-        "y": 14,
-        "w": 12,
-        "h": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "topk(10, 100 * rate(container_cpu_cfs_throttled_periods_total{namespace=~\"${namespace}\", container!=\"\"}[5m]) / rate(container_cpu_cfs_periods_total{namespace=~\"${namespace}\", container!=\"\"}[5m]))",
-          "legendFormat": "{{namespace}}/{{pod}}/{{container}}"
-        }
-      ],
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "drawStyle": "line"
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 25
-              },
-              {
-                "color": "red",
-                "value": 50
-              }
-            ]
           }
         },
         "overrides": []
+      },
+      "id": 6,
+      "gridPos": {
+        "x": 20,
+        "y": 1,
+        "w": 4,
+        "h": 4
       }
     },
     {
-      "id": 11,
       "type": "timeseries",
-      "title": "Node Memory & Disk Pressure",
-      "gridPos": {
-        "x": 12,
-        "y": 14,
-        "w": 12,
-        "h": 8
-      },
+      "title": "Container Restart Rate (top 10 pods)",
+      "description": "Restarts per pod over 30 minutes",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -642,17 +440,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "kube_node_status_condition{condition=\"MemoryPressure\", status=\"true\"}",
-          "legendFormat": "{{node}} MemPressure"
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "kube_node_status_condition{condition=\"DiskPressure\", status=\"true\"}",
-          "legendFormat": "{{node}} DiskPressure"
+          "expr": "topk(10, round(increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\"}[30m])) > 0)",
+          "legendFormat": "{{pod}}/{{container}}"
         }
       ],
       "options": {
@@ -670,250 +459,164 @@
         "defaults": {
           "custom": {
             "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 20,
+            "lineWidth": 1,
+            "fillOpacity": 10,
             "gradientMode": "none",
             "spanNulls": false,
-            "showPoints": "auto",
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "id": 7,
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU Throttling % (top 10 containers)",
+      "description": "Share of CFS periods throttled",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "topk(10, 100 * rate(container_cpu_cfs_throttled_periods_total{namespace=\"$namespace\", container!=\"\"}[5m]) / rate(container_cpu_cfs_periods_total{namespace=\"$namespace\", container!=\"\"}[5m]))",
+          "legendFormat": "{{pod}}/{{container}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
             "drawStyle": "line"
           },
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "short",
-          "min": 0,
-          "max": 1
+          "unit": "percent"
         },
         "overrides": []
+      },
+      "id": 8,
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 8
       }
     },
     {
-      "id": 12,
-      "type": "row",
-      "title": "Kubernetes Warning Events",
-      "collapsed": true,
+      "type": "timeseries",
+      "title": "Node Memory & Disk Pressure",
+      "description": "Nodes reporting pressure conditions",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "kube_node_status_condition{condition=\"MemoryPressure\", status=\"true\"}",
+          "legendFormat": "{{node}} memory"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "kube_node_status_condition{condition=\"DiskPressure\", status=\"true\"}",
+          "legendFormat": "{{node}} disk"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "id": 9,
       "gridPos": {
         "x": 0,
-        "y": 22,
+        "y": 13,
         "w": 24,
-        "h": 1
-      },
-      "panels": [
-        {
-          "id": 13,
-          "type": "logs",
-          "title": "Warning Events (BackOff / OOMKill / Failed / Evicted)",
-          "description": "Kubernetes events from Alloy eventhandler \u2014 critical failure signals",
-          "gridPos": {
-            "x": 0,
-            "y": 23,
-            "w": 24,
-            "h": 10
-          },
-          "datasource": {
-            "type": "loki",
-            "uid": "${loki_datasource}"
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "loki",
-                "uid": "${loki_datasource}"
-              },
-              "expr": "{job=\"integrations/kubernetes/eventhandler\"} |= \"Warning\" |~ \"BackOff|OOMKill|Failed|Evict|Unhealthy|ImagePull|Pending\"",
-              "legendFormat": ""
-            }
-          ],
-          "options": {
-            "showTime": true,
-            "showLabels": true,
-            "showCommonLabels": false,
-            "wrapLogMessage": true,
-            "prettifyLogMessage": false,
-            "enableLogDetails": true,
-            "sortOrder": "Descending",
-            "dedupStrategy": "none"
-          },
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "maxDataPoints": 100
-        }
-      ]
+        "h": 6
+      }
     },
     {
-      "id": 14,
+      "id": 10,
       "type": "row",
-      "title": "ArgoCD Sync Status",
+      "title": "Kubernetes Events",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 33,
+        "y": 19,
         "w": 24,
         "h": 1
       },
       "panels": []
     },
     {
-      "id": 15,
-      "type": "stat",
-      "title": "Apps Out of Sync",
-      "gridPos": {
-        "x": 0,
-        "y": 34,
-        "w": 6,
-        "h": 3
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "count(argocd_app_info{sync_status!=\"Synced\"}) or vector(0)",
-          "instant": true,
-          "legendFormat": ""
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "All Synced",
-                  "color": "green"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 16,
-      "type": "stat",
-      "title": "Apps Degraded / Unknown",
-      "gridPos": {
-        "x": 6,
-        "y": 34,
-        "w": 6,
-        "h": 3
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "count(argocd_app_info{health_status=~\"Degraded|Unknown\"}) or vector(0)",
-          "instant": true,
-          "legendFormat": ""
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "All Healthy",
-                  "color": "green"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 17,
       "type": "logs",
-      "title": "ArgoCD Sync Errors",
-      "gridPos": {
-        "x": 12,
-        "y": 34,
-        "w": 12,
-        "h": 6
-      },
+      "title": "Warning Events (BackOff / OOMKill / Failed / Evicted)",
+      "description": "Warning events for objects in the platform namespace",
       "datasource": {
         "type": "loki",
         "uid": "${loki_datasource}"
@@ -925,7 +628,7 @@
             "type": "loki",
             "uid": "${loki_datasource}"
           },
-          "expr": "{namespace=\"argocd\"} |~ \"(?i)(error|failed|sync.failed)\"",
+          "expr": "{job=\"integrations/kubernetes/eventhandler\", namespace=\"$namespace\"} |= \"type=Warning\" |~ \"BackOff|OOMKill|Failed|Evict|Unhealthy|ImagePull|FailedScheduling\"",
           "legendFormat": ""
         }
       ],
@@ -943,7 +646,56 @@
         "defaults": {},
         "overrides": []
       },
-      "maxDataPoints": 200
+      "maxDataPoints": 100,
+      "id": 11,
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 24,
+        "h": 10
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Operator Events",
+      "description": "Events the platform operator records on platform resources",
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki_datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "expr": "{job=\"integrations/kubernetes/eventhandler\", namespace=\"$namespace\"} |~ \"kind=(KamiwazaPlatform|ModelDeployment|Extension|SandboxPool)\"",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "maxDataPoints": 100,
+      "id": 12,
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 24,
+        "h": 8
+      }
     }
   ]
 }

@@ -1,13 +1,9 @@
 {
   "uid": "kam-02",
-  "title": "Inference & Ray Cluster",
-  "tags": [
-    "kamiwaza",
-    "ray",
-    "inference"
-  ],
+  "title": "Inference & Delegated Compute",
+  "tags": ["kamiwaza"],
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "editable": false,
   "fiscalYearStartMonth": 0,
   "weekStart": "",
@@ -21,34 +17,48 @@
   "graphTooltip": 1,
   "links": [
     {
-      "title": "\u2190 Platform Overview",
+      "title": "Platform Overview",
       "url": "/d/kam-01",
       "type": "link",
       "targetBlank": false
     },
     {
-      "title": "Log Explorer",
+      "title": "Application API",
+      "url": "/d/kam-03",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Data Infrastructure",
+      "url": "/d/kam-04",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Extensions & Operator",
+      "url": "/d/kam-05",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Auth",
+      "url": "/d/kam-06",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "K8s Events",
+      "url": "/d/kam-07",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Logs",
       "url": "/d/kam-08",
       "type": "link",
       "targetBlank": false
     }
   ],
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      }
-    ]
-  },
   "templating": {
     "list": [
       {
@@ -72,28 +82,35 @@
         "refresh": 1
       },
       {
-        "name": "deployment",
+        "name": "namespace",
         "type": "query",
+        "label": "Platform namespace",
+        "hide": 0,
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "query": "label_values(ray_serve_deployment_request_counter_requests_total, deployment_name)",
+        "definition": "label_values(kamiwaza_platform_condition, namespace)",
+        "query": {
+          "query": "label_values(kamiwaza_platform_condition, namespace)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
         "current": {},
-        "hide": 0,
-        "label": "Deployment",
-        "multi": true,
-        "includeAll": true,
-        "allValue": ".*",
-        "refresh": 2
+        "multi": false,
+        "includeAll": false,
+        "sort": 1
       }
     ]
+  },
+  "annotations": {
+    "list": []
   },
   "panels": [
     {
       "id": 1,
       "type": "row",
-      "title": "Ray Cluster Health",
+      "title": "Model Serving",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -104,15 +121,9 @@
       "panels": []
     },
     {
-      "id": 2,
       "type": "stat",
-      "title": "Alive Ray Nodes",
-      "gridPos": {
-        "x": 0,
-        "y": 1,
-        "w": 6,
-        "h": 4
-      },
+      "title": "Served Models Ready",
+      "description": "ModelDeployments whose Ready condition is True",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -124,17 +135,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(ray_component_num_alive_nodes{Component=\"GCS\"}) or vector(0)",
-          "instant": true,
-          "legendFormat": ""
+          "expr": "count(kamiwaza_model_deployment_condition{namespace=\"$namespace\", type=\"Ready\"} == 1) or vector(0)",
+          "legendFormat": "",
+          "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": ""
         },
         "orientation": "auto",
@@ -148,38 +157,91 @@
           "color": {
             "mode": "thresholds"
           },
-          "unit": "short",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1
-              },
-              {
                 "color": "green",
-                "value": 2
+                "value": null
               }
             ]
           }
         },
         "overrides": []
+      },
+      "id": 2,
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 6,
+        "h": 4
       }
     },
     {
-      "id": 3,
       "type": "stat",
-      "title": "Object Store Used %",
+      "title": "Served Models Not Ready",
+      "description": "ModelDeployments whose Ready condition is False",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count(kamiwaza_model_deployment_condition{namespace=\"$namespace\", type=\"Ready\"} == 0) or vector(0)",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "id": 3,
       "gridPos": {
         "x": 6,
         "y": 1,
         "w": 6,
         "h": 4
-      },
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Serving Replicas Ready",
+      "description": "Ready serving replicas across every ModelDeployment",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -191,17 +253,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "100 * sum(ray_object_store_memory) / (sum(ray_object_store_memory) + sum(ray_object_store_available_memory))",
-          "instant": true,
-          "legendFormat": ""
+          "expr": "sum(kamiwaza_model_deployment_ready_replicas{namespace=\"$namespace\"}) or vector(0)",
+          "legendFormat": "",
+          "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": ""
         },
         "orientation": "auto",
@@ -215,39 +275,30 @@
           "color": {
             "mode": "thresholds"
           },
-          "unit": "percent",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "orange",
-                "value": 60
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           }
         },
         "overrides": []
-      }
-    },
-    {
+      },
       "id": 4,
-      "type": "stat",
-      "title": "Pending Tasks",
-      "description": "Tasks queued waiting for Ray workers",
       "gridPos": {
         "x": 12,
         "y": 1,
         "w": 6,
         "h": 4
-      },
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Model Serving Capability",
+      "description": "State the operator reports for the modelServing capability",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -259,21 +310,19 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(ray_num_pending_tasks) or vector(0)",
-          "instant": true,
-          "legendFormat": ""
+          "expr": "kamiwaza_platform_component_state{namespace=\"$namespace\", component=\"modelServing\"} == 1",
+          "legendFormat": "{{state}}",
+          "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": ""
         },
         "orientation": "auto",
-        "textMode": "auto",
+        "textMode": "name",
         "colorMode": "background",
         "graphMode": "none",
         "justifyMode": "auto"
@@ -283,39 +332,30 @@
           "color": {
             "mode": "thresholds"
           },
-          "unit": "short",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "orange",
-                "value": 50
-              },
-              {
-                "color": "red",
-                "value": 200
               }
             ]
           }
         },
         "overrides": []
-      }
-    },
-    {
+      },
       "id": 5,
-      "type": "stat",
-      "title": "Ongoing Serve Requests",
-      "description": "In-flight requests currently being processed by Ray Serve",
       "gridPos": {
         "x": 18,
         "y": 1,
         "w": 6,
         "h": 4
-      },
+      }
+    },
+    {
+      "type": "table",
+      "title": "Model Deployments",
+      "description": "Each ModelDeployment's Ready condition and replicas",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -327,205 +367,10 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(ray_serve_num_ongoing_requests) or vector(0)",
+          "expr": "kamiwaza_model_deployment_condition{namespace=\"$namespace\", type=\"Ready\"}",
+          "legendFormat": "",
           "instant": true,
-          "legendFormat": ""
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 50
-              },
-              {
-                "color": "red",
-                "value": 100
-              }
-            ]
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 6,
-      "type": "row",
-      "title": "Inference Throughput & Latency",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 5,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
-    },
-    {
-      "id": 7,
-      "type": "timeseries",
-      "title": "Requests/sec per Deployment",
-      "gridPos": {
-        "x": 0,
-        "y": 6,
-        "w": 8,
-        "h": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(rate(ray_serve_deployment_request_counter_requests_total{deployment_name=~\"${deployment}\"}[5m])) by (deployment_name)",
-          "legendFormat": "{{deployment_name}}"
-        }
-      ],
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "drawStyle": "line"
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "reqps"
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 8,
-      "type": "timeseries",
-      "title": "Error Rate per Deployment",
-      "gridPos": {
-        "x": 8,
-        "y": 6,
-        "w": 8,
-        "h": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(rate(ray_serve_deployment_error_counter_requests_total{deployment_name=~\"${deployment}\"}[5m])) by (deployment_name)",
-          "legendFormat": "{{deployment_name}} errors"
-        }
-      ],
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 20,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "drawStyle": "line"
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "ops"
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 14,
-      "type": "timeseries",
-      "title": "Serve Request Latency (p50 / p95 / p99)",
-      "description": "End-to-end request processing latency as seen by Ray Serve",
-      "gridPos": {
-        "x": 16,
-        "y": 6,
-        "w": 8,
-        "h": 8
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "histogram_quantile(0.5, sum(rate(ray_serve_deployment_processing_latency_ms_bucket{deployment_name=~\"${deployment}\"}[5m])) by (le, deployment_name))",
-          "legendFormat": "p50 {{deployment_name}}"
+          "format": "table"
         },
         {
           "refId": "B",
@@ -533,8 +378,10 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(ray_serve_deployment_processing_latency_ms_bucket{deployment_name=~\"${deployment}\"}[5m])) by (le, deployment_name))",
-          "legendFormat": "p95 {{deployment_name}}"
+          "expr": "kamiwaza_model_deployment_ready_replicas{namespace=\"$namespace\"}",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table"
         },
         {
           "refId": "C",
@@ -542,83 +389,129 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.99, sum(rate(ray_serve_deployment_processing_latency_ms_bucket{deployment_name=~\"${deployment}\"}[5m])) by (le, deployment_name))",
-          "legendFormat": "p99 {{deployment_name}}"
+          "expr": "kamiwaza_model_deployment_desired_replicas{namespace=\"$namespace\"}",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "name",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": ["name", "Value #A", "reason", "Value #B", "Value #C"]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "name": 0,
+              "Value #A": 1,
+              "reason": 2,
+              "Value #B": 3,
+              "Value #C": 4
+            },
+            "renameByName": {
+              "name": "Model Deployment",
+              "Value #A": "Ready",
+              "reason": "Reason",
+              "Value #B": "Ready Replicas",
+              "Value #C": "Desired Replicas"
+            }
+          }
         }
       ],
       "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
         },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        }
+        "sortBy": [
+          {
+            "displayName": "Model Deployment",
+            "desc": false
+          }
+        ]
       },
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "fillOpacity": 5,
-            "gradientMode": "none",
-            "spanNulls": false,
-            "showPoints": "never",
-            "drawStyle": "line"
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "ms",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
+            "displayMode": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ready"
+            },
+            "properties": [
               {
-                "color": "green",
-                "value": null
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
               },
               {
-                "color": "orange",
-                "value": 1000
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
               },
               {
-                "color": "red",
-                "value": 5000
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "False"
+                      },
+                      "1": {
+                        "text": "True"
+                      }
+                    }
+                  }
+                ]
               }
             ]
           }
-        },
-        "overrides": []
+        ]
+      },
+      "id": 6,
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 7
       }
     },
     {
-      "id": 9,
-      "type": "row",
-      "title": "Ray Resource Usage",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 14,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
-    },
-    {
-      "id": 10,
       "type": "timeseries",
-      "title": "Ray Node CPU Utilisation",
-      "gridPos": {
-        "x": 0,
-        "y": 15,
-        "w": 12,
-        "h": 8
-      },
+      "title": "Serving CPU by Model",
+      "description": "CPU cores used by each ModelDeployment's pods",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -630,8 +523,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "ray_node_cpu_utilization",
-          "legendFormat": "{{NodeAddress}}"
+          "expr": "sum by (label_serving_kamiwaza_ai_deployment_name) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container!=\"\"}[5m]) * on (namespace, pod) group_left (label_serving_kamiwaza_ai_deployment_name) max by (namespace, pod, label_serving_kamiwaza_ai_deployment_name) (kube_pod_labels{namespace=\"$namespace\", label_serving_kamiwaza_ai_deployment_name!=\"\"}))",
+          "legendFormat": "{{label_serving_kamiwaza_ai_deployment_name}}"
         }
       ],
       "options": {
@@ -642,10 +535,7 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
+          "calcs": []
         }
       },
       "fieldConfig": {
@@ -662,23 +552,22 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "percent",
-          "min": 0,
-          "max": 100
+          "unit": "short"
         },
         "overrides": []
+      },
+      "id": 7,
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
       }
     },
     {
-      "id": 11,
       "type": "timeseries",
-      "title": "Ray Object Store Memory",
-      "gridPos": {
-        "x": 12,
-        "y": 15,
-        "w": 12,
-        "h": 8
-      },
+      "title": "Serving Memory by Model",
+      "description": "Working-set memory of each ModelDeployment's pods",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -690,17 +579,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(ray_object_store_memory)",
-          "legendFormat": "Used"
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(ray_object_store_memory) + sum(ray_object_store_available_memory)",
-          "legendFormat": "Total"
+          "expr": "sum by (label_serving_kamiwaza_ai_deployment_name) (container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\"} * on (namespace, pod) group_left (label_serving_kamiwaza_ai_deployment_name) max by (namespace, pod, label_serving_kamiwaza_ai_deployment_name) (kube_pod_labels{namespace=\"$namespace\", label_serving_kamiwaza_ai_deployment_name!=\"\"}))",
+          "legendFormat": "{{label_serving_kamiwaza_ai_deployment_name}}"
         }
       ],
       "options": {
@@ -731,32 +611,32 @@
           "unit": "bytes"
         },
         "overrides": []
+      },
+      "id": 8,
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 8
       }
     },
     {
-      "id": 15,
+      "id": 9,
       "type": "row",
-      "title": "GPU Utilisation",
+      "title": "Delegated Compute",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 23,
+        "y": 20,
         "w": 24,
         "h": 1
       },
       "panels": []
     },
     {
-      "id": 16,
       "type": "stat",
-      "title": "GPUs Available",
-      "description": "Total GPUs visible to Ray. Shows 0 if no GPUs are detected or Ray GPU metrics are not exposed.",
-      "gridPos": {
-        "x": 0,
-        "y": 24,
-        "w": 6,
-        "h": 4
-      },
+      "title": "Compute Head Ready",
+      "description": "Ready replicas of the delegated-compute head",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -768,17 +648,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(ray_resources_total{resource=\"GPU\"}) or vector(0)",
-          "instant": true,
-          "legendFormat": ""
+          "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"core-raycluster-head\"}) or vector(0)",
+          "legendFormat": "",
+          "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": ""
         },
         "orientation": "auto",
@@ -792,12 +670,11 @@
           "color": {
             "mode": "thresholds"
           },
-          "unit": "short",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "orange",
+                "color": "red",
                 "value": null
               },
               {
@@ -808,19 +685,19 @@
           }
         },
         "overrides": []
+      },
+      "id": 10,
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 6,
+        "h": 4
       }
     },
     {
-      "id": 17,
-      "type": "timeseries",
-      "title": "GPU Utilisation %",
-      "description": "Per-node GPU utilisation from Ray metrics (ray_node_gpus_utilization) or DCGM exporter (DCGM_FI_DEV_GPU_UTIL). Panels show No data if GPUs are not present.",
-      "gridPos": {
-        "x": 6,
-        "y": 24,
-        "w": 9,
-        "h": 8
-      },
+      "type": "stat",
+      "title": "Compute Workers Ready",
+      "description": "Ready replicas of the delegated-compute workers",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -832,17 +709,191 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "ray_node_gpus_utilization * 100",
-          "legendFormat": "Ray {{NodeAddress}} GPU{{GpuIndex}}"
+          "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"core-raycluster-worker\"}) or vector(0)",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
         },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "id": 11,
+      "gridPos": {
+        "x": 6,
+        "y": 21,
+        "w": 6,
+        "h": 4
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Compute Metrics Targets Up",
+      "description": "Head and worker pods answering on their metrics port",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
         {
-          "refId": "B",
+          "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "DCGM_FI_DEV_GPU_UTIL",
-          "legendFormat": "DCGM {{gpu}} ({{instance}})"
+          "expr": "sum(up{job=\"monitoring/core-delegated-compute\", namespace=\"$namespace\"}) or vector(0)",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "id": 12,
+      "gridPos": {
+        "x": 12,
+        "y": 21,
+        "w": 6,
+        "h": 4
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Compute Restarts (1h)",
+      "description": "Container restarts in head and worker pods over the last hour",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "round(sum(increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\", pod=~\"core-raycluster-.*\"}[1h]))) or vector(0)",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "id": 13,
+      "gridPos": {
+        "x": 18,
+        "y": 21,
+        "w": 6,
+        "h": 4
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Compute CPU",
+      "description": "CPU cores used by head and worker pods",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", pod=~\"core-raycluster-.*\", container!=\"\"}[5m]))",
+          "legendFormat": "{{pod}}"
         }
       ],
       "options": {
@@ -853,10 +904,7 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
+          "calcs": []
         }
       },
       "fieldConfig": {
@@ -873,24 +921,22 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "percent",
-          "min": 0,
-          "max": 100
+          "unit": "short"
         },
         "overrides": []
+      },
+      "id": 14,
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 12,
+        "h": 8
       }
     },
     {
-      "id": 18,
       "type": "timeseries",
-      "title": "GPU Memory Usage",
-      "description": "GPU framebuffer memory from Ray (ray_node_gram_used / ray_node_gram_available) or DCGM (DCGM_FI_DEV_FB_USED).",
-      "gridPos": {
-        "x": 15,
-        "y": 24,
-        "w": 9,
-        "h": 8
-      },
+      "title": "Compute Memory",
+      "description": "Working-set memory of head and worker pods",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -902,26 +948,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "ray_node_gram_used * 1024 * 1024",
-          "legendFormat": "Used {{NodeAddress}} GPU{{GpuIndex}}"
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "(ray_node_gram_used + ray_node_gram_available) * 1024 * 1024",
-          "legendFormat": "Total {{NodeAddress}} GPU{{GpuIndex}}"
-        },
-        {
-          "refId": "C",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "DCGM_FI_DEV_FB_USED * 1024 * 1024",
-          "legendFormat": "DCGM Used {{gpu}} ({{instance}})"
+          "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\", pod=~\"core-raycluster-.*\", container!=\"\"})",
+          "legendFormat": "{{pod}}"
         }
       ],
       "options": {
@@ -932,10 +960,7 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
+          "calcs": []
         }
       },
       "fieldConfig": {
@@ -955,63 +980,236 @@
           "unit": "bytes"
         },
         "overrides": []
+      },
+      "id": 15,
+      "gridPos": {
+        "x": 12,
+        "y": 25,
+        "w": 12,
+        "h": 8
       }
     },
     {
-      "id": 12,
+      "id": 16,
       "type": "row",
-      "title": "Ray & Scheduler Logs",
-      "collapsed": true,
+      "title": "Accelerators",
+      "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 32,
+        "y": 33,
         "w": 24,
         "h": 1
       },
-      "panels": [
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "GPU Utilisation %",
+      "description": "Requires the NVIDIA DCGM exporter; empty on CPU-only clusters",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
         {
-          "id": 13,
-          "type": "logs",
-          "title": "Ray / Scheduler Errors",
-          "description": "ERROR and WARNING logs from Ray and core-scheduler containers",
-          "gridPos": {
-            "x": 0,
-            "y": 33,
-            "w": 24,
-            "h": 10
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
+          "expr": "DCGM_FI_DEV_GPU_UTIL{namespace=\"$namespace\"}",
+          "legendFormat": "{{pod}} GPU {{gpu}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "id": 17,
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "GPU Memory Used",
+      "description": "Requires the NVIDIA DCGM exporter; empty on CPU-only clusters",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "DCGM_FI_DEV_FB_USED{namespace=\"$namespace\"} * 1024 * 1024",
+          "legendFormat": "{{pod}} GPU {{gpu}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "id": 18,
+      "gridPos": {
+        "x": 12,
+        "y": 34,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "id": 19,
+      "type": "row",
+      "title": "Logs",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 42,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "logs",
+      "title": "Model Serving Errors",
+      "description": "Error lines from serving pods",
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki_datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
           "datasource": {
             "type": "loki",
             "uid": "${loki_datasource}"
           },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "loki",
-                "uid": "${loki_datasource}"
-              },
-              "expr": "{namespace=\"kamiwaza\", container=~\"ray.*|core\"} |~ \"(?i)(error|fatal|exception|traceback)\"",
-              "legendFormat": ""
-            }
-          ],
-          "options": {
-            "showTime": true,
-            "showLabels": true,
-            "showCommonLabels": false,
-            "wrapLogMessage": true,
-            "prettifyLogMessage": false,
-            "enableLogDetails": true,
-            "sortOrder": "Descending",
-            "dedupStrategy": "none"
-          },
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "maxDataPoints": 100
+          "expr": "{namespace=\"$namespace\", model=~\".+\"} |~ \"(?i)(error|fatal|exception|traceback)\"",
+          "legendFormat": ""
         }
-      ]
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "maxDataPoints": 100,
+      "id": 20,
+      "gridPos": {
+        "x": 0,
+        "y": 43,
+        "w": 12,
+        "h": 10
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Delegated Compute Errors",
+      "description": "Error lines from head and worker pods",
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki_datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_datasource}"
+          },
+          "expr": "{namespace=\"$namespace\", app=\"core-raycluster\"} |~ \"(?i)(error|fatal|exception|traceback)\"",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "maxDataPoints": 100,
+      "id": 21,
+      "gridPos": {
+        "x": 12,
+        "y": 43,
+        "w": 12,
+        "h": 10
+      }
     }
   ]
 }

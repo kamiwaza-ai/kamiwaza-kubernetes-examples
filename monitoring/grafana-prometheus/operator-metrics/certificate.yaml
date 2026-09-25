@@ -1,0 +1,45 @@
+# Serving certificate for the platform operator's metrics endpoint.
+#
+# The operator serves metrics only over TLS, and its chart refuses to enable
+# them without a Secret holding `tls.crt`, `tls.key`, and `ca.crt`. The Secret
+# must exist before the operator is installed or upgraded with
+# `values.yaml`, because the manager Pod mounts it.
+#
+# A dedicated self-signed issuer is used because the operator starts before the
+# platform it reconciles, so the platform's own CA does not exist yet. cert-manager
+# publishes the self-signed certificate as its own `ca.crt`, which is what the
+# chart's ServiceMonitor trusts. The manager reloads the files when the
+# certificate rotates.
+#
+# The DNS name is the chart's metrics Service, `<release>-metrics.<namespace>.svc`.
+# Change both names if the operator release or namespace differs.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: kamiwaza-platform-operator-metrics
+  namespace: kamiwaza
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kamiwaza-platform-operator-metrics
+  namespace: kamiwaza
+spec:
+  secretName: kamiwaza-platform-operator-metrics-tls
+  # A self-signed certificate's issuer is its own subject, so it needs one:
+  # an empty subject produces an empty issuer DN, which RFC 5280 forbids.
+  commonName: kamiwaza-platform-operator-metrics.kamiwaza.svc
+  dnsNames:
+    - kamiwaza-platform-operator-metrics.kamiwaza.svc
+  duration: 2160h
+  renewBefore: 360h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    group: cert-manager.io
+    kind: Issuer
+    name: kamiwaza-platform-operator-metrics

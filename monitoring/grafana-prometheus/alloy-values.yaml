@@ -2,8 +2,8 @@
 #
 # Install (after Loki is running):
 #   helm repo add grafana https://grafana.github.io/helm-charts
-#   helm upgrade --install alloy grafana/alloy \
-#     -n monitoring --create-namespace -f alloy-values.yaml
+#   helm upgrade --install alloy grafana/alloy --version 1.12.1 \
+#   -n monitoring --create-namespace -f alloy-values.yaml
 
 alloy:
   mounts:
@@ -46,6 +46,16 @@ alloy:
           source_labels = ["__meta_kubernetes_pod_label_app"]
           regex         = "(.+)"
           target_label  = "app"
+        }
+        // The extension and the served model a pod belongs to, as the
+        // platform operator labels them. Pods without the label get none.
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_kamiwaza_ai_extension"]
+          target_label  = "extension"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_serving_kamiwaza_ai_deployment_name"]
+          target_label  = "model"
         }
         rule {
           source_labels = ["__meta_kubernetes_node_name"]

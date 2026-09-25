@@ -1,14 +1,9 @@
 {
   "uid": "kam-04",
   "title": "Data Infrastructure",
-  "tags": [
-    "kamiwaza",
-    "etcd",
-    "postgres",
-    "storage"
-  ],
+  "tags": ["kamiwaza"],
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "editable": false,
   "fiscalYearStartMonth": 0,
   "weekStart": "",
@@ -22,34 +17,48 @@
   "graphTooltip": 1,
   "links": [
     {
-      "title": "\u2190 Platform Overview",
+      "title": "Platform Overview",
       "url": "/d/kam-01",
       "type": "link",
       "targetBlank": false
     },
     {
-      "title": "Log Explorer",
+      "title": "Inference & Compute",
+      "url": "/d/kam-02",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Application API",
+      "url": "/d/kam-03",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Extensions & Operator",
+      "url": "/d/kam-05",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Auth",
+      "url": "/d/kam-06",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "K8s Events",
+      "url": "/d/kam-07",
+      "type": "link",
+      "targetBlank": false
+    },
+    {
+      "title": "Logs",
       "url": "/d/kam-08",
       "type": "link",
       "targetBlank": false
     }
   ],
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      }
-    ]
-  },
   "templating": {
     "list": [
       {
@@ -71,14 +80,37 @@
         "label": "Loki",
         "multi": false,
         "refresh": 1
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "label": "Platform namespace",
+        "hide": 0,
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(kamiwaza_platform_condition, namespace)",
+        "query": {
+          "query": "label_values(kamiwaza_platform_condition, namespace)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "current": {},
+        "multi": false,
+        "includeAll": false,
+        "sort": 1
       }
     ]
+  },
+  "annotations": {
+    "list": []
   },
   "panels": [
     {
       "id": 1,
       "type": "row",
-      "title": "etcd",
+      "title": "Capabilities",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -89,15 +121,9 @@
       "panels": []
     },
     {
-      "id": 2,
-      "type": "stat",
-      "title": "etcd Has Leader",
-      "gridPos": {
-        "x": 0,
-        "y": 1,
-        "w": 4,
-        "h": 3
-      },
+      "type": "table",
+      "title": "Data Capabilities",
+      "description": "Capabilities that hold durable platform state",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -109,17 +135,144 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "etcd_server_has_leader{job=\"core-etcd\"} or vector(0)",
+          "expr": "(kamiwaza_platform_component_state{namespace=\"$namespace\", component=~\"statefulStorage|durableData|objectStorage|metadataCatalog|modelArtifacts\"} == 1) * on (namespace, name, component) group_left (reason) kamiwaza_platform_component_reason{namespace=\"$namespace\"}",
+          "legendFormat": "",
           "instant": true,
-          "legendFormat": ""
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": ["component", "state", "reason"]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "component": 0,
+              "state": 1,
+              "reason": 2
+            },
+            "renameByName": {
+              "component": "Capability",
+              "state": "State",
+              "reason": "Reason"
+            }
+          }
+        }
+      ],
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Capability",
+            "desc": false
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "displayMode": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "State"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Ready": {
+                        "color": "green"
+                      },
+                      "ExternalReady": {
+                        "color": "green"
+                      },
+                      "DisabledByPlan": {
+                        "color": "text"
+                      },
+                      "Progressing": {
+                        "color": "orange"
+                      },
+                      "Blocked": {
+                        "color": "red"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "id": 2,
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 24,
+        "h": 7
+      }
+    },
+    {
+      "id": 3,
+      "type": "row",
+      "title": "Coordination Store (etcd)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "etcd Has Leader",
+      "description": "Members that see an elected leader",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "min(etcd_server_has_leader{job=\"core-etcd\", namespace=\"$namespace\"}) or vector(0)",
+          "legendFormat": "",
+          "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": ""
         },
         "orientation": "auto",
@@ -155,7 +308,7 @@
                   "color": "red"
                 },
                 "1": {
-                  "text": "HAS LEADER",
+                  "text": "LEADER",
                   "color": "green"
                 }
               }
@@ -163,18 +316,19 @@
           ]
         },
         "overrides": []
+      },
+      "id": 4,
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 6,
+        "h": 4
       }
     },
     {
-      "id": 3,
       "type": "stat",
-      "title": "etcd DB Size",
-      "gridPos": {
-        "x": 4,
-        "y": 1,
-        "w": 4,
-        "h": 3
-      },
+      "title": "etcd Members Up",
+      "description": "Members answering on their metrics port",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -186,17 +340,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "etcd_mvcc_db_total_size_in_bytes{job=\"core-etcd\"}",
-          "instant": true,
-          "legendFormat": ""
+          "expr": "sum(up{job=\"core-etcd\", namespace=\"$namespace\"}) or vector(0)",
+          "legendFormat": "",
+          "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": ""
         },
         "orientation": "auto",
@@ -210,39 +362,92 @@
           "color": {
             "mode": "thresholds"
           },
-          "unit": "bytes",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "id": 5,
+      "gridPos": {
+        "x": 6,
+        "y": 9,
+        "w": 6,
+        "h": 4
+      }
+    },
+    {
+      "type": "stat",
+      "title": "etcd DB Size",
+      "description": "Largest member database size",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max(etcd_mvcc_db_total_size_in_bytes{job=\"core-etcd\", namespace=\"$namespace\"})",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "orange",
-                "value": 2000000000
-              },
-              {
-                "color": "red",
-                "value": 4000000000
               }
             ]
-          }
+          },
+          "unit": "bytes"
         },
         "overrides": []
+      },
+      "id": 6,
+      "gridPos": {
+        "x": 12,
+        "y": 9,
+        "w": 6,
+        "h": 4
       }
     },
     {
-      "id": 4,
       "type": "stat",
-      "title": "etcd Leader Changes",
-      "description": "Total leader re-elections \u2014 nonzero indicates instability",
-      "gridPos": {
-        "x": 8,
-        "y": 1,
-        "w": 4,
-        "h": 3
-      },
+      "title": "etcd Leader Changes (1h)",
+      "description": "Leader elections observed in the last hour",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -254,17 +459,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(etcd_server_leader_changes_seen_total{job=\"core-etcd\"}[1h])",
-          "instant": true,
-          "legendFormat": ""
+          "expr": "max(increase(etcd_server_leader_changes_seen_total{job=\"core-etcd\", namespace=\"$namespace\"}[1h])) or vector(0)",
+          "legendFormat": "",
+          "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": ""
         },
         "orientation": "auto",
@@ -278,7 +481,6 @@
           "color": {
             "mode": "thresholds"
           },
-          "unit": "short",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -289,27 +491,24 @@
               {
                 "color": "orange",
                 "value": 1
-              },
-              {
-                "color": "red",
-                "value": 5
               }
             ]
           }
         },
         "overrides": []
+      },
+      "id": 7,
+      "gridPos": {
+        "x": 18,
+        "y": 9,
+        "w": 6,
+        "h": 4
       }
     },
     {
-      "id": 5,
       "type": "timeseries",
       "title": "etcd Proposals Committed vs Failed /s",
-      "gridPos": {
-        "x": 12,
-        "y": 1,
-        "w": 12,
-        "h": 7
-      },
+      "description": "Raft proposals per second",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -321,8 +520,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(etcd_server_proposals_committed_total{job=\"core-etcd\"}[5m])",
-          "legendFormat": "Committed/s"
+          "expr": "sum(rate(etcd_server_proposals_committed_total{job=\"core-etcd\", namespace=\"$namespace\"}[5m]))",
+          "legendFormat": "committed"
         },
         {
           "refId": "B",
@@ -330,8 +529,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(etcd_server_proposals_failed_total{job=\"core-etcd\"}[5m])",
-          "legendFormat": "Failed/s (should be 0)"
+          "expr": "sum(rate(etcd_server_proposals_failed_total{job=\"core-etcd\", namespace=\"$namespace\"}[5m]))",
+          "legendFormat": "failed"
         }
       ],
       "options": {
@@ -361,40 +560,20 @@
           },
           "unit": "ops"
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Failed/s (should be 0)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              },
-              {
-                "id": "custom.lineWidth",
-                "value": 2
-              }
-            ]
-          }
-        ]
+        "overrides": []
+      },
+      "id": 8,
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 8,
+        "h": 8
       }
     },
     {
-      "id": 6,
       "type": "timeseries",
       "title": "etcd WAL Fsync Duration (p99)",
-      "description": "p99 WAL sync latency \u2014 high values signal disk I/O pressure",
-      "gridPos": {
-        "x": 0,
-        "y": 8,
-        "w": 12,
-        "h": 6
-      },
+      "description": "Disk latency of write-ahead log fsync per member",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -406,8 +585,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job=\"core-etcd\"}[5m]))",
-          "legendFormat": "p99 WAL fsync"
+          "expr": "histogram_quantile(0.99, sum by (le, pod) (rate(etcd_disk_wal_fsync_duration_seconds_bucket{job=\"core-etcd\", namespace=\"$namespace\"}[5m])))",
+          "legendFormat": "{{pod}}"
         }
       ],
       "options": {
@@ -430,47 +609,27 @@
             "gradientMode": "none",
             "spanNulls": false,
             "showPoints": "never",
-            "drawStyle": "line",
-            "thresholdsStyle": {
-              "mode": "line+area"
-            }
+            "drawStyle": "line"
           },
           "color": {
-            "fixedColor": "orange",
-            "mode": "fixed"
+            "mode": "palette-classic"
           },
-          "unit": "s",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "transparent",
-                "value": null
-              },
-              {
-                "color": "rgba(255, 152, 48, 0.1)",
-                "value": 0.01
-              },
-              {
-                "color": "rgba(242, 73, 92, 0.15)",
-                "value": 0.1
-              }
-            ]
-          }
+          "unit": "s"
         },
         "overrides": []
+      },
+      "id": 9,
+      "gridPos": {
+        "x": 8,
+        "y": 13,
+        "w": 8,
+        "h": 8
       }
     },
     {
-      "id": 7,
       "type": "timeseries",
       "title": "etcd DB Size Trend",
-      "gridPos": {
-        "x": 12,
-        "y": 8,
-        "w": 12,
-        "h": 6
-      },
+      "description": "Database size per member",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -482,8 +641,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "etcd_mvcc_db_total_size_in_bytes{job=\"core-etcd\"}",
-          "legendFormat": "DB size"
+          "expr": "etcd_mvcc_db_total_size_in_bytes{job=\"core-etcd\", namespace=\"$namespace\"}",
+          "legendFormat": "{{pod}}"
         }
       ],
       "options": {
@@ -494,10 +653,7 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": [
-            "last",
-            "max"
-          ]
+          "calcs": []
         }
       },
       "fieldConfig": {
@@ -512,104 +668,94 @@
             "drawStyle": "line"
           },
           "color": {
-            "fixedColor": "blue",
-            "mode": "fixed"
+            "mode": "palette-classic"
           },
           "unit": "bytes"
         },
         "overrides": []
+      },
+      "id": 10,
+      "gridPos": {
+        "x": 16,
+        "y": 13,
+        "w": 8,
+        "h": 8
       }
     },
     {
-      "id": 8,
+      "id": 11,
       "type": "row",
-      "title": "PostgreSQL",
+      "title": "Durable Data (PostgreSQL)",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 14,
+        "y": 21,
         "w": 24,
         "h": 1
       },
       "panels": []
     },
     {
-      "id": 9,
       "type": "stat",
       "title": "Active Connections",
+      "description": "Connections to the kamiwaza database",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (instance) (sum by (instance) (pg_stat_activity_count{job=\"postgres-exporter\", datname=\"kamiwaza\"}))",
+          "legendFormat": "",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "id": 12,
       "gridPos": {
         "x": 0,
-        "y": 15,
-        "w": 3,
-        "h": 3
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "pg_stat_activity_count{job=\"postgres-exporter\", datname=\"kamiwaza\"}",
-          "instant": true,
-          "legendFormat": ""
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 80
-              },
-              {
-                "color": "red",
-                "value": 100
-              }
-            ]
-          }
-        },
-        "overrides": []
+        "y": 22,
+        "w": 6,
+        "h": 4
       }
     },
     {
-      "id": 10,
       "type": "stat",
       "title": "DB Size",
-      "gridPos": {
-        "x": 3,
-        "y": 15,
-        "w": 3,
-        "h": 3
-      },
+      "description": "Size of the kamiwaza database",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -621,17 +767,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "pg_database_size_bytes{job=\"postgres-exporter\", datname=\"kamiwaza\"}",
-          "instant": true,
-          "legendFormat": ""
+          "expr": "max(pg_database_size_bytes{job=\"postgres-exporter\", datname=\"kamiwaza\"})",
+          "legendFormat": "",
+          "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": ""
         },
         "orientation": "auto",
@@ -645,38 +789,31 @@
           "color": {
             "mode": "thresholds"
           },
-          "unit": "bytes",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "orange",
-                "value": 5000000000
-              },
-              {
-                "color": "red",
-                "value": 10000000000
               }
             ]
-          }
+          },
+          "unit": "bytes"
         },
         "overrides": []
+      },
+      "id": 13,
+      "gridPos": {
+        "x": 6,
+        "y": 22,
+        "w": 6,
+        "h": 4
       }
     },
     {
-      "id": 11,
       "type": "stat",
       "title": "Deadlocks (1h)",
-      "gridPos": {
-        "x": 6,
-        "y": 15,
-        "w": 3,
-        "h": 3
-      },
+      "description": "Deadlocks detected in the last hour",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -688,17 +825,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "increase(pg_stat_database_deadlocks{job=\"postgres-exporter\", datname=\"kamiwaza\"}[1h])",
-          "instant": true,
-          "legendFormat": ""
+          "expr": "round(max(increase(pg_stat_database_deadlocks{job=\"postgres-exporter\", datname=\"kamiwaza\"}[1h]))) or vector(0)",
+          "legendFormat": "",
+          "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": ""
         },
         "orientation": "auto",
@@ -712,7 +847,6 @@
           "color": {
             "mode": "thresholds"
           },
-          "unit": "short",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -725,33 +859,22 @@
                 "value": 1
               }
             ]
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "0 (OK)",
-                  "color": "green"
-                }
-              }
-            }
-          ]
+          }
         },
         "overrides": []
+      },
+      "id": 14,
+      "gridPos": {
+        "x": 12,
+        "y": 22,
+        "w": 6,
+        "h": 4
       }
     },
     {
-      "id": 17,
       "type": "stat",
       "title": "Cache Hit Ratio",
-      "description": "Buffer cache hit ratio \u2014 percentage of reads served from shared_buffers vs disk. Values below 95% warrant investigation.",
-      "gridPos": {
-        "x": 9,
-        "y": 15,
-        "w": 3,
-        "h": 3
-      },
+      "description": "Buffer cache hit ratio",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -763,17 +886,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "100 * pg_stat_database_blks_hit{job=\"postgres-exporter\", datname=\"kamiwaza\"} / (pg_stat_database_blks_hit{job=\"postgres-exporter\", datname=\"kamiwaza\"} + pg_stat_database_blks_read{job=\"postgres-exporter\", datname=\"kamiwaza\"} > 0)",
-          "instant": true,
-          "legendFormat": ""
+          "expr": "100 * max(pg_stat_database_blks_hit{job=\"postgres-exporter\", datname=\"kamiwaza\"}) / (max(pg_stat_database_blks_hit{job=\"postgres-exporter\", datname=\"kamiwaza\"}) + max(pg_stat_database_blks_read{job=\"postgres-exporter\", datname=\"kamiwaza\"}) > 0)",
+          "legendFormat": "",
+          "instant": true
         }
       ],
       "options": {
         "reduceOptions": {
           "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": ""
         },
         "orientation": "auto",
@@ -787,8 +908,6 @@
           "color": {
             "mode": "thresholds"
           },
-          "unit": "percent",
-          "decimals": 1,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -802,24 +921,26 @@
               },
               {
                 "color": "green",
-                "value": 95
+                "value": 99
               }
             ]
-          }
+          },
+          "unit": "percent"
         },
         "overrides": []
+      },
+      "id": 15,
+      "gridPos": {
+        "x": 18,
+        "y": 22,
+        "w": 6,
+        "h": 4
       }
     },
     {
-      "id": 12,
       "type": "timeseries",
-      "title": "PostgreSQL Transactions/sec",
-      "gridPos": {
-        "x": 12,
-        "y": 15,
-        "w": 12,
-        "h": 7
-      },
+      "title": "Transactions/sec",
+      "description": "Commits and rollbacks per second",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -831,8 +952,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(pg_stat_database_xact_commit{job=\"postgres-exporter\", datname=\"kamiwaza\"}[5m])",
-          "legendFormat": "Commits/s"
+          "expr": "sum(rate(pg_stat_database_xact_commit{job=\"postgres-exporter\", datname=\"kamiwaza\"}[5m]))",
+          "legendFormat": "commit"
         },
         {
           "refId": "B",
@@ -840,8 +961,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(pg_stat_database_xact_rollback{job=\"postgres-exporter\", datname=\"kamiwaza\"}[5m])",
-          "legendFormat": "Rollbacks/s"
+          "expr": "sum(rate(pg_stat_database_xact_rollback{job=\"postgres-exporter\", datname=\"kamiwaza\"}[5m]))",
+          "legendFormat": "rollback"
         }
       ],
       "options": {
@@ -852,9 +973,7 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": [
-            "mean"
-          ]
+          "calcs": []
         }
       },
       "fieldConfig": {
@@ -874,18 +993,19 @@
           "unit": "ops"
         },
         "overrides": []
+      },
+      "id": 16,
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 8,
+        "h": 8
       }
     },
     {
-      "id": 13,
       "type": "timeseries",
-      "title": "PostgreSQL Active Connections Over Time",
-      "gridPos": {
-        "x": 0,
-        "y": 22,
-        "w": 12,
-        "h": 7
-      },
+      "title": "Connections by State",
+      "description": "Connections to the kamiwaza database by state",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -897,8 +1017,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "pg_stat_activity_count{job=\"postgres-exporter\", datname=\"kamiwaza\"}",
-          "legendFormat": "Active connections"
+          "expr": "sum by (state) (pg_stat_activity_count{job=\"postgres-exporter\", datname=\"kamiwaza\"})",
+          "legendFormat": "{{state}}"
         }
       ],
       "options": {
@@ -909,10 +1029,7 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": [
-            "mean",
-            "max"
-          ]
+          "calcs": []
         }
       },
       "fieldConfig": {
@@ -927,24 +1044,23 @@
             "drawStyle": "line"
           },
           "color": {
-            "fixedColor": "green",
-            "mode": "fixed"
-          },
-          "unit": "short"
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
+      },
+      "id": 17,
+      "gridPos": {
+        "x": 8,
+        "y": 26,
+        "w": 8,
+        "h": 8
       }
     },
     {
-      "id": 14,
       "type": "timeseries",
-      "title": "PostgreSQL Row Activity",
-      "gridPos": {
-        "x": 12,
-        "y": 22,
-        "w": 12,
-        "h": 7
-      },
+      "title": "Row Activity",
+      "description": "Rows fetched, inserted, updated, and deleted per second",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -956,8 +1072,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(pg_stat_database_tup_fetched{job=\"postgres-exporter\", datname=\"kamiwaza\"}[5m])",
-          "legendFormat": "Rows fetched/s"
+          "expr": "sum(rate(pg_stat_database_tup_fetched{job=\"postgres-exporter\", datname=\"kamiwaza\"}[5m]))",
+          "legendFormat": "fetched"
         },
         {
           "refId": "B",
@@ -965,8 +1081,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(pg_stat_database_tup_inserted{job=\"postgres-exporter\", datname=\"kamiwaza\"}[5m])",
-          "legendFormat": "Rows inserted/s"
+          "expr": "sum(rate(pg_stat_database_tup_inserted{job=\"postgres-exporter\", datname=\"kamiwaza\"}[5m]))",
+          "legendFormat": "inserted"
         },
         {
           "refId": "C",
@@ -974,8 +1090,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(pg_stat_database_tup_updated{job=\"postgres-exporter\", datname=\"kamiwaza\"}[5m])",
-          "legendFormat": "Rows updated/s"
+          "expr": "sum(rate(pg_stat_database_tup_updated{job=\"postgres-exporter\", datname=\"kamiwaza\"}[5m]))",
+          "legendFormat": "updated"
         },
         {
           "refId": "D",
@@ -983,8 +1099,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(pg_stat_database_tup_deleted{job=\"postgres-exporter\", datname=\"kamiwaza\"}[5m])",
-          "legendFormat": "Rows deleted/s"
+          "expr": "sum(rate(pg_stat_database_tup_deleted{job=\"postgres-exporter\", datname=\"kamiwaza\"}[5m]))",
+          "legendFormat": "deleted"
         }
       ],
       "options": {
@@ -995,9 +1111,7 @@
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "calcs": [
-            "mean"
-          ]
+          "calcs": []
         }
       },
       "fieldConfig": {
@@ -1005,7 +1119,7 @@
           "custom": {
             "lineInterpolation": "linear",
             "lineWidth": 1,
-            "fillOpacity": 5,
+            "fillOpacity": 10,
             "gradientMode": "none",
             "spanNulls": false,
             "showPoints": "never",
@@ -1017,62 +1131,203 @@
           "unit": "ops"
         },
         "overrides": []
+      },
+      "id": 18,
+      "gridPos": {
+        "x": 16,
+        "y": 26,
+        "w": 8,
+        "h": 8
       }
     },
     {
-      "id": 15,
+      "id": 19,
       "type": "row",
-      "title": "Data Infrastructure Logs",
-      "collapsed": true,
+      "title": "Metadata Catalog",
+      "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 29,
+        "y": 34,
         "w": 24,
         "h": 1
       },
-      "panels": [
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "JVM Heap Used",
+      "description": "Heap in use per catalog service",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
         {
-          "id": 16,
-          "type": "logs",
-          "title": "etcd & PostgreSQL Logs (ERROR / WARNING)",
-          "gridPos": {
-            "x": 0,
-            "y": 30,
-            "w": 24,
-            "h": 8
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
+          "expr": "sum by (job) (jvm_memory_used_bytes{job=~\"datahub-gms|datahub-frontend\", namespace=\"$namespace\", area=\"heap\"})",
+          "legendFormat": "{{job}} used"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (job) (jvm_memory_max_bytes{job=~\"datahub-gms|datahub-frontend\", namespace=\"$namespace\", area=\"heap\"})",
+          "legendFormat": "{{job}} max"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "id": 20,
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "JVM GC Time",
+      "description": "Seconds per second spent in garbage collection",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (job, gc) (rate(jvm_gc_collection_seconds_sum{job=~\"datahub-gms|datahub-frontend\", namespace=\"$namespace\"}[5m]))",
+          "legendFormat": "{{job}} {{gc}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "drawStyle": "line"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "id": 21,
+      "gridPos": {
+        "x": 12,
+        "y": 35,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "id": 22,
+      "type": "row",
+      "title": "Logs",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 43,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "logs",
+      "title": "etcd & PostgreSQL Logs (ERROR / WARNING)",
+      "description": "Coordination store and database logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki_datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
           "datasource": {
             "type": "loki",
             "uid": "${loki_datasource}"
           },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "loki",
-                "uid": "${loki_datasource}"
-              },
-              "expr": "{namespace=\"kamiwaza\", container=~\"etcd|postgres.*\"} |~ \"(?i)(error|warning|fatal|panic)\"",
-              "legendFormat": ""
-            }
-          ],
-          "options": {
-            "showTime": true,
-            "showLabels": true,
-            "showCommonLabels": false,
-            "wrapLogMessage": true,
-            "prettifyLogMessage": false,
-            "enableLogDetails": true,
-            "sortOrder": "Descending",
-            "dedupStrategy": "none"
-          },
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "maxDataPoints": 100
+          "expr": "{namespace=\"$namespace\", container=~\"etcd|postgres\"} |~ \"(?i)(error|warning|fatal|panic)\"",
+          "legendFormat": ""
         }
-      ]
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "maxDataPoints": 100,
+      "id": 23,
+      "gridPos": {
+        "x": 0,
+        "y": 44,
+        "w": 24,
+        "h": 10
+      }
     }
   ]
 }

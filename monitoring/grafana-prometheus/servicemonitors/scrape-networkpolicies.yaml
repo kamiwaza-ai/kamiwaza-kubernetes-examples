@@ -1,0 +1,143 @@
+# Admit Prometheus to the platform's metrics ports, and nothing else.
+#
+# The operator installs a default-deny ingress floor for every platform pod and
+# then admits only the platform's own callers. A scraper in another namespace
+# is not one of them, so without these policies every platform target reports
+# `up == 0` with a connection timeout.
+#
+# NetworkPolicies are additive. These add one narrow allowance per metrics
+# port; they do not widen any API port, and they carry no operator ownership,
+# so reconciliation neither adopts nor removes them. Each peer requires both
+# the `monitoring` namespace and the Prometheus pod label, so other workloads in
+# the monitoring namespace stay denied.
+#
+# The platform operator pod has no ingress floor; its metrics endpoint
+# authenticates each scrape instead (see `../operator-metrics/`).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-coordination-store
+  namespace: kamiwaza
+  labels:
+    app.kubernetes.io/part-of: kamiwaza
+    app.kubernetes.io/component: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: core-etcd
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-delegated-compute
+  namespace: kamiwaza
+  labels:
+    app.kubernetes.io/part-of: kamiwaza
+    app.kubernetes.io/component: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: core-raycluster
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-metadata-catalog
+  namespace: kamiwaza
+  labels:
+    app.kubernetes.io/part-of: kamiwaza
+    app.kubernetes.io/component: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: metadata-catalog
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 4318
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-authorization
+  namespace: kamiwaza
+  labels:
+    app.kubernetes.io/part-of: kamiwaza
+    app.kubernetes.io/component: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: spicedb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 9090
+          protocol: TCP
+---
+# The PostgreSQL exporter (`exporters/`) runs beside the database in the
+# platform namespace and dials it directly. Only that exporter is admitted.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-postgres-exporter-durable-data
+  namespace: kamiwaza
+  labels:
+    app.kubernetes.io/part-of: kamiwaza
+    app.kubernetes.io/component: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: core-postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus-postgres-exporter
+      ports:
+        - port: 5432
+          protocol: TCP
