@@ -1,6 +1,6 @@
 # Kamiwaza Grafana dashboards
 
-Nine Grafana dashboards for a platform reconciled by the Kamiwaza platform operator: eight for the platform, and one for the Tomo extension.
+Ten Grafana dashboards for a platform reconciled by the Kamiwaza platform operator: eight for the platform, and two for the Tomo extension.
 
 Each file is a Grafana **v2 dashboard resource** (`apiVersion: dashboard.grafana.app/v2`), the schema behind Grafana 13's dynamic dashboards. They need **Grafana 13 or later**; kube-prometheus-stack 91.5.2 ships Grafana 13.2.2. An older Grafana rejects them.
 
@@ -18,7 +18,8 @@ Start at **kam-01**. Each dashboard answers one question, and its tiles link to 
 | `kam-06-auth-identity.json`       | Kamiwaza · Auth & Identity                 | Can users sign in, are authorization decisions fast and correct, are certificates valid? |
 | `kam-07-kubernetes-events.json`   | Kamiwaza · Kubernetes Events & Stability   | Which pods in the platform namespace are failing or short of resources?                  |
 | `kam-08-log-explorer.json`        | Kamiwaza · Log Explorer                    | What are the workloads saying?                                                           |
-| `kam-09-tomo.json`                | Kamiwaza · Tomo                            | Is Tomo answering members, and how are its models and tools doing?                       |
+| `kam-09-tomo.json`                | Kamiwaza · Tomo operations                 | Is Tomo answering members, and how are its models and tools doing?                       |
+| `kam-10-tomo-product.json`        | Kamiwaza · Tomo product insight            | How do members use Tomo, where do they struggle, and which features earn their place?    |
 
 Every dashboard carries its question as its description and in a collapsed **About this dashboard** section.
 
@@ -41,7 +42,7 @@ These rules follow Grafana's [dashboard best practices](https://grafana.com/docs
 8. **Name series by workload, not by pod.** Legends read `workload · container`, from `app.kubernetes.io/name`, so a rollout does not rename a series and replicas of one workload share a line. Saturation rankings leave out one-shot Job pods, whose saturation is not actionable. Log panels drop Alloy's `service_name` and `stream` labels, which repeat the workload and level.
 9. **No stacking, except for log-volume charts.** Stacked series hide individual values. Log volume is a total by design.
 10. **One place per fact.** kam-01 holds every capability's state and history, and marks the operator's warning events on its time axis. A detail dashboard shows at most the one capability it is about, then the signals behind it. Each component has one name on every dashboard.
-11. **Refresh every minute.** Prometheus scrapes every 30 seconds, so refreshing faster only adds load.
+11. **Refresh every minute.** Prometheus scrapes every 30 seconds, so refreshing faster only adds load. kam-10 is the exception: it reads Tomo's database, its numbers move by the day, and it refreshes every 15 minutes over the last 30 days.
 
 ## Grafana features in use
 
@@ -81,27 +82,27 @@ done
 
 ## Datasource requirements
 
-| Datasource | Required for                                  | Default URL                                                                                          |
-| ---------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Prometheus | kam-01 through kam-07, kam-09                 | `http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090`                          |
-| Loki       | Log panels on every dashboard                 | `http://loki.monitoring.svc.cluster.local:3100`                                                      |
-| PostgreSQL | kam-09 model, turn, and connector-tool panels | One **Tomo · &lt;install&gt;** datasource per Tomo install, provisioned by `../tomo/connect-tomo.sh` |
+| Datasource | Required for                                              | Default URL                                                                                          |
+| ---------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Prometheus | kam-01 through kam-07, kam-09                             | `http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090`                          |
+| Loki       | Log panels on every dashboard                             | `http://loki.monitoring.svc.cluster.local:3100`                                                      |
+| PostgreSQL | kam-10, and kam-09 model, turn, and connector-tool panels | One **Tomo · &lt;install&gt;** datasource per Tomo install, provisioned by `../tomo/connect-tomo.sh` |
 
-The **Metrics** and **Logs** selectors pick the datasource by type (`prometheus`, `loki`), so no name mapping is needed. kam-09 picks the PostgreSQL datasource named for the selected Tomo install.
+The **Metrics** and **Logs** selectors pick the datasource by type (`prometheus`, `loki`), so no name mapping is needed. kam-09 and kam-10 pick the PostgreSQL datasource named for the selected Tomo install.
 
 ## Where the data comes from
 
-| Series                                                                                                  | Source                                                   | Set up by                                                                          |
-| ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `kamiwaza_platform_*`, `kamiwaza_model_deployment_*`, `kamiwaza_extension_*`, `kamiwaza_sandbox_pool_*` | Conditions and status on the operator's custom resources | kube-state-metrics custom resource state in `../kube-prometheus-stack-values.yaml` |
-| `kamiwaza_operator_*`, `leader_election_master_status`                                                  | The operator manager                                     | `../operator-metrics/`                                                             |
-| `etcd_*`, `grpc_server_*`, `jvm_*`, `up` for delegated compute                                          | Platform workloads                                       | `../servicemonitors/`                                                              |
-| `pg_*`                                                                                                  | PostgreSQL exporter                                      | `../exporters/`                                                                    |
-| `certmanager_*`                                                                                         | cert-manager                                             | `../servicemonitors/cert-manager-servicemonitor.yaml`                              |
-| Container, pod, node, limit, and PVC series                                                             | kubelet and kube-state-metrics                           | kube-prometheus-stack                                                              |
-| `app`, `container`, `extension`, and `model` log labels                                                 | Alloy                                                    | `../alloy-values.yaml`                                                             |
-| `kaizen_*`, `tool_run_total`, `sandbox_*`, `worker_queue_depth`                                         | Tomo's API and workers                                   | `../tomo/connect-tomo.sh`                                                          |
-| Model, turn, connector-tool, and feedback history                                                       | Content-free columns of Tomo's database                  | `../tomo/connect-tomo.sh`                                                          |
+| Series                                                                                                  | Source                                                                         | Set up by                                                                          |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `kamiwaza_platform_*`, `kamiwaza_model_deployment_*`, `kamiwaza_extension_*`, `kamiwaza_sandbox_pool_*` | Conditions and status on the operator's custom resources                       | kube-state-metrics custom resource state in `../kube-prometheus-stack-values.yaml` |
+| `kamiwaza_operator_*`, `leader_election_master_status`                                                  | The operator manager                                                           | `../operator-metrics/`                                                             |
+| `etcd_*`, `grpc_server_*`, `jvm_*`, `up` for delegated compute                                          | Platform workloads                                                             | `../servicemonitors/`                                                              |
+| `pg_*`                                                                                                  | PostgreSQL exporter                                                            | `../exporters/`                                                                    |
+| `certmanager_*`                                                                                         | cert-manager                                                                   | `../servicemonitors/cert-manager-servicemonitor.yaml`                              |
+| Container, pod, node, limit, and PVC series                                                             | kubelet and kube-state-metrics                                                 | kube-prometheus-stack                                                              |
+| `app`, `container`, `extension`, and `model` log labels                                                 | Alloy                                                                          | `../alloy-values.yaml`                                                             |
+| `kaizen_*`, `tool_run_total`, `sandbox_*`, `worker_queue_depth`                                         | Tomo's API and workers                                                         | `../tomo/connect-tomo.sh`                                                          |
+| Member usage, feature use, votes, model, turn, and connector-tool history                               | Tomo's database, through the content-free functions in `../tomo/reporting.sql` | `../tomo/connect-tomo.sh`                                                          |
 
 ## What these dashboards do not show
 

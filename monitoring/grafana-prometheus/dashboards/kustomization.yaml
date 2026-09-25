@@ -44,3 +44,6 @@ configMapGenerator:
   - name: kam-09-tomo
     files:
       - kam-09-tomo.json
+  - name: kam-10-tomo-product
+    files:
+      - kam-10-tomo-product.json

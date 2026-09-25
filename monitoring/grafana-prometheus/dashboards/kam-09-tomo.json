@@ -5,7 +5,7 @@
     "name": "kam-09"
   },
   "spec": {
-    "title": "Kamiwaza · Tomo",
+    "title": "Kamiwaza · Tomo operations",
     "description": "Is Tomo answering members, and how are its models and tools doing?",
     "tags": ["kamiwaza"],
     "editable": false,
@@ -13,6 +13,18 @@
     "liveNow": false,
     "preload": false,
     "links": [
+      {
+        "title": "Tomo product insight",
+        "type": "link",
+        "icon": "dashboard",
+        "tooltip": "How members use Tomo",
+        "url": "/d/kam-10",
+        "tags": [],
+        "asDropdown": false,
+        "targetBlank": false,
+        "includeVars": true,
+        "keepTime": false
+      },
       {
         "title": "Kamiwaza dashboards",
         "type": "dashboards",
@@ -586,7 +598,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT count(*) FILTER (WHERE status IN ('completed', 'salvaged')) AS value FROM conversation_input WHERE kind IN ('message', 'steer') AND $__timeFilter(accepted_at)",
+                        "rawSql": "SELECT count(*) FILTER (WHERE status IN ('completed', 'salvaged')) AS value FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind IN ('message', 'steer')",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "table"
@@ -668,7 +680,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT count(*) FILTER (WHERE status = 'failed') AS value FROM conversation_input WHERE kind IN ('message', 'steer') AND $__timeFilter(accepted_at)",
+                        "rawSql": "SELECT count(*) FILTER (WHERE status = 'failed') AS value FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind IN ('message', 'steer')",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "table"
@@ -964,7 +976,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT COALESCE(NULLIF(model_id, ''), 'Unattributed') AS model,\n       string_agg(DISTINCT route, ', ') AS route,\n       count(*) AS calls,\n       100.0 * count(*) FILTER (WHERE outcome = 'ok') / count(*) AS success,\n       percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms) / 1000.0 AS p50,\n       percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) / 1000.0 AS p95,\n       COALESCE(sum(prompt_token_count), 0) AS input_tokens,\n       COALESCE(sum(response_token_count), 0) AS output_tokens,\n       100.0 * COALESCE(sum(prompt_cache_read_tokens), 0) / NULLIF(sum(prompt_token_count), 0) AS cached\n  FROM llm_audit_event\n WHERE $__timeFilter(created_at)\n GROUP BY 1\n ORDER BY calls DESC",
+                        "rawSql": "SELECT model, string_agg(DISTINCT route, ', ') AS route, count(*) AS calls,\n       100.0 * count(*) FILTER (WHERE outcome = 'ok') / count(*) AS success,\n       percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms) / 1000.0 AS p50,\n       percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) / 1000.0 AS p95,\n       COALESCE(sum(input_tokens), 0) AS input_tokens, COALESCE(sum(output_tokens), 0) AS output_tokens,\n       100.0 * COALESCE(sum(cache_read_tokens), 0) / NULLIF(sum(input_tokens), 0) AS cached\n  FROM model_calls($__timeFrom()::timestamptz, $__timeTo()::timestamptz)\n GROUP BY 1\n ORDER BY calls DESC",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "table"
@@ -1236,7 +1248,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeGroupAlias(created_at, $__interval, 0), COALESCE(NULLIF(model_id, ''), 'Unattributed') AS metric, count(*) AS value\n  FROM llm_audit_event\n WHERE $__timeFilter(created_at)\n GROUP BY 1, 2\n ORDER BY 1",
+                        "rawSql": "SELECT $__timeGroupAlias(created_at, $__interval, 0), model AS metric, count(*) AS value\n  FROM model_calls($__timeFrom()::timestamptz, $__timeTo()::timestamptz) GROUP BY 1, 2 ORDER BY 1",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -1325,7 +1337,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeGroupAlias(created_at, $__interval, 0), COALESCE(NULLIF(model_id, ''), 'Unattributed') AS metric,\n       sum(COALESCE(prompt_token_count, 0) + COALESCE(response_token_count, 0)) AS value\n  FROM llm_audit_event\n WHERE $__timeFilter(created_at)\n GROUP BY 1, 2\n ORDER BY 1",
+                        "rawSql": "SELECT $__timeGroupAlias(created_at, $__interval, 0), model AS metric,\n       sum(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)) AS value\n  FROM model_calls($__timeFrom()::timestamptz, $__timeTo()::timestamptz) GROUP BY 1, 2 ORDER BY 1",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -1414,7 +1426,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeGroupAlias(created_at, $__interval), COALESCE(NULLIF(model_id, ''), 'Unattributed') AS metric,\n       percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) / 1000.0 AS value\n  FROM llm_audit_event\n WHERE $__timeFilter(created_at) AND outcome = 'ok'\n GROUP BY 1, 2\n ORDER BY 1",
+                        "rawSql": "SELECT $__timeGroupAlias(created_at, $__interval), model AS metric,\n       percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) / 1000.0 AS value\n  FROM model_calls($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE outcome = 'ok' GROUP BY 1, 2 ORDER BY 1",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -1590,7 +1602,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT COALESCE(NULLIF(model_id, ''), 'Unattributed') AS model, outcome, COALESCE(error_class, '') AS error,\n       count(*) AS calls, max(created_at) AS last_seen\n  FROM llm_audit_event\n WHERE $__timeFilter(created_at) AND outcome <> 'ok'\n GROUP BY 1, 2, 3\n ORDER BY calls DESC",
+                        "rawSql": "SELECT model, outcome, COALESCE(error_class, '') AS error, count(*) AS calls, max(created_at) AS last_seen\n  FROM model_calls($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE outcome <> 'ok' GROUP BY 1, 2, 3 ORDER BY calls DESC",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "table"
@@ -1728,7 +1740,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT COALESCE(NULLIF(model_catalog_id, ''), NULLIF(model_deployment_id, ''), 'Default model') AS model,\n       count(*) AS turns,\n       100.0 * count(*) FILTER (WHERE status IN ('completed', 'salvaged'))\n             / NULLIF(count(*) FILTER (WHERE status IN ('completed', 'salvaged', 'failed')), 0) AS success,\n       count(*) FILTER (WHERE status = 'failed') AS failed,\n       count(*) FILTER (WHERE status = 'cancelled') AS cancelled,\n       percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM completed_at - started_at))\n         FILTER (WHERE status IN ('completed', 'salvaged')) AS p50,\n       percentile_cont(0.95) WITHIN GROUP (ORDER BY extract(epoch FROM completed_at - started_at))\n         FILTER (WHERE status IN ('completed', 'salvaged')) AS p95,\n       mode() WITHIN GROUP (ORDER BY reasoning_effort) AS reasoning\n  FROM conversation_input WHERE kind IN ('message', 'steer') AND $__timeFilter(accepted_at)\n GROUP BY 1\n ORDER BY turns DESC",
+                        "rawSql": "SELECT model, count(*) AS turns,\n       100.0 * count(*) FILTER (WHERE status IN ('completed', 'salvaged'))\n             / NULLIF(count(*) FILTER (WHERE status IN ('completed', 'salvaged', 'failed')), 0) AS success,\n       count(*) FILTER (WHERE status = 'failed') AS failed,\n       count(*) FILTER (WHERE status = 'cancelled') AS cancelled,\n       percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM completed_at - started_at))\n         FILTER (WHERE status IN ('completed', 'salvaged')) AS p50,\n       percentile_cont(0.95) WITHIN GROUP (ORDER BY extract(epoch FROM completed_at - started_at))\n         FILTER (WHERE status IN ('completed', 'salvaged')) AS p95,\n       mode() WITHIN GROUP (ORDER BY reasoning_effort) AS reasoning\n  FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind IN ('message', 'steer')\n GROUP BY 1 ORDER BY turns DESC",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "table"
@@ -1957,7 +1969,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeGroupAlias(accepted_at, $__interval, 0),\n       CASE WHEN status IN ('completed', 'salvaged') THEN 'completed' ELSE status END AS metric,\n       count(*) AS value\n  FROM conversation_input WHERE kind IN ('message', 'steer') AND $__timeFilter(accepted_at) AND status IN ('completed', 'salvaged', 'failed', 'cancelled')\n GROUP BY 1, 2\n ORDER BY 1",
+                        "rawSql": "SELECT $__timeGroupAlias(accepted_at, $__interval, 0),\n       CASE WHEN status IN ('completed', 'salvaged') THEN 'completed' ELSE status END AS metric, count(*) AS value\n  FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind IN ('message', 'steer') AND status IN ('completed', 'salvaged', 'failed', 'cancelled')\n GROUP BY 1, 2 ORDER BY 1",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -2046,7 +2058,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT COALESCE(agent_name, 'Tomo') AS agent,\n       CASE execution_mode WHEN 'interactive' THEN 'Chat' ELSE 'Task' END AS mode,\n       count(*) AS turns,\n       count(*) FILTER (WHERE status = 'failed') AS failed\n  FROM conversation_input WHERE kind IN ('message', 'steer') AND $__timeFilter(accepted_at)\n GROUP BY 1, 2\n ORDER BY turns DESC",
+                        "rawSql": "SELECT COALESCE(agent_name, 'Tomo') AS agent,\n       CASE execution_mode WHEN 'interactive' THEN 'Chat' ELSE 'Task' END AS mode,\n       count(*) AS turns, count(*) FILTER (WHERE status = 'failed') AS failed\n  FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind IN ('message', 'steer') GROUP BY 1, 2 ORDER BY turns DESC",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "table"
@@ -2157,7 +2169,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT count(*) AS value FROM conversation_input WHERE status IN ('queued', 'claimed', 'running')",
+                        "rawSql": "SELECT count(*) AS value FROM turns(now() - interval '7 days', now()) WHERE status IN ('queued', 'claimed', 'running')",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "table"
@@ -2721,7 +2733,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT tool_name AS tool, capability,\n       count(*) AS calls,\n       count(*) FILTER (WHERE status = 'failed') AS failed,\n       count(*) FILTER (WHERE status = 'ambiguous') AS ambiguous,\n       count(*) FILTER (WHERE status = 'executing') AS running,\n       percentile_cont(0.95) WITHIN GROUP (ORDER BY extract(epoch FROM finished_at - created_at))\n         FILTER (WHERE finished_at IS NOT NULL) AS p95\n  FROM capability_invocation_receipt\n WHERE $__timeFilter(created_at)\n GROUP BY 1, 2\n ORDER BY calls DESC",
+                        "rawSql": "SELECT tool, capability, count(*) AS calls,\n       count(*) FILTER (WHERE status = 'failed') AS failed,\n       count(*) FILTER (WHERE status = 'ambiguous') AS ambiguous,\n       count(*) FILTER (WHERE status = 'executing') AS running,\n       percentile_cont(0.95) WITHIN GROUP (ORDER BY extract(epoch FROM finished_at - created_at))\n         FILTER (WHERE finished_at IS NOT NULL) AS p95\n  FROM connector_calls($__timeFrom()::timestamptz, $__timeTo()::timestamptz) GROUP BY 1, 2 ORDER BY calls DESC",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "table"
@@ -3193,7 +3205,7 @@
         "spec": {
           "id": 25,
           "title": "Answer feedback",
-          "description": "Member votes on answers in the time range",
+          "description": "Member thumbs-up and thumbs-down votes on answers in the time range",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -3210,7 +3222,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT count(*) FILTER (WHERE vote = 'up') AS \"helpful\",\n       count(*) FILTER (WHERE vote = 'down') AS \"not helpful\"\n  FROM chat_answer_feedback\n WHERE $__timeFilter(created_at)",
+                        "rawSql": "SELECT count(*) FILTER (WHERE vote = 'up') AS \"helpful\", count(*) FILTER (WHERE vote = 'down') AS \"not helpful\"\n  FROM answer_votes($__timeFrom()::timestamptz, $__timeTo()::timestamptz)",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "table"

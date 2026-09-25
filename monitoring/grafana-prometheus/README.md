@@ -1,19 +1,19 @@
 # Grafana + Prometheus monitoring for Kamiwaza
 
-**Scenario:** deploy a Prometheus + Grafana + Loki + Alloy monitoring stack for a platform reconciled by the Kamiwaza platform operator, with scrape configuration, exporters, and 9 pre-built dashboards. Each component is independently usable.
+**Scenario:** deploy a Prometheus + Grafana + Loki + Alloy monitoring stack for a platform reconciled by the Kamiwaza platform operator, with scrape configuration, exporters, and 10 pre-built dashboards. Each component is independently usable.
 
 **Tags:** #monitoring #prometheus #grafana #loki #dashboards
 
 ## What you get
 
-| Component                | Path                                                                         | Purpose                                                                                                                                                                                                                                                    |
-| ------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Dashboards**           | `dashboards/`                                                                | 9 Grafana dashboards: kam-01 through kam-08 cover platform capabilities, inference and compute, the application API, data infrastructure, extensions and the operator, auth, events, and logs; kam-09 covers the Tomo extension's models, turns, and tools |
-| **Tomo connection**      | `tomo/`                                                                      | Script that connects every Tomo install: its metrics scrape, and a read-only, content-free database datasource for kam-09                                                                                                                                  |
-| **Scrape configuration** | `servicemonitors/`                                                           | ServiceMonitors and PodMonitors for etcd, delegated compute, the metadata catalog, the authorization decision service, and cert-manager, plus the NetworkPolicies that admit Prometheus to those metrics ports                                             |
-| **Operator metrics**     | `operator-metrics/`                                                          | Serving certificate and Helm values that turn on the operator's authenticated metrics endpoint, ServiceMonitor, and alert rules                                                                                                                            |
-| **Postgres exporter**    | `exporters/`                                                                 | Helm values for `prometheus-postgres-exporter` against `core-postgres`                                                                                                                                                                                     |
-| **Full stack values**    | `kube-prometheus-stack-values.yaml`, `loki-values.yaml`, `alloy-values.yaml` | Helm values to deploy Prometheus, Grafana, Loki, and Alloy from scratch                                                                                                                                                                                    |
+| Component                | Path                                                                         | Purpose                                                                                                                                                                                                                                                                      |
+| ------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dashboards**           | `dashboards/`                                                                | 10 Grafana dashboards: kam-01 through kam-08 cover platform capabilities, inference and compute, the application API, data infrastructure, extensions and the operator, auth, events, and logs; kam-09 covers the Tomo extension's operations, and kam-10 how members use it |
+| **Tomo connection**      | `tomo/`                                                                      | Script that connects every Tomo install: its metrics scrape, and a read-only, content-free database datasource for kam-09 and kam-10                                                                                                                                         |
+| **Scrape configuration** | `servicemonitors/`                                                           | ServiceMonitors and PodMonitors for etcd, delegated compute, the metadata catalog, the authorization decision service, and cert-manager, plus the NetworkPolicies that admit Prometheus to those metrics ports                                                               |
+| **Operator metrics**     | `operator-metrics/`                                                          | Serving certificate and Helm values that turn on the operator's authenticated metrics endpoint, ServiceMonitor, and alert rules                                                                                                                                              |
+| **Postgres exporter**    | `exporters/`                                                                 | Helm values for `prometheus-postgres-exporter` against `core-postgres`                                                                                                                                                                                                       |
+| **Full stack values**    | `kube-prometheus-stack-values.yaml`, `loki-values.yaml`, `alloy-values.yaml` | Helm values to deploy Prometheus, Grafana, Loki, and Alloy from scratch                                                                                                                                                                                                      |
 
 ## How the stack reads the platform
 
@@ -91,7 +91,7 @@ helm upgrade --install kamiwaza-platform-operator <operator chart> \
 
 The operator chart creates its own ServiceMonitor and PrometheusRule in the operator namespace. It requires the Prometheus Operator CRDs, so install kube-prometheus-stack first.
 
-If Tomo is installed, connect every install for kam-09, and run the script again whenever an install is added or removed. See [tomo/README.md](tomo/README.md) for what it grants:
+If Tomo is installed, connect every install for kam-09 and kam-10, and run the script again whenever an install is added or removed. See [tomo/README.md](tomo/README.md) for what it grants:
 
 ```bash
 monitoring/grafana-prometheus/tomo/connect-tomo.sh
@@ -156,17 +156,18 @@ The chart stores the generated Grafana admin password in `Secret/monitoring/kube
 
 The dashboards are Grafana v2 dashboard resources and need Grafana 13 or later. Start at **kam-01 Platform Overview**; its tiles link to the dashboard for each component.
 
-| Dashboard                                  | Question it answers                                                        |
-| ------------------------------------------ | -------------------------------------------------------------------------- |
-| **kam-01 Platform Overview**               | Is the platform healthy, and where should I look if it is not?             |
-| **kam-02 Inference & Delegated Compute**   | Are served models and delegated compute healthy and within their limits?   |
-| **kam-03 Application API & Web Interface** | Are the application workloads up, erroring, or short of resources?         |
-| **kam-04 Data Infrastructure**             | Are the stores that hold platform state healthy and far from their limits? |
-| **kam-05 Extensions & Platform Operator**  | Are extensions healthy, and is the operator reconciling without errors?    |
-| **kam-06 Auth & Identity**                 | Can users sign in, are decisions fast and correct, are certificates valid? |
-| **kam-07 Kubernetes Events & Stability**   | Which pods are failing or short of resources?                              |
-| **kam-08 Log Explorer**                    | What are the workloads saying?                                             |
-| **kam-09 Tomo**                            | Is Tomo answering members, and how are its models and tools doing?         |
+| Dashboard                                  | Question it answers                                                               |
+| ------------------------------------------ | --------------------------------------------------------------------------------- |
+| **kam-01 Platform Overview**               | Is the platform healthy, and where should I look if it is not?                    |
+| **kam-02 Inference & Delegated Compute**   | Are served models and delegated compute healthy and within their limits?          |
+| **kam-03 Application API & Web Interface** | Are the application workloads up, erroring, or short of resources?                |
+| **kam-04 Data Infrastructure**             | Are the stores that hold platform state healthy and far from their limits?        |
+| **kam-05 Extensions & Platform Operator**  | Are extensions healthy, and is the operator reconciling without errors?           |
+| **kam-06 Auth & Identity**                 | Can users sign in, are decisions fast and correct, are certificates valid?        |
+| **kam-07 Kubernetes Events & Stability**   | Which pods are failing or short of resources?                                     |
+| **kam-08 Log Explorer**                    | What are the workloads saying?                                                    |
+| **kam-09 Tomo operations**                 | Is Tomo answering members, and how are its models and tools doing?                |
+| **kam-10 Tomo product insight**            | How do members use Tomo, where do they struggle, which features earn their place? |
 
 See [dashboards/README.md](dashboards/README.md) for the design rules they follow, how to install them without the sidecar, and which panels hide themselves when their data cannot exist.
 
@@ -177,7 +178,7 @@ See [dashboards/README.md](dashboards/README.md) for the design rules they follo
 | `kube-prometheus-stack-values.yaml`           | Helm values for Prometheus + Grafana + Alertmanager, and kube-state-metrics custom resource state for the operator's resources |
 | `loki-values.yaml`                            | Helm values for Loki (single-binary, filesystem storage)                                                                       |
 | `alloy-values.yaml`                           | Helm values for Alloy DaemonSet log collector, labelling logs by workload, extension, and served model                         |
-| `dashboards/*.json`                           | 9 Grafana v2 dashboard resources, loaded by the sidecar or created through the Grafana API                                     |
+| `dashboards/*.json`                           | 10 Grafana v2 dashboard resources, loaded by the sidecar or created through the Grafana API                                    |
 | `dashboards/kustomization.yaml`               | Wraps JSON files as ConfigMaps for sidecar auto-loading                                                                        |
 | `servicemonitors/*monitor.yaml`               | ServiceMonitors and PodMonitors for etcd, delegated compute, metadata catalog, authorization, and cert-manager                 |
 | `servicemonitors/scrape-networkpolicies.yaml` | NetworkPolicies admitting Prometheus to the platform's metrics ports and the exporter to PostgreSQL                            |

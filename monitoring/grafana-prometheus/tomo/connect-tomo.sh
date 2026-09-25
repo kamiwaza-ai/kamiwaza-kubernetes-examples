@@ -7,11 +7,12 @@
 #
 #   1. A PodMonitor for the API (port 8000) and the two workers (port 9100),
 #      and a NetworkPolicy admitting only the Prometheus pods to those ports.
-#   2. A PostgreSQL role, `grafana_reader`, in that install's database. It can
-#      read only the content-free columns kam-09 queries: no message text, no
-#      member identity, no prompt. The role is read-only, holds at most 6
-#      connections, and every statement it runs is cancelled after 15 seconds,
-#      so a dashboard cannot load Tomo.
+#   2. A PostgreSQL role, `grafana_reader`, in that install's database. It has
+#      no privilege on any Tomo table: it can only call the reporting functions
+#      in reporting.sql, which return rows without message text, prompts, or
+#      identities, and name a member only by a keyed hash. The role is
+#      read-only, holds at most 6 connections, and every statement it runs is
+#      cancelled after 15 seconds, so a dashboard cannot load Tomo.
 #   3. A Service with a stable name in front of that database, a NetworkPolicy
 #      admitting only the Grafana pods to it, and a Grafana datasource named
 #      "Tomo · <install>" that the datasource sidecar provisions.
@@ -32,6 +33,7 @@ MONITORING_NAMESPACE=monitoring
 ONLY=""
 REMOVE=false
 READER=grafana_reader
+REPORTING_SQL="$(dirname "$0")/reporting.sql"
 # Marks every object this script creates, and names the install it serves.
 MARK=app.kubernetes.io/name=tomo-connection
 # Marks a datasource tombstone: removing a provisioning file does not remove
@@ -124,12 +126,14 @@ YAML
   db=$(running_db_pod "$ext")
   if [ -n "$db" ]; then
     psql_superuser "$db" <<SQL
+SET client_min_messages = warning;
 SELECT format('REVOKE ALL ON ALL TABLES IN SCHEMA public FROM %I', '$READER')
  WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '$READER') \gexec
 SELECT format('REVOKE ALL ON SCHEMA public FROM %I', '$READER')
  WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '$READER') \gexec
 SELECT format('REVOKE ALL ON DATABASE %I FROM %I', current_database(), '$READER')
  WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '$READER') \gexec
+DROP SCHEMA IF EXISTS tomo_reporting CASCADE;
 DROP ROLE IF EXISTS $READER;
 SQL
   fi
@@ -213,7 +217,8 @@ YAML
 
 grant_reader() {
   local db="$1" password="$2"
-  psql_superuser "$db" <<SQL
+  {
+    cat <<SQL
 \set pw '$password'
 SELECT 'CREATE ROLE $READER LOGIN' WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '$READER') \gexec
 ALTER ROLE $READER WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS
@@ -221,23 +226,14 @@ ALTER ROLE $READER WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NORE
 ALTER ROLE $READER SET default_transaction_read_only = on;
 ALTER ROLE $READER SET statement_timeout = '15s';
 ALTER ROLE $READER SET idle_in_transaction_session_timeout = '30s';
+ALTER ROLE $READER SET search_path = tomo_reporting;
 SELECT format('GRANT CONNECT ON DATABASE %I TO %I', current_database(), '$READER') \gexec
-GRANT USAGE ON SCHEMA public TO $READER;
--- Start from nothing, then grant exactly the columns kam-09 reads.
+-- The role reads nothing directly; it only calls the functions in reporting.sql.
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM $READER;
-GRANT SELECT (created_at, purpose, route, model_id, outcome, error_class, latency_ms,
-              prompt_token_count, response_token_count,
-              prompt_cache_read_tokens, prompt_cache_write_tokens)
-  ON llm_audit_event TO $READER;
-GRANT SELECT (kind, status, execution_mode, reasoning_effort, agent_name,
-              model_catalog_id, model_deployment_id,
-              accepted_at, started_at, completed_at)
-  ON conversation_input TO $READER;
-GRANT SELECT (tool_name, capability, status, created_at, finished_at)
-  ON capability_invocation_receipt TO $READER;
-GRANT SELECT (vote, answer_path, created_at)
-  ON chat_answer_feedback TO $READER;
+REVOKE ALL ON SCHEMA public FROM $READER;
 SQL
+    cat "$REPORTING_SQL"
+  } | psql_superuser "$db"
 }
 
 connect_database() {
@@ -250,7 +246,7 @@ connect_database() {
   tables=$(
     psql_superuser "$db" <<'SQL'
 SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename IN
-  ('llm_audit_event', 'conversation_input', 'capability_invocation_receipt', 'chat_answer_feedback');
+  ('llm_audit_event', 'conversation_input', 'capability_invocation_receipt', 'audit_event');
 SQL
   ) || tables=unreachable
   if [ "$tables" != 4 ]; then
