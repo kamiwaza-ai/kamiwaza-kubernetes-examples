@@ -47,6 +47,27 @@
             "type": "dashboard"
           }
         }
+      },
+      {
+        "kind": "AnnotationQuery",
+        "spec": {
+          "query": {
+            "kind": "DataQuery",
+            "group": "loki",
+            "version": "v0",
+            "datasource": {
+              "name": "${loki_datasource}"
+            },
+            "spec": {
+              "expr": "{job=\"integrations/kubernetes/eventhandler\", namespace=\"$namespace\"} |= \"type=Warning\" |~ \"kind=(KamiwazaPlatform|ModelDeployment|Extension|SandboxPool)\"",
+              "refId": "Anno"
+            }
+          },
+          "enable": true,
+          "hide": false,
+          "iconColor": "orange",
+          "name": "Operator warnings"
+        }
       }
     ],
     "timeSettings": {
@@ -219,8 +240,8 @@
         "kind": "Panel",
         "spec": {
           "id": 2,
-          "title": "OOMKilled",
-          "description": "Containers whose last termination was an out-of-memory kill",
+          "title": "OOM kills (1h)",
+          "description": "Containers restarted after an out-of-memory kill in the last hour",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -237,7 +258,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "count(kube_pod_container_status_last_terminated_reason{namespace=\"$namespace\", reason=\"OOMKilled\"}) or vector(0)",
+                        "expr": "count(max by (namespace, pod, container) (kube_pod_container_status_last_terminated_reason{namespace=\"$namespace\", reason=\"OOMKilled\"}) * on (namespace, pod, container) (increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\"}[1h]) > 0)) or vector(0)",
                         "legendFormat": "",
                         "instant": true,
                         "range": false
@@ -301,7 +322,7 @@
         "spec": {
           "id": 3,
           "title": "CrashLoopBackOff",
-          "description": "Containers waiting in CrashLoopBackOff",
+          "description": "Containers waiting in CrashLoopBackOff now",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -458,10 +479,91 @@
           }
         }
       },
-      "image-pull": {
+      "failed": {
         "kind": "Panel",
         "spec": {
           "id": 5,
+          "title": "Failed pods",
+          "description": "Pods in the Failed phase, usually a Job that ran out of retries; they stay until deleted",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "count(kube_pod_status_phase{namespace=\"$namespace\", phase=\"Failed\"} == 1) or vector(0)",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": ["lastNotNull"],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "green"
+                      },
+                      {
+                        "value": 1,
+                        "color": "orange"
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "image-pull": {
+        "kind": "Panel",
+        "spec": {
+          "id": 6,
           "title": "Image pull failures",
           "description": "Containers that cannot pull their image",
           "links": [],
@@ -542,7 +644,7 @@
       "targets-down": {
         "kind": "Panel",
         "spec": {
-          "id": 6,
+          "id": 7,
           "title": "Scrape targets down",
           "description": "Kamiwaza metrics targets that failed their last scrape",
           "links": [],
@@ -623,9 +725,9 @@
       "cpu-now": {
         "kind": "Panel",
         "spec": {
-          "id": 7,
+          "id": 8,
           "title": "CPU, % of limit",
-          "description": "Busiest container per workload right now",
+          "description": "Busiest container per long-running workload right now",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -642,7 +744,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "topk(10, 100 * max by (label_app_kubernetes_io_name) ((sum by (namespace, pod, container) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container!=\"\"}[$__rate_interval])) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"cpu\"})) * on (namespace, pod) group_left (label_app_kubernetes_io_name) max by (namespace, pod, label_app_kubernetes_io_name) (kube_pod_labels{namespace=\"$namespace\", label_app_kubernetes_io_name!=\"\"})))",
+                        "expr": "topk(10, 100 * max by (label_app_kubernetes_io_name) (((sum by (namespace, pod, container) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container!=\"\"}[$__rate_interval])) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"cpu\"})) * on (namespace, pod) group_left () max by (namespace, pod) (kube_pod_owner{namespace=\"$namespace\", owner_kind=~\"ReplicaSet|StatefulSet|DaemonSet\"})) * on (namespace, pod) group_left (label_app_kubernetes_io_name) max by (namespace, pod, label_app_kubernetes_io_name) (kube_pod_labels{namespace=\"$namespace\", label_app_kubernetes_io_name!=\"\"})))",
                         "legendFormat": "{{label_app_kubernetes_io_name}}",
                         "instant": true,
                         "range": false
@@ -719,9 +821,9 @@
       "memory-now": {
         "kind": "Panel",
         "spec": {
-          "id": 8,
+          "id": 9,
           "title": "Memory, % of limit",
-          "description": "Largest container per workload right now",
+          "description": "Largest container per long-running workload right now",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -738,7 +840,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "topk(10, 100 * max by (label_app_kubernetes_io_name) ((sum by (namespace, pod, container) (container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\"}) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"memory\"})) * on (namespace, pod) group_left (label_app_kubernetes_io_name) max by (namespace, pod, label_app_kubernetes_io_name) (kube_pod_labels{namespace=\"$namespace\", label_app_kubernetes_io_name!=\"\"})))",
+                        "expr": "topk(10, 100 * max by (label_app_kubernetes_io_name) (((sum by (namespace, pod, container) (container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\"}) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"memory\"})) * on (namespace, pod) group_left () max by (namespace, pod) (kube_pod_owner{namespace=\"$namespace\", owner_kind=~\"ReplicaSet|StatefulSet|DaemonSet\"})) * on (namespace, pod) group_left (label_app_kubernetes_io_name) max by (namespace, pod, label_app_kubernetes_io_name) (kube_pod_labels{namespace=\"$namespace\", label_app_kubernetes_io_name!=\"\"})))",
                         "legendFormat": "{{label_app_kubernetes_io_name}}",
                         "instant": true,
                         "range": false
@@ -815,9 +917,9 @@
       "throttling": {
         "kind": "Panel",
         "spec": {
-          "id": 9,
+          "id": 10,
           "title": "CPU throttling, top 10",
-          "description": "Share of CFS periods throttled per container",
+          "description": "Share of CFS periods throttled, by workload and container",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -834,8 +936,8 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "topk(10, 100 * sum by (pod, container) (rate(container_cpu_cfs_throttled_periods_total{namespace=\"$namespace\", container!=\"\"}[$__rate_interval])) / sum by (pod, container) (rate(container_cpu_cfs_periods_total{namespace=\"$namespace\", container!=\"\"}[$__rate_interval])))",
-                        "legendFormat": "{{pod}} · {{container}}"
+                        "expr": "topk(10, 100 * max by (label_app_kubernetes_io_name, container) ((sum by (namespace, pod, container) (rate(container_cpu_cfs_throttled_periods_total{namespace=\"$namespace\", container!=\"\"}[$__rate_interval])) / sum by (namespace, pod, container) (rate(container_cpu_cfs_periods_total{namespace=\"$namespace\", container!=\"\"}[$__rate_interval]))) * on (namespace, pod) group_left () max by (namespace, pod) (kube_pod_owner{namespace=\"$namespace\", owner_kind=~\"ReplicaSet|StatefulSet|DaemonSet\"}) * on (namespace, pod) group_left (label_app_kubernetes_io_name) max by (namespace, pod, label_app_kubernetes_io_name) (kube_pod_labels{namespace=\"$namespace\", label_app_kubernetes_io_name!=\"\"})))",
+                        "legendFormat": "{{label_app_kubernetes_io_name}} · {{container}}"
                       }
                     },
                     "refId": "A",
@@ -862,7 +964,7 @@
                   "showLegend": true,
                   "displayMode": "table",
                   "placement": "right",
-                  "calcs": ["lastNotNull"],
+                  "calcs": ["lastNotNull", "max"],
                   "limit": 8,
                   "sortBy": "Last *",
                   "sortDesc": true
@@ -915,9 +1017,9 @@
       "restart-rate": {
         "kind": "Panel",
         "spec": {
-          "id": 10,
+          "id": 11,
           "title": "Restarts",
-          "description": "Container restarts over a sliding 30 minutes, top 10",
+          "description": "Container restarts over a sliding 30 minutes, by workload and container",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -934,8 +1036,8 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "topk(10, round(increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\"}[30m])) > 0)",
-                        "legendFormat": "{{pod}} · {{container}}"
+                        "expr": "topk(10, sum by (label_app_kubernetes_io_name, container) (round(increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\"}[30m])) * on (namespace, pod) group_left (label_app_kubernetes_io_name) max by (namespace, pod, label_app_kubernetes_io_name) (kube_pod_labels{namespace=\"$namespace\", label_app_kubernetes_io_name!=\"\"})) > 0)",
+                        "legendFormat": "{{label_app_kubernetes_io_name}} · {{container}}"
                       }
                     },
                     "refId": "A",
@@ -964,7 +1066,7 @@
                   "placement": "bottom",
                   "calcs": ["max"],
                   "limit": 8,
-                  "sortBy": "Total",
+                  "sortBy": "Max",
                   "sortDesc": true
                 }
               },
@@ -1001,7 +1103,7 @@
       "node-pressure": {
         "kind": "Panel",
         "spec": {
-          "id": 11,
+          "id": 12,
           "title": "Node pressure",
           "description": "Memory, disk, and PID pressure per node",
           "links": [],
@@ -1039,10 +1141,10 @@
             "version": "",
             "spec": {
               "options": {
-                "showValue": "never",
+                "showValue": "auto",
                 "rowHeight": 0.8,
                 "mergeValues": true,
-                "alignValue": "left",
+                "alignValue": "center",
                 "tooltip": {
                   "mode": "single",
                   "sort": "none"
@@ -1073,6 +1175,10 @@
                       }
                     }
                   ],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#8e8e8e"
+                  },
                   "custom": {
                     "lineWidth": 0,
                     "fillOpacity": 85
@@ -1087,7 +1193,7 @@
       "pvc": {
         "kind": "Panel",
         "spec": {
-          "id": 12,
+          "id": 13,
           "title": "Volumes",
           "description": "Persistent volume claims by utilisation (needs kubelet volume statistics)",
           "links": [],
@@ -1295,7 +1401,7 @@
       "warnings": {
         "kind": "Panel",
         "spec": {
-          "id": 13,
+          "id": 14,
           "title": "Warning events",
           "description": "Kubernetes Warning events in the platform namespace",
           "links": [],
@@ -1314,7 +1420,7 @@
                         "name": "${loki_datasource}"
                       },
                       "spec": {
-                        "expr": "{job=\"integrations/kubernetes/eventhandler\", namespace=\"$namespace\"} |= \"type=Warning\"",
+                        "expr": "{job=\"integrations/kubernetes/eventhandler\", namespace=\"$namespace\"} |= \"type=Warning\" | drop service_name, stream",
                         "legendFormat": ""
                       }
                     },
@@ -1357,7 +1463,7 @@
       "operator-events": {
         "kind": "Panel",
         "spec": {
-          "id": 14,
+          "id": 15,
           "title": "Operator events",
           "description": "Events the platform operator records on platform resources",
           "links": [],
@@ -1376,7 +1482,7 @@
                         "name": "${loki_datasource}"
                       },
                       "spec": {
-                        "expr": "{job=\"integrations/kubernetes/eventhandler\", namespace=\"$namespace\"} |~ \"kind=(KamiwazaPlatform|ModelDeployment|Extension|SandboxPool)\"",
+                        "expr": "{job=\"integrations/kubernetes/eventhandler\", namespace=\"$namespace\"} |~ \"kind=(KamiwazaPlatform|ModelDeployment|Extension|SandboxPool)\" | drop service_name, stream",
                         "legendFormat": ""
                       }
                     },
@@ -1419,7 +1525,7 @@
       "about": {
         "kind": "Panel",
         "spec": {
-          "id": 15,
+          "id": 16,
           "title": "About this dashboard",
           "description": "",
           "links": [],
@@ -1438,7 +1544,7 @@
             "spec": {
               "options": {
                 "mode": "markdown",
-                "content": "**Which pods in the platform namespace are failing or short of resources?**\n\n- **Errors** counts restarts, out-of-memory kills, crash loops, pending pods, and image pull failures.\n- **Saturation** shows the workloads closest to their CPU and memory limits and the most throttled containers.\n- **Nodes** shows memory, disk, and PID pressure over the time range.\n- **Events** lists Kubernetes warnings and the operator's own events.",
+                "content": "**Which pods in the platform namespace are failing or short of resources?**\n\n- **Errors** counts restarts and out-of-memory kills in the last hour, and crash loops, pending pods, failed pods, and image pull failures now.\n- **Saturation** shows the long-running workloads closest to their CPU and memory limits and the most throttled containers. One-shot Job pods are left out: their saturation is not actionable.\n- **Nodes** shows memory, disk, and PID pressure over the time range.\n- **Events** lists Kubernetes warnings and the operator's own events.",
                 "code": {
                   "language": "plaintext",
                   "showLineNumbers": false,
@@ -1468,7 +1574,7 @@
               "layout": {
                 "kind": "AutoGridLayout",
                 "spec": {
-                  "maxColumnCount": 6,
+                  "maxColumnCount": 7,
                   "columnWidthMode": "narrow",
                   "rowHeightMode": "short",
                   "fillScreen": false,
@@ -1506,6 +1612,15 @@
                         "element": {
                           "kind": "ElementReference",
                           "name": "pending"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "failed"
                         }
                       }
                     },

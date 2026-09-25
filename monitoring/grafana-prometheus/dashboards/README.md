@@ -31,15 +31,16 @@ These rules follow Grafana's [dashboard best practices](https://grafana.com/docs
    - Services with request metrics use **RED**: rate, errors, and duration. That covers the authorization decision service and the operator's reconcile loop.
    - Resources use **USE**: utilisation, saturation, and errors. That covers container CPU and memory, the stores' capacity, and throttling.
    - The application API publishes no request metrics, so its error signal is its error log rate.
-4. **Normalised axes.** CPU and memory are shown as a percentage of each container's limit, not as cores or bytes, so 100% means the same thing for every workload.
-5. **Colour means state.** Green is healthy, orange needs a look, red is wrong, and grey is disabled by plan. Counts that are not good or bad, such as models ready or warm sandboxes, are neutral. No colour is decorative.
-6. **Show what is in trouble.** kam-01's **Needs attention** table lists only capabilities that are Progressing or Blocked, and is hidden when there are none.
+4. **Normalised axes.** CPU and memory are shown as a percentage of each container's limit, not as cores or bytes, so 100% means the same thing for every workload. Replica tiles show ready next to desired, never a percentage, so "1 of 2" is not read as "50% healthy".
+5. **Colour means state.** Green is healthy, orange needs a look, red is wrong, and grey is disabled by plan. Counts that are not good or bad, such as models ready or warm sandboxes, are neutral. A rate that is normal at low values, such as authentication failures, stays neutral until a stated threshold. No colour is decorative, and every state timeline has a legend and labelled segments.
+6. **Show what is in trouble, and only while it is.** kam-01 opens with warning and critical Prometheus alerts, and its **Needs attention** table lists only capabilities that are Progressing or Blocked, saying so when there are none. Error tiles count events inside a window (restarts and out-of-memory kills in the last hour) or states that hold now (crash loops, pending pods), so a problem that has passed does not keep a tile red. Failed Job pods are reported on kam-07, not in kam-01's health.
 7. **Hide panels whose data cannot exist, never panels that are merely quiet.**
    - Hidden when their data cannot exist on this installation: GPU charts without the DCGM exporter, volume usage without kubelet volume statistics, and operator reconcile charts before operator metrics are on.
    - Always shown: error, restart, and diagnostic panels. An empty one means nothing went wrong, and that is information.
-8. **No stacking, except for log-volume charts.** Stacked series hide individual values. Log volume is a total by design.
-9. **One place per fact.** kam-01 holds every capability's state and history. A detail dashboard shows at most the one capability it is about, then the signals behind it.
-10. **Refresh every minute.** Prometheus scrapes every 30 seconds, so refreshing faster only adds load.
+8. **Name series by workload, not by pod.** Legends read `workload · container`, from `app.kubernetes.io/name`, so a rollout does not rename a series and replicas of one workload share a line. Saturation rankings leave out one-shot Job pods, whose saturation is not actionable. Log panels drop Alloy's `service_name` and `stream` labels, which repeat the workload and level.
+9. **No stacking, except for log-volume charts.** Stacked series hide individual values. Log volume is a total by design.
+10. **One place per fact.** kam-01 holds every capability's state and history, and marks the operator's warning events on its time axis. A detail dashboard shows at most the one capability it is about, then the signals behind it. Each component has one name on every dashboard.
+11. **Refresh every minute.** Prometheus scrapes every 30 seconds, so refreshing faster only adds load.
 
 ## Grafana features in use
 
@@ -50,6 +51,8 @@ These rules follow Grafana's [dashboard best practices](https://grafana.com/docs
 - **Time comparison** against the day before, on the application error rate and database commits.
 - The **revamped gauge**, with sparklines, for store saturation. Table **gauge cells** for certificate expiry and volume usage.
 - **Data links** on kam-01 tiles, and **legend limits** on charts with many series.
+- **Config from query results** on replica tiles: desired replicas set the threshold at which ready turns green.
+- A **Loki annotation** that marks the operator's Warning events on every platform dashboard's time axis.
 
 ## Install through the kube-prometheus-stack sidecar
 

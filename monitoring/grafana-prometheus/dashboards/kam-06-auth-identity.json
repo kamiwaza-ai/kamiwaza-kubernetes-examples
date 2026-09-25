@@ -47,6 +47,27 @@
             "type": "dashboard"
           }
         }
+      },
+      {
+        "kind": "AnnotationQuery",
+        "spec": {
+          "query": {
+            "kind": "DataQuery",
+            "group": "loki",
+            "version": "v0",
+            "datasource": {
+              "name": "${loki_datasource}"
+            },
+            "spec": {
+              "expr": "{job=\"integrations/kubernetes/eventhandler\", namespace=\"$namespace\"} |= \"type=Warning\" |~ \"kind=(KamiwazaPlatform|ModelDeployment|Extension|SandboxPool)\"",
+              "refId": "Anno"
+            }
+          },
+          "enable": true,
+          "hide": false,
+          "iconColor": "orange",
+          "name": "Operator warnings"
+        }
       }
     ],
     "timeSettings": {
@@ -184,7 +205,7 @@
                 },
                 "orientation": "auto",
                 "textMode": "auto",
-                "colorMode": "background",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
@@ -243,7 +264,7 @@
         "spec": {
           "id": 2,
           "title": "Identity provider",
-          "description": "Ready of desired keycloak replicas",
+          "description": "Ready keycloak replicas against desired",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -260,8 +281,8 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"keycloak\"}) / sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"keycloak\"})",
-                        "legendFormat": "",
+                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"keycloak\"}) or vector(0)",
+                        "legendFormat": "ready",
                         "instant": true,
                         "range": false
                       }
@@ -269,9 +290,76 @@
                     "refId": "A",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"keycloak\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"keycloak\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "configFromData",
+                  "spec": {
+                    "id": "configFromData",
+                    "options": {
+                      "configRefId": "B",
+                      "applyTo": {
+                        "id": "byFrameRefID",
+                        "options": "A"
+                      },
+                      "mappings": [
+                        {
+                          "fieldName": "desired",
+                          "handlerKey": "threshold1",
+                          "handlerArguments": {
+                            "threshold": {
+                              "color": "green"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
@@ -286,9 +374,9 @@
                   "calcs": ["lastNotNull"],
                   "fields": ""
                 },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "background",
+                "orientation": "vertical",
+                "textMode": "value_and_name",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
@@ -299,7 +387,6 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "unit": "percentunit",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -308,18 +395,30 @@
                         "color": "red"
                       },
                       {
-                        "value": 0.01,
-                        "color": "orange"
-                      },
-                      {
                         "value": 1,
-                        "color": "green"
+                        "color": "orange"
                       }
                     ]
                   },
                   "decimals": 0
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "desired"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -330,7 +429,7 @@
         "spec": {
           "id": 3,
           "title": "Authorization",
-          "description": "Ready of desired decision-service replicas",
+          "description": "Ready decision-service replicas against desired",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -347,8 +446,8 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"spicedb\"}) / sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"spicedb\"})",
-                        "legendFormat": "",
+                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"spicedb\"}) or vector(0)",
+                        "legendFormat": "ready",
                         "instant": true,
                         "range": false
                       }
@@ -356,9 +455,76 @@
                     "refId": "A",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"spicedb\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"spicedb\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "configFromData",
+                  "spec": {
+                    "id": "configFromData",
+                    "options": {
+                      "configRefId": "B",
+                      "applyTo": {
+                        "id": "byFrameRefID",
+                        "options": "A"
+                      },
+                      "mappings": [
+                        {
+                          "fieldName": "desired",
+                          "handlerKey": "threshold1",
+                          "handlerArguments": {
+                            "threshold": {
+                              "color": "green"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
@@ -373,9 +539,9 @@
                   "calcs": ["lastNotNull"],
                   "fields": ""
                 },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "background",
+                "orientation": "vertical",
+                "textMode": "value_and_name",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
@@ -386,7 +552,6 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "unit": "percentunit",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -395,18 +560,30 @@
                         "color": "red"
                       },
                       {
-                        "value": 0.01,
-                        "color": "orange"
-                      },
-                      {
                         "value": 1,
-                        "color": "green"
+                        "color": "orange"
                       }
                     ]
                   },
                   "decimals": 0
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "desired"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -502,8 +679,8 @@
         "kind": "Panel",
         "spec": {
           "id": 5,
-          "title": "Auth failures (range)",
-          "description": "401, 403, and unauthorized lines in the selected range",
+          "title": "Auth failures / min",
+          "description": "401, 403, and unauthorized lines per minute over the last 5 minutes",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -520,7 +697,7 @@
                         "name": "${loki_datasource}"
                       },
                       "spec": {
-                        "expr": "sum(count_over_time({namespace=\"$namespace\"} != \"response body\" |~ \"(?i)( 401 | 403 |status[=: \\\"]*40[13]|unauthorized|forbidden|authentication.failed|invalid.token)\" [$__range])) or vector(0)",
+                        "expr": "sum(count_over_time({namespace=\"$namespace\"} != \"response body\" |~ \"(?i)( 401 | 403 |status[=: \\\"]*40[13]|unauthorized|forbidden|authentication.failed|invalid.token)\" [5m])) / 5 or vector(0)",
                         "legendFormat": "",
                         "queryType": "instant"
                       }
@@ -547,7 +724,7 @@
                 },
                 "orientation": "auto",
                 "textMode": "auto",
-                "colorMode": "background",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
@@ -563,14 +740,19 @@
                     "steps": [
                       {
                         "value": null,
-                        "color": "green"
+                        "color": "text"
                       },
                       {
-                        "value": 1,
+                        "value": 10,
                         "color": "orange"
+                      },
+                      {
+                        "value": 60,
+                        "color": "red"
                       }
                     ]
-                  }
+                  },
+                  "decimals": 1
                 },
                 "overrides": []
               }
@@ -1056,7 +1238,7 @@
                         "name": "${loki_datasource}"
                       },
                       "spec": {
-                        "expr": "{namespace=\"$namespace\"} != \"response body\" |~ \"(?i)( 401 | 403 |status[=: \\\"]*40[13]|unauthorized|forbidden|authentication.failed|invalid.token)\"",
+                        "expr": "{namespace=\"$namespace\"} != \"response body\" |~ \"(?i)( 401 | 403 |status[=: \\\"]*40[13]|unauthorized|forbidden|authentication.failed|invalid.token)\" | drop service_name, stream",
                         "legendFormat": ""
                       }
                     },
@@ -1118,7 +1300,7 @@
                         "name": "${loki_datasource}"
                       },
                       "spec": {
-                        "expr": "{namespace=\"$namespace\", app=\"keycloak\"} |= \"org.keycloak.events\" |= \"_ERROR\"",
+                        "expr": "{namespace=\"$namespace\", app=\"keycloak\"} |= \"org.keycloak.events\" |= \"_ERROR\" | drop service_name, stream",
                         "legendFormat": ""
                       }
                     },
@@ -1180,7 +1362,7 @@
             "spec": {
               "options": {
                 "mode": "markdown",
-                "content": "**Can users sign in, are authorization decisions fast and correct, and are certificates valid?**\n\n- **Authorization** follows RED for the decision service: request rate, error ratio, and p95 latency.\n- **Certificates** lists every cert-manager certificate in the platform namespace by days left.\n- **Authentication failures** counts 401, 403, and unauthorized log lines.\n\nIdentity-provider sessions and logins are not shown: the identity provider image ships without its metrics endpoint.",
+                "content": "**Can users sign in, are authorization decisions fast and correct, and are certificates valid?**\n\n- **Authorization** follows RED for the decision service: request rate, error ratio, and p95 latency.\n- **Certificates** lists every cert-manager certificate in the platform namespace by days left.\n- **Authentication failures** is the per-minute rate of 401, 403, and unauthorized log lines. Unauthenticated requests are normal, so the tile turns orange only above 10 a minute and red above 60.\n\nIdentity-provider sessions and logins are not shown: the identity provider image ships without its metrics endpoint.",
                 "code": {
                   "language": "plaintext",
                   "showLineNumbers": false,

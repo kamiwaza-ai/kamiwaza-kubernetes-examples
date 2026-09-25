@@ -47,6 +47,27 @@
             "type": "dashboard"
           }
         }
+      },
+      {
+        "kind": "AnnotationQuery",
+        "spec": {
+          "query": {
+            "kind": "DataQuery",
+            "group": "loki",
+            "version": "v0",
+            "datasource": {
+              "name": "${loki_datasource}"
+            },
+            "spec": {
+              "expr": "{job=\"integrations/kubernetes/eventhandler\", namespace=\"$namespace\"} |= \"type=Warning\" |~ \"kind=(KamiwazaPlatform|ModelDeployment|Extension|SandboxPool)\"",
+              "refId": "Anno"
+            }
+          },
+          "enable": true,
+          "hide": false,
+          "iconColor": "orange",
+          "name": "Operator warnings"
+        }
       }
     ],
     "timeSettings": {
@@ -288,8 +309,8 @@
         "kind": "Panel",
         "spec": {
           "id": 3,
-          "title": "Serving replicas ready",
-          "description": "Ready of desired serving replicas across every ModelDeployment",
+          "title": "Serving replicas",
+          "description": "Ready serving replicas against desired, across every ModelDeployment",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -306,8 +327,8 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(kamiwaza_model_deployment_ready_replicas{namespace=\"$namespace\"}) / sum(kamiwaza_model_deployment_desired_replicas{namespace=\"$namespace\"})",
-                        "legendFormat": "",
+                        "expr": "sum(kamiwaza_model_deployment_ready_replicas{namespace=\"$namespace\"}) or vector(0)",
+                        "legendFormat": "ready",
                         "instant": true,
                         "range": false
                       }
@@ -315,9 +336,76 @@
                     "refId": "A",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kamiwaza_model_deployment_desired_replicas{namespace=\"$namespace\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kamiwaza_model_deployment_desired_replicas{namespace=\"$namespace\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "configFromData",
+                  "spec": {
+                    "id": "configFromData",
+                    "options": {
+                      "configRefId": "B",
+                      "applyTo": {
+                        "id": "byFrameRefID",
+                        "options": "A"
+                      },
+                      "mappings": [
+                        {
+                          "fieldName": "desired",
+                          "handlerKey": "threshold1",
+                          "handlerArguments": {
+                            "threshold": {
+                              "color": "green"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
@@ -332,9 +420,9 @@
                   "calcs": ["lastNotNull"],
                   "fields": ""
                 },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "background",
+                "orientation": "vertical",
+                "textMode": "value_and_name",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
@@ -345,7 +433,6 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "unit": "percentunit",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -354,18 +441,30 @@
                         "color": "red"
                       },
                       {
-                        "value": 0.01,
-                        "color": "orange"
-                      },
-                      {
                         "value": 1,
-                        "color": "green"
+                        "color": "orange"
                       }
                     ]
                   },
                   "decimals": 0
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "desired"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -481,10 +580,10 @@
             "version": "",
             "spec": {
               "options": {
-                "showValue": "never",
+                "showValue": "auto",
                 "rowHeight": 0.8,
                 "mergeValues": true,
-                "alignValue": "left",
+                "alignValue": "center",
                 "tooltip": {
                   "mode": "single",
                   "sort": "none"
@@ -515,6 +614,10 @@
                       }
                     }
                   ],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#8e8e8e"
+                  },
                   "custom": {
                     "lineWidth": 0,
                     "fillOpacity": 85
@@ -950,7 +1053,7 @@
                         "name": "${loki_datasource}"
                       },
                       "spec": {
-                        "expr": "{namespace=\"$namespace\", model=~\".+\"} |~ \"(?i)(error|fatal|exception|traceback)\"",
+                        "expr": "{namespace=\"$namespace\", model=~\".+\"} |~ \"(?i)(error|fatal|exception|traceback)\" | drop service_name, stream",
                         "legendFormat": ""
                       }
                     },
@@ -995,7 +1098,7 @@
         "spec": {
           "id": 10,
           "title": "Head",
-          "description": "Ready head replicas of desired",
+          "description": "Ready head replicas against desired",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1012,8 +1115,8 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"core-raycluster-head\"}) / sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"core-raycluster-head\"})",
-                        "legendFormat": "",
+                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"core-raycluster-head\"}) or vector(0)",
+                        "legendFormat": "ready",
                         "instant": true,
                         "range": false
                       }
@@ -1021,9 +1124,76 @@
                     "refId": "A",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"core-raycluster-head\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"core-raycluster-head\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "configFromData",
+                  "spec": {
+                    "id": "configFromData",
+                    "options": {
+                      "configRefId": "B",
+                      "applyTo": {
+                        "id": "byFrameRefID",
+                        "options": "A"
+                      },
+                      "mappings": [
+                        {
+                          "fieldName": "desired",
+                          "handlerKey": "threshold1",
+                          "handlerArguments": {
+                            "threshold": {
+                              "color": "green"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
@@ -1038,9 +1208,9 @@
                   "calcs": ["lastNotNull"],
                   "fields": ""
                 },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "background",
+                "orientation": "vertical",
+                "textMode": "value_and_name",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
@@ -1051,7 +1221,6 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "unit": "percentunit",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -1060,18 +1229,30 @@
                         "color": "red"
                       },
                       {
-                        "value": 0.01,
-                        "color": "orange"
-                      },
-                      {
                         "value": 1,
-                        "color": "green"
+                        "color": "orange"
                       }
                     ]
                   },
                   "decimals": 0
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "desired"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -1082,7 +1263,7 @@
         "spec": {
           "id": 11,
           "title": "Workers",
-          "description": "Ready worker replicas of desired",
+          "description": "Ready worker replicas against desired",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1099,8 +1280,8 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"core-raycluster-worker\"}) / sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"core-raycluster-worker\"})",
-                        "legendFormat": "",
+                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"core-raycluster-worker\"}) or vector(0)",
+                        "legendFormat": "ready",
                         "instant": true,
                         "range": false
                       }
@@ -1108,9 +1289,76 @@
                     "refId": "A",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"core-raycluster-worker\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"core-raycluster-worker\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "configFromData",
+                  "spec": {
+                    "id": "configFromData",
+                    "options": {
+                      "configRefId": "B",
+                      "applyTo": {
+                        "id": "byFrameRefID",
+                        "options": "A"
+                      },
+                      "mappings": [
+                        {
+                          "fieldName": "desired",
+                          "handlerKey": "threshold1",
+                          "handlerArguments": {
+                            "threshold": {
+                              "color": "green"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
@@ -1125,9 +1373,9 @@
                   "calcs": ["lastNotNull"],
                   "fields": ""
                 },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "background",
+                "orientation": "vertical",
+                "textMode": "value_and_name",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
@@ -1138,7 +1386,6 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "unit": "percentunit",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -1147,18 +1394,30 @@
                         "color": "red"
                       },
                       {
-                        "value": 0.01,
-                        "color": "orange"
-                      },
-                      {
                         "value": 1,
-                        "color": "green"
+                        "color": "orange"
                       }
                     ]
                   },
                   "decimals": 0
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "desired"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -1331,7 +1590,7 @@
         "spec": {
           "id": 14,
           "title": "CPU, % of limit",
-          "description": "Busiest container per pod, as a share of its CPU limit",
+          "description": "Busiest container per head or worker, as a share of its CPU limit",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1348,8 +1607,8 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "100 * max by (pod) (sum by (namespace, pod, container) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container!=\"\", pod=~\"core-raycluster-.*\"}[$__rate_interval])) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"cpu\"}))",
-                        "legendFormat": "{{pod}}"
+                        "expr": "100 * max by (label_app_kubernetes_io_name, container) ((sum by (namespace, pod, container) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container!=\"\"}[$__rate_interval])) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"cpu\"})) * on (namespace, pod) group_left (label_app_kubernetes_io_name) max by (namespace, pod, label_app_kubernetes_io_name) (kube_pod_labels{namespace=\"$namespace\", label_app_kubernetes_io_name=\"core-raycluster\"}))",
+                        "legendFormat": "{{container}}"
                       }
                     },
                     "refId": "A",
@@ -1431,7 +1690,7 @@
         "spec": {
           "id": 15,
           "title": "Memory, % of limit",
-          "description": "Largest container per pod, as a share of its memory limit",
+          "description": "Largest container per head or worker, as a share of its memory limit",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1448,8 +1707,8 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "100 * max by (pod) (sum by (namespace, pod, container) (container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\", pod=~\"core-raycluster-.*\"}) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"memory\"}))",
-                        "legendFormat": "{{pod}}"
+                        "expr": "100 * max by (label_app_kubernetes_io_name, container) ((sum by (namespace, pod, container) (container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\"}) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"memory\"})) * on (namespace, pod) group_left (label_app_kubernetes_io_name) max by (namespace, pod, label_app_kubernetes_io_name) (kube_pod_labels{namespace=\"$namespace\", label_app_kubernetes_io_name=\"core-raycluster\"}))",
+                        "legendFormat": "{{container}}"
                       }
                     },
                     "refId": "A",
@@ -1723,7 +1982,7 @@
                         "name": "${loki_datasource}"
                       },
                       "spec": {
-                        "expr": "{namespace=\"$namespace\", app=\"core-raycluster\"} |~ \"(?i)(error|fatal|exception|traceback)\"",
+                        "expr": "{namespace=\"$namespace\", app=\"core-raycluster\"} |~ \"(?i)(error|fatal|exception|traceback)\" | drop service_name, stream",
                         "legendFormat": ""
                       }
                     },

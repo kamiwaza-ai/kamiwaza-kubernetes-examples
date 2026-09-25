@@ -47,6 +47,27 @@
             "type": "dashboard"
           }
         }
+      },
+      {
+        "kind": "AnnotationQuery",
+        "spec": {
+          "query": {
+            "kind": "DataQuery",
+            "group": "loki",
+            "version": "v0",
+            "datasource": {
+              "name": "${loki_datasource}"
+            },
+            "spec": {
+              "expr": "{job=\"integrations/kubernetes/eventhandler\", namespace=\"$namespace\"} |= \"type=Warning\" |~ \"kind=(KamiwazaPlatform|ModelDeployment|Extension|SandboxPool)\"",
+              "refId": "Anno"
+            }
+          },
+          "enable": true,
+          "hide": false,
+          "iconColor": "orange",
+          "name": "Operator warnings"
+        }
       }
     ],
     "timeSettings": {
@@ -184,7 +205,7 @@
                 },
                 "orientation": "auto",
                 "textMode": "auto",
-                "colorMode": "background",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
@@ -1601,7 +1622,7 @@
                         "name": "${loki_datasource}"
                       },
                       "spec": {
-                        "expr": "{namespace=\"$namespace\", container=~\"etcd|postgres\"} |~ \"(?i)(error|warning|fatal|panic)\"",
+                        "expr": "{namespace=\"$namespace\", container=~\"etcd|postgres\"} |~ \"(?i)(error|warning|fatal|panic)\" | drop service_name, stream",
                         "legendFormat": ""
                       }
                     },
@@ -1663,7 +1684,7 @@
             "spec": {
               "options": {
                 "mode": "markdown",
-                "content": "**Are the stores that hold platform state healthy and far from their limits?**\n\nThe top row is saturation, one gauge per store. Each section below follows the same order: traffic, errors, latency, then capacity.\n\n- **Coordination store** is etcd.\n- **Database** is the application's PostgreSQL.\n- **Metadata catalog** is the catalog's JVM.",
+                "content": "**Are the stores that hold platform state healthy and far from their limits?**\n\nThe top row is each store's health and saturation. Each section below follows the same order: traffic, errors, latency, then capacity.\n\n- **Coordination store** is etcd.\n- **Database** is the application's PostgreSQL.\n- **Metadata catalog** is the catalog's JVM.",
                 "code": {
                   "language": "plaintext",
                   "showLineNumbers": false,
@@ -1686,7 +1707,7 @@
           {
             "kind": "RowsLayoutRow",
             "spec": {
-              "title": "Saturation",
+              "title": "Health and saturation",
               "collapse": false,
               "hideHeader": false,
               "fillScreen": false,

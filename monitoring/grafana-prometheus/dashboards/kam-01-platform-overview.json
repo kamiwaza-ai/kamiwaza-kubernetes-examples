@@ -47,6 +47,27 @@
             "type": "dashboard"
           }
         }
+      },
+      {
+        "kind": "AnnotationQuery",
+        "spec": {
+          "query": {
+            "kind": "DataQuery",
+            "group": "loki",
+            "version": "v0",
+            "datasource": {
+              "name": "${loki_datasource}"
+            },
+            "spec": {
+              "expr": "{job=\"integrations/kubernetes/eventhandler\", namespace=\"$namespace\"} |= \"type=Warning\" |~ \"kind=(KamiwazaPlatform|ModelDeployment|Extension|SandboxPool)\"",
+              "refId": "Anno"
+            }
+          },
+          "enable": true,
+          "hide": false,
+          "iconColor": "orange",
+          "name": "Operator warnings"
+        }
       }
     ],
     "timeSettings": {
@@ -575,7 +596,7 @@
         "spec": {
           "id": 6,
           "title": "Unhealthy pods",
-          "description": "Pods Pending, Failed, or Unknown, plus containers in CrashLoopBackOff",
+          "description": "Pods Pending or Unknown now, plus containers in CrashLoopBackOff. Failed Job pods are on kam-07.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -592,7 +613,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "(count(kube_pod_status_phase{namespace=\"$namespace\", phase=~\"Pending|Failed|Unknown\"} == 1) or vector(0)) + (count(kube_pod_container_status_waiting_reason{namespace=\"$namespace\", reason=\"CrashLoopBackOff\"}) or vector(0))",
+                        "expr": "(count(kube_pod_status_phase{namespace=\"$namespace\", phase=~\"Pending|Unknown\"} == 1) or vector(0)) + (count(kube_pod_container_status_waiting_reason{namespace=\"$namespace\", reason=\"CrashLoopBackOff\"}) or vector(0))",
                         "legendFormat": "",
                         "instant": true,
                         "range": false
@@ -658,11 +679,156 @@
           }
         }
       },
-      "svc-etcd": {
+      "alerts": {
         "kind": "Panel",
         "spec": {
           "id": 7,
-          "title": "Coordination",
+          "title": "Firing alerts",
+          "description": "Warning and critical Prometheus alerts firing now, across the cluster, with how many instances fire",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "count by (alertname, severity, namespace) (ALERTS{alertstate=\"firing\", severity=~\"warning|critical\"})",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false,
+                        "format": "table"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "kind": "filterFieldsByName",
+                  "spec": {
+                    "id": "filterFieldsByName",
+                    "options": {
+                      "include": {
+                        "names": ["alertname", "severity", "namespace", "Value"]
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "organize",
+                  "spec": {
+                    "id": "organize",
+                    "options": {
+                      "excludeByName": {},
+                      "indexByName": {
+                        "alertname": 0,
+                        "severity": 1,
+                        "namespace": 2,
+                        "Value": 3
+                      },
+                      "renameByName": {
+                        "alertname": "Alert",
+                        "severity": "Severity",
+                        "namespace": "Namespace",
+                        "Value": "Firing"
+                      }
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "showHeader": true,
+                "footer": {
+                  "show": false,
+                  "reducer": ["sum"],
+                  "fields": ""
+                },
+                "sortBy": [
+                  {
+                    "displayName": "Severity",
+                    "desc": false
+                  }
+                ]
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "align": "auto",
+                    "filterable": true,
+                    "cellOptions": {
+                      "type": "auto"
+                    },
+                    "inspect": false
+                  },
+                  "noValue": "No alerts firing"
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Severity"
+                    },
+                    "properties": [
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "critical": {
+                                "color": "red",
+                                "index": 0
+                              },
+                              "warning": {
+                                "color": "orange",
+                                "index": 1
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "svc-etcd": {
+        "kind": "Panel",
+        "spec": {
+          "id": 8,
+          "title": "Coordination store",
           "description": "etcd has an elected leader",
           "links": [],
           "data": {
@@ -708,7 +874,7 @@
                 },
                 "orientation": "auto",
                 "textMode": "auto",
-                "colorMode": "background",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
@@ -766,7 +932,7 @@
       "svc-db": {
         "kind": "Panel",
         "spec": {
-          "id": 8,
+          "id": 9,
           "title": "Database",
           "description": "The PostgreSQL exporter reaches the application database",
           "links": [],
@@ -813,7 +979,7 @@
                 },
                 "orientation": "auto",
                 "textMode": "auto",
-                "colorMode": "background",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
@@ -871,9 +1037,9 @@
       "svc-idp": {
         "kind": "Panel",
         "spec": {
-          "id": 9,
+          "id": 10,
           "title": "Identity provider",
-          "description": "Ready keycloak replicas of desired",
+          "description": "Ready keycloak replicas against desired",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -890,8 +1056,8 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"keycloak\"}) / sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"keycloak\"})",
-                        "legendFormat": "",
+                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"keycloak\"}) or vector(0)",
+                        "legendFormat": "ready",
                         "instant": true,
                         "range": false
                       }
@@ -899,9 +1065,76 @@
                     "refId": "A",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"keycloak\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"keycloak\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "configFromData",
+                  "spec": {
+                    "id": "configFromData",
+                    "options": {
+                      "configRefId": "B",
+                      "applyTo": {
+                        "id": "byFrameRefID",
+                        "options": "A"
+                      },
+                      "mappings": [
+                        {
+                          "fieldName": "desired",
+                          "handlerKey": "threshold1",
+                          "handlerArguments": {
+                            "threshold": {
+                              "color": "green"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
@@ -916,9 +1149,9 @@
                   "calcs": ["lastNotNull"],
                   "fields": ""
                 },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "background",
+                "orientation": "vertical",
+                "textMode": "value_and_name",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
@@ -929,7 +1162,6 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "unit": "percentunit",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -938,12 +1170,8 @@
                         "color": "red"
                       },
                       {
-                        "value": 0.01,
-                        "color": "orange"
-                      },
-                      {
                         "value": 1,
-                        "color": "green"
+                        "color": "orange"
                       }
                     ]
                   },
@@ -956,7 +1184,23 @@
                     }
                   ]
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "desired"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -965,9 +1209,9 @@
       "svc-authz": {
         "kind": "Panel",
         "spec": {
-          "id": 10,
+          "id": 11,
           "title": "Authorization",
-          "description": "Ready decision-service replicas of desired",
+          "description": "Ready decision-service replicas against desired",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -984,8 +1228,8 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"spicedb\"}) / sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"spicedb\"})",
-                        "legendFormat": "",
+                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"spicedb\"}) or vector(0)",
+                        "legendFormat": "ready",
                         "instant": true,
                         "range": false
                       }
@@ -993,9 +1237,76 @@
                     "refId": "A",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"spicedb\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"spicedb\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "configFromData",
+                  "spec": {
+                    "id": "configFromData",
+                    "options": {
+                      "configRefId": "B",
+                      "applyTo": {
+                        "id": "byFrameRefID",
+                        "options": "A"
+                      },
+                      "mappings": [
+                        {
+                          "fieldName": "desired",
+                          "handlerKey": "threshold1",
+                          "handlerArguments": {
+                            "threshold": {
+                              "color": "green"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
@@ -1010,9 +1321,9 @@
                   "calcs": ["lastNotNull"],
                   "fields": ""
                 },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "background",
+                "orientation": "vertical",
+                "textMode": "value_and_name",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
@@ -1023,7 +1334,6 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "unit": "percentunit",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -1032,12 +1342,8 @@
                         "color": "red"
                       },
                       {
-                        "value": 0.01,
-                        "color": "orange"
-                      },
-                      {
                         "value": 1,
-                        "color": "green"
+                        "color": "orange"
                       }
                     ]
                   },
@@ -1050,7 +1356,23 @@
                     }
                   ]
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "desired"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -1059,9 +1381,9 @@
       "svc-api": {
         "kind": "Panel",
         "spec": {
-          "id": 11,
+          "id": 12,
           "title": "Application API",
-          "description": "Ready core-api replicas of desired",
+          "description": "Ready core-api replicas against desired",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1078,8 +1400,8 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"core-api\"}) / sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"core-api\"})",
-                        "legendFormat": "",
+                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"core-api\"}) or vector(0)",
+                        "legendFormat": "ready",
                         "instant": true,
                         "range": false
                       }
@@ -1087,9 +1409,76 @@
                     "refId": "A",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"core-api\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"core-api\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "configFromData",
+                  "spec": {
+                    "id": "configFromData",
+                    "options": {
+                      "configRefId": "B",
+                      "applyTo": {
+                        "id": "byFrameRefID",
+                        "options": "A"
+                      },
+                      "mappings": [
+                        {
+                          "fieldName": "desired",
+                          "handlerKey": "threshold1",
+                          "handlerArguments": {
+                            "threshold": {
+                              "color": "green"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
@@ -1104,9 +1493,9 @@
                   "calcs": ["lastNotNull"],
                   "fields": ""
                 },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "background",
+                "orientation": "vertical",
+                "textMode": "value_and_name",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
@@ -1117,7 +1506,6 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "unit": "percentunit",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -1126,12 +1514,8 @@
                         "color": "red"
                       },
                       {
-                        "value": 0.01,
-                        "color": "orange"
-                      },
-                      {
                         "value": 1,
-                        "color": "green"
+                        "color": "orange"
                       }
                     ]
                   },
@@ -1144,7 +1528,23 @@
                     }
                   ]
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "desired"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -1153,9 +1553,9 @@
       "svc-compute": {
         "kind": "Panel",
         "spec": {
-          "id": 12,
-          "title": "Compute",
-          "description": "Ready head and worker replicas of desired",
+          "id": 13,
+          "title": "Delegated compute",
+          "description": "Ready head and worker replicas against desired",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1172,8 +1572,8 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"core-raycluster-.*\"}) / sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"core-raycluster-.*\"})",
-                        "legendFormat": "",
+                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"core-raycluster-.*\"}) or vector(0)",
+                        "legendFormat": "ready",
                         "instant": true,
                         "range": false
                       }
@@ -1181,9 +1581,76 @@
                     "refId": "A",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"core-raycluster-.*\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"core-raycluster-.*\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "configFromData",
+                  "spec": {
+                    "id": "configFromData",
+                    "options": {
+                      "configRefId": "B",
+                      "applyTo": {
+                        "id": "byFrameRefID",
+                        "options": "A"
+                      },
+                      "mappings": [
+                        {
+                          "fieldName": "desired",
+                          "handlerKey": "threshold1",
+                          "handlerArguments": {
+                            "threshold": {
+                              "color": "green"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
@@ -1198,9 +1665,9 @@
                   "calcs": ["lastNotNull"],
                   "fields": ""
                 },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "background",
+                "orientation": "vertical",
+                "textMode": "value_and_name",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
@@ -1211,7 +1678,6 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "unit": "percentunit",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -1220,12 +1686,8 @@
                         "color": "red"
                       },
                       {
-                        "value": 0.01,
-                        "color": "orange"
-                      },
-                      {
                         "value": 1,
-                        "color": "green"
+                        "color": "orange"
                       }
                     ]
                   },
@@ -1238,7 +1700,23 @@
                     }
                   ]
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "desired"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -1247,9 +1725,9 @@
       "svc-operator": {
         "kind": "Panel",
         "spec": {
-          "id": 13,
-          "title": "Operator",
-          "description": "Ready manager replicas; details need operator metrics",
+          "id": 14,
+          "title": "Platform operator",
+          "description": "Ready manager replicas against desired, in any namespace",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1266,8 +1744,8 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(kube_deployment_status_replicas_ready{deployment=\"kamiwaza-platform-operator\"}) / sum(kube_deployment_spec_replicas{deployment=\"kamiwaza-platform-operator\"})",
-                        "legendFormat": "",
+                        "expr": "sum(kube_deployment_status_replicas_ready{deployment=~\"kamiwaza-platform-operator\"}) or vector(0)",
+                        "legendFormat": "ready",
                         "instant": true,
                         "range": false
                       }
@@ -1275,9 +1753,76 @@
                     "refId": "A",
                     "hidden": false
                   }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{deployment=~\"kamiwaza-platform-operator\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(kube_deployment_spec_replicas{deployment=~\"kamiwaza-platform-operator\"})",
+                        "legendFormat": "desired",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "C",
+                    "hidden": false
+                  }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "configFromData",
+                  "spec": {
+                    "id": "configFromData",
+                    "options": {
+                      "configRefId": "B",
+                      "applyTo": {
+                        "id": "byFrameRefID",
+                        "options": "A"
+                      },
+                      "mappings": [
+                        {
+                          "fieldName": "desired",
+                          "handlerKey": "threshold1",
+                          "handlerArguments": {
+                            "threshold": {
+                              "color": "green"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
@@ -1292,9 +1837,9 @@
                   "calcs": ["lastNotNull"],
                   "fields": ""
                 },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "background",
+                "orientation": "vertical",
+                "textMode": "value_and_name",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
@@ -1305,7 +1850,6 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "unit": "percentunit",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -1314,12 +1858,8 @@
                         "color": "red"
                       },
                       {
-                        "value": 0.01,
-                        "color": "orange"
-                      },
-                      {
                         "value": 1,
-                        "color": "green"
+                        "color": "orange"
                       }
                     ]
                   },
@@ -1332,7 +1872,23 @@
                     }
                   ]
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "desired"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -1341,7 +1897,7 @@
       "needs-attention": {
         "kind": "Panel",
         "spec": {
-          "id": 14,
+          "id": 15,
           "title": "Needs attention",
           "description": "Capabilities that are Progressing or Blocked, with the operator's reason",
           "links": [],
@@ -1439,7 +1995,8 @@
                       "type": "auto"
                     },
                     "inspect": false
-                  }
+                  },
+                  "noValue": "Every capability is Ready or disabled by plan"
                 },
                 "overrides": [
                   {
@@ -1483,7 +2040,7 @@
       "capability-history": {
         "kind": "Panel",
         "spec": {
-          "id": 15,
+          "id": 16,
           "title": "Capability history",
           "description": "Each capability's state over the time range",
           "links": [],
@@ -1521,10 +2078,10 @@
             "version": "",
             "spec": {
               "options": {
-                "showValue": "never",
+                "showValue": "auto",
                 "rowHeight": 0.8,
                 "mergeValues": true,
-                "alignValue": "left",
+                "alignValue": "center",
                 "tooltip": {
                   "mode": "single",
                   "sort": "none"
@@ -1565,6 +2122,10 @@
                       }
                     }
                   ],
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "#8e8e8e"
+                  },
                   "custom": {
                     "lineWidth": 0,
                     "fillOpacity": 85
@@ -1579,7 +2140,7 @@
       "capabilities": {
         "kind": "Panel",
         "spec": {
-          "id": 16,
+          "id": 17,
           "title": "All capabilities",
           "description": "Every capability with its current state and stable reason",
           "links": [],
@@ -1733,7 +2294,7 @@
       "release": {
         "kind": "Panel",
         "spec": {
-          "id": 17,
+          "id": 18,
           "title": "Release",
           "description": "Current platform release and reconciling operator version",
           "links": [],
@@ -1802,7 +2363,7 @@
       "warnings": {
         "kind": "Panel",
         "spec": {
-          "id": 18,
+          "id": 19,
           "title": "Warning events",
           "description": "Kubernetes Warning events in the platform namespace",
           "links": [],
@@ -1821,7 +2382,7 @@
                         "name": "${loki_datasource}"
                       },
                       "spec": {
-                        "expr": "{job=\"integrations/kubernetes/eventhandler\", namespace=\"$namespace\"} |= \"type=Warning\"",
+                        "expr": "{job=\"integrations/kubernetes/eventhandler\", namespace=\"$namespace\"} |= \"type=Warning\" | drop service_name, stream",
                         "legendFormat": ""
                       }
                     },
@@ -1864,7 +2425,7 @@
       "about": {
         "kind": "Panel",
         "spec": {
-          "id": 19,
+          "id": 20,
           "title": "About this dashboard",
           "description": "",
           "links": [],
@@ -1883,7 +2444,7 @@
             "spec": {
               "options": {
                 "mode": "markdown",
-                "content": "**Is the platform healthy, and where should I look if it is not?**\n\n- **Status** answers the question in one row. Green means nothing needs attention.\n- **Core services** shows the services the platform depends on. Click a tile to open its dashboard.\n- **Needs attention** lists only capabilities that are not Ready and conditions that are not healthy. It is hidden when there are none.\n- **Capability history** shows when each capability changed state over the time range.\n\nStates come from the operator's own `KamiwazaPlatform` status through kube-state-metrics.",
+                "content": "**Is the platform healthy, and where should I look if it is not?**\n\n- **Status** answers the question in one row. Green means nothing needs attention.\n- **Firing alerts** lists every warning or critical Prometheus alert firing now, including the operator's own rules.\n- **Core services** shows the services the platform depends on, with ready against desired replicas. Click a tile to open its dashboard.\n- **Needs attention** lists only capabilities that are Progressing or Blocked.\n- **Capability history** shows when each capability changed state. Orange markers on the time axis are the operator's warning events.\n\nStates come from the operator's own `KamiwazaPlatform` status through kube-state-metrics.",
                 "code": {
                   "language": "plaintext",
                   "showLineNumbers": false,
@@ -1980,6 +2541,35 @@
           {
             "kind": "RowsLayoutRow",
             "spec": {
+              "title": "Firing alerts",
+              "collapse": false,
+              "hideHeader": true,
+              "fillScreen": false,
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 0,
+                        "width": 24,
+                        "height": 5,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "alerts"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
               "title": "Core services",
               "collapse": false,
               "hideHeader": false,
@@ -1987,8 +2577,8 @@
               "layout": {
                 "kind": "AutoGridLayout",
                 "spec": {
-                  "maxColumnCount": 7,
-                  "columnWidthMode": "narrow",
+                  "maxColumnCount": 4,
+                  "columnWidthMode": "standard",
                   "rowHeightMode": "short",
                   "fillScreen": false,
                   "items": [
@@ -2068,121 +2658,58 @@
               "hideHeader": false,
               "fillScreen": false,
               "layout": {
-                "kind": "RowsLayout",
+                "kind": "GridLayout",
                 "spec": {
-                  "rows": [
+                  "items": [
                     {
-                      "kind": "RowsLayoutRow",
+                      "kind": "GridLayoutItem",
                       "spec": {
-                        "title": "Needs attention",
-                        "collapse": false,
-                        "hideHeader": true,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "AutoGridLayout",
-                          "spec": {
-                            "maxColumnCount": 1,
-                            "columnWidthMode": "standard",
-                            "rowHeightMode": "standard",
-                            "fillScreen": false,
-                            "items": [
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "needs-attention"
-                                  },
-                                  "conditionalRendering": {
-                                    "kind": "ConditionalRenderingGroup",
-                                    "spec": {
-                                      "visibility": "show",
-                                      "condition": "and",
-                                      "items": [
-                                        {
-                                          "kind": "ConditionalRenderingData",
-                                          "spec": {
-                                            "value": true
-                                          }
-                                        }
-                                      ]
-                                    }
-                                  }
-                                }
-                              }
-                            ]
-                          }
+                        "x": 0,
+                        "y": 0,
+                        "width": 24,
+                        "height": 5,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "needs-attention"
                         }
                       }
                     },
                     {
-                      "kind": "RowsLayoutRow",
+                      "kind": "GridLayoutItem",
                       "spec": {
-                        "title": "History",
-                        "collapse": false,
-                        "hideHeader": true,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "GridLayout",
-                          "spec": {
-                            "items": [
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 24,
-                                  "height": 9,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "capability-history"
-                                  }
-                                }
-                              }
-                            ]
-                          }
+                        "x": 0,
+                        "y": 5,
+                        "width": 24,
+                        "height": 9,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "capability-history"
                         }
                       }
                     },
                     {
-                      "kind": "RowsLayoutRow",
+                      "kind": "GridLayoutItem",
                       "spec": {
-                        "title": "Detail",
-                        "collapse": false,
-                        "hideHeader": true,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "GridLayout",
-                          "spec": {
-                            "items": [
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 18,
-                                  "height": 12,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "capabilities"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 18,
-                                  "y": 0,
-                                  "width": 6,
-                                  "height": 4,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "release"
-                                  }
-                                }
-                              }
-                            ]
-                          }
+                        "x": 0,
+                        "y": 14,
+                        "width": 18,
+                        "height": 12,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "capabilities"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 18,
+                        "y": 14,
+                        "width": 6,
+                        "height": 4,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "release"
                         }
                       }
                     }
