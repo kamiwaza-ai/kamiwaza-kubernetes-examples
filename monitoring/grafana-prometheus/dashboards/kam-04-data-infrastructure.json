@@ -6,7 +6,7 @@
   },
   "spec": {
     "title": "Kamiwaza · Data Infrastructure",
-    "description": "The coordination store, the durable-data database, and the metadata catalog.",
+    "description": "Are the stores that hold platform state healthy and far from their limits?",
     "tags": ["kamiwaza"],
     "editable": false,
     "cursorSync": "Crosshair",
@@ -53,8 +53,8 @@
       "timezone": "browser",
       "from": "now-3h",
       "to": "now",
-      "autoRefresh": "30s",
-      "autoRefreshIntervals": ["10s", "30s", "1m", "5m", "15m", "1h"],
+      "autoRefresh": "1m",
+      "autoRefreshIntervals": ["30s", "1m", "5m", "15m"],
       "hideTimepicker": false,
       "fiscalYearStartMonth": 0
     },
@@ -134,12 +134,12 @@
       }
     ],
     "elements": {
-      "data-capabilities": {
+      "etcd-leader": {
         "kind": "Panel",
         "spec": {
           "id": 1,
-          "title": "Data capabilities",
-          "description": "Capabilities that hold durable platform state",
+          "title": "Coordination store",
+          "description": "etcd has an elected leader",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -156,11 +156,10 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "(kamiwaza_platform_component_state{namespace=\"$namespace\", component=~\"statefulStorage|durableData|objectStorage|metadataCatalog|modelArtifacts\"} == 1) * on (namespace, name, component) group_left (reason) kamiwaza_platform_component_reason{namespace=\"$namespace\"}",
+                        "expr": "min(etcd_server_has_leader{job=\"core-etcd\", namespace=\"$namespace\"}) or vector(0)",
                         "legendFormat": "",
                         "instant": true,
-                        "range": false,
-                        "format": "table"
+                        "range": false
                       }
                     },
                     "refId": "A",
@@ -168,132 +167,77 @@
                   }
                 }
               ],
-              "transformations": [
-                {
-                  "kind": "filterFieldsByName",
-                  "spec": {
-                    "id": "filterFieldsByName",
-                    "options": {
-                      "include": {
-                        "names": ["component", "state", "reason"]
-                      }
-                    }
-                  }
-                },
-                {
-                  "kind": "organize",
-                  "spec": {
-                    "id": "organize",
-                    "options": {
-                      "excludeByName": {},
-                      "indexByName": {
-                        "component": 0,
-                        "state": 1,
-                        "reason": 2
-                      },
-                      "renameByName": {
-                        "component": "Capability",
-                        "state": "State",
-                        "reason": "Reason"
-                      }
-                    }
-                  }
-                }
-              ],
+              "transformations": [],
               "queryOptions": {}
             }
           },
           "vizConfig": {
             "kind": "VizConfig",
-            "group": "table",
+            "group": "stat",
             "version": "",
             "spec": {
               "options": {
-                "cellHeight": "sm",
-                "showHeader": true,
-                "footer": {
-                  "show": false,
-                  "reducer": ["sum"],
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": ["lastNotNull"],
                   "fields": ""
                 },
-                "sortBy": [
-                  {
-                    "displayName": "Capability",
-                    "desc": false
-                  }
-                ]
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "wideLayout": true,
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
                   "color": {
-                    "mode": "palette-classic"
+                    "mode": "thresholds"
                   },
-                  "custom": {
-                    "align": "auto",
-                    "filterable": true,
-                    "cellOptions": {
-                      "type": "auto"
-                    },
-                    "inspect": false
-                  }
-                },
-                "overrides": [
-                  {
-                    "matcher": {
-                      "id": "byName",
-                      "options": "State"
-                    },
-                    "properties": [
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
                       {
-                        "id": "mappings",
-                        "value": [
-                          {
-                            "type": "value",
-                            "options": {
-                              "Ready": {
-                                "color": "green",
-                                "index": 0
-                              },
-                              "ExternalReady": {
-                                "color": "green",
-                                "index": 1
-                              },
-                              "DisabledByPlan": {
-                                "color": "#8e8e8e",
-                                "index": 2
-                              },
-                              "Progressing": {
-                                "color": "orange",
-                                "index": 3
-                              },
-                              "Blocked": {
-                                "color": "red",
-                                "index": 4
-                              }
-                            }
-                          }
-                        ]
+                        "value": null,
+                        "color": "red"
                       },
                       {
-                        "id": "custom.cellOptions",
-                        "value": {
-                          "type": "color-text"
-                        }
+                        "value": 1,
+                        "color": "green"
                       }
                     ]
-                  }
-                ]
+                  },
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "0": {
+                          "text": "No leader",
+                          "color": "red",
+                          "index": 0
+                        },
+                        "1": {
+                          "text": "Leader",
+                          "color": "green",
+                          "index": 1
+                        }
+                      }
+                    }
+                  ]
+                },
+                "overrides": []
               }
             }
           }
         }
       },
-      "pg-cache": {
+      "etcd-quota": {
         "kind": "Panel",
         "spec": {
           "id": 2,
-          "title": "Database cache hit ratio",
-          "description": "Buffer cache hits as a share of block reads",
+          "title": "Coordination store space",
+          "description": "Largest member database as a share of its backend quota",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -310,7 +254,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "100 * max(pg_stat_database_blks_hit{job=\"postgres-exporter\", datname=\"kamiwaza\"}) / (max(pg_stat_database_blks_hit{job=\"postgres-exporter\", datname=\"kamiwaza\"}) + max(pg_stat_database_blks_read{job=\"postgres-exporter\", datname=\"kamiwaza\"}) > 0)",
+                        "expr": "100 * max(etcd_mvcc_db_total_size_in_bytes{job=\"core-etcd\", namespace=\"$namespace\"}) / max(etcd_server_quota_backend_bytes{job=\"core-etcd\", namespace=\"$namespace\"})",
                         "legendFormat": ""
                       }
                     },
@@ -345,38 +289,39 @@
                 "barWidthFactor": 0.45,
                 "endpointMarker": "glow",
                 "textMode": "auto",
+                "segmentCount": 1,
+                "segmentSpacing": 0.3,
                 "effects": {
                   "gradient": true,
                   "centerGlow": true,
                   "barGlow": false
-                },
-                "segmentCount": 1,
-                "segmentSpacing": 0.3
+                }
               },
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
                   "unit": "percent",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
                         "value": null,
-                        "color": "red"
+                        "color": "green"
                       },
                       {
-                        "value": 90,
+                        "value": 70,
                         "color": "orange"
                       },
                       {
-                        "value": 99,
-                        "color": "green"
+                        "value": 90,
+                        "color": "red"
                       }
                     ]
                   },
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "min": 80,
+                  "decimals": 1,
+                  "min": 0,
                   "max": 100
                 },
                 "overrides": []
@@ -389,7 +334,7 @@
         "kind": "Panel",
         "spec": {
           "id": 3,
-          "title": "Database connections in use",
+          "title": "Database connections",
           "description": "Connections as a share of max_connections",
           "links": [],
           "data": {
@@ -442,16 +387,19 @@
                 "barWidthFactor": 0.45,
                 "endpointMarker": "glow",
                 "textMode": "auto",
+                "segmentCount": 1,
+                "segmentSpacing": 0.3,
                 "effects": {
                   "gradient": true,
                   "centerGlow": true,
                   "barGlow": false
-                },
-                "segmentCount": 1,
-                "segmentSpacing": 0.3
+                }
               },
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
                   "unit": "percent",
                   "thresholds": {
                     "mode": "absolute",
@@ -465,15 +413,111 @@
                         "color": "orange"
                       },
                       {
-                        "value": 85,
+                        "value": 90,
                         "color": "red"
                       }
                     ]
                   },
+                  "decimals": 1,
+                  "min": 0,
+                  "max": 100
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "pg-cache": {
+        "kind": "Panel",
+        "spec": {
+          "id": 4,
+          "title": "Database cache hits",
+          "description": "Buffer cache hits as a share of block reads; low values mean disk reads",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "100 * max(pg_stat_database_blks_hit{job=\"postgres-exporter\", datname=\"kamiwaza\"}) / (max(pg_stat_database_blks_hit{job=\"postgres-exporter\", datname=\"kamiwaza\"}) + max(pg_stat_database_blks_read{job=\"postgres-exporter\", datname=\"kamiwaza\"}) > 0)",
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "gauge",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": ["lastNotNull"],
+                  "fields": ""
+                },
+                "showThresholdMarkers": true,
+                "showThresholdLabels": false,
+                "sizing": "auto",
+                "minVizWidth": 75,
+                "minVizHeight": 75,
+                "shape": "gauge",
+                "sparkline": true,
+                "barShape": "rounded",
+                "barWidthFactor": 0.45,
+                "endpointMarker": "glow",
+                "textMode": "auto",
+                "segmentCount": 1,
+                "segmentSpacing": 0.3,
+                "effects": {
+                  "gradient": true,
+                  "centerGlow": true,
+                  "barGlow": false
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
                   "color": {
                     "mode": "thresholds"
                   },
-                  "min": 0,
+                  "unit": "percent",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "red"
+                      },
+                      {
+                        "value": 90,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 99,
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "decimals": 1,
+                  "min": 80,
                   "max": 100
                 },
                 "overrides": []
@@ -485,8 +529,8 @@
       "catalog-heap": {
         "kind": "Panel",
         "spec": {
-          "id": 4,
-          "title": "Catalog heap in use",
+          "id": 5,
+          "title": "Catalog heap",
           "description": "Metadata catalog API heap as a share of its maximum",
           "links": [],
           "data": {
@@ -539,16 +583,19 @@
                 "barWidthFactor": 0.45,
                 "endpointMarker": "glow",
                 "textMode": "auto",
+                "segmentCount": 1,
+                "segmentSpacing": 0.3,
                 "effects": {
                   "gradient": true,
                   "centerGlow": true,
                   "barGlow": false
-                },
-                "segmentCount": 1,
-                "segmentSpacing": 0.3
+                }
               },
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
                   "unit": "percent",
                   "thresholds": {
                     "mode": "absolute",
@@ -562,352 +609,14 @@
                         "color": "orange"
                       },
                       {
-                        "value": 85,
+                        "value": 90,
                         "color": "red"
                       }
                     ]
                   },
-                  "color": {
-                    "mode": "thresholds"
-                  },
+                  "decimals": 1,
                   "min": 0,
                   "max": 100
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "etcd-leader": {
-        "kind": "Panel",
-        "spec": {
-          "id": 5,
-          "title": "Coordination store",
-          "description": "Members that see an elected leader",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "min(etcd_server_has_leader{job=\"core-etcd\", namespace=\"$namespace\"}) or vector(0)",
-                        "legendFormat": "",
-                        "instant": true,
-                        "range": false
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "",
-            "spec": {
-              "options": {
-                "reduceOptions": {
-                  "values": false,
-                  "calcs": ["lastNotNull"],
-                  "fields": ""
-                },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "background",
-                "graphMode": "none",
-                "justifyMode": "center",
-                "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": null,
-                        "color": "red"
-                      },
-                      {
-                        "value": 1,
-                        "color": "green"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "mappings": [
-                    {
-                      "type": "value",
-                      "options": {
-                        "0": {
-                          "text": "No leader",
-                          "color": "red",
-                          "index": 0
-                        },
-                        "1": {
-                          "text": "Leader",
-                          "color": "green",
-                          "index": 1
-                        }
-                      }
-                    }
-                  ]
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "etcd-members": {
-        "kind": "Panel",
-        "spec": {
-          "id": 6,
-          "title": "Members up",
-          "description": "Members answering on their metrics port",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "sum(up{job=\"core-etcd\", namespace=\"$namespace\"}) or vector(0)",
-                        "legendFormat": "",
-                        "instant": true,
-                        "range": false
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "",
-            "spec": {
-              "options": {
-                "reduceOptions": {
-                  "values": false,
-                  "calcs": ["lastNotNull"],
-                  "fields": ""
-                },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "background",
-                "graphMode": "none",
-                "justifyMode": "center",
-                "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": null,
-                        "color": "red"
-                      },
-                      {
-                        "value": 1,
-                        "color": "orange"
-                      },
-                      {
-                        "value": 3,
-                        "color": "green"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "etcd-db": {
-        "kind": "Panel",
-        "spec": {
-          "id": 7,
-          "title": "Database size",
-          "description": "Largest member database",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "max(etcd_mvcc_db_total_size_in_bytes{job=\"core-etcd\", namespace=\"$namespace\"})",
-                        "legendFormat": ""
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "",
-            "spec": {
-              "options": {
-                "reduceOptions": {
-                  "values": false,
-                  "calcs": ["lastNotNull"],
-                  "fields": ""
-                },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "center",
-                "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "bytes",
-                  "color": {
-                    "mode": "fixed",
-                    "fixedColor": "blue"
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "etcd-elections": {
-        "kind": "Panel",
-        "spec": {
-          "id": 8,
-          "title": "Leader changes (1h)",
-          "description": "Elections observed in the last hour",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "max(increase(etcd_server_leader_changes_seen_total{job=\"core-etcd\", namespace=\"$namespace\"}[1h])) or vector(0)",
-                        "legendFormat": "",
-                        "instant": true,
-                        "range": false
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "",
-            "spec": {
-              "options": {
-                "reduceOptions": {
-                  "values": false,
-                  "calcs": ["lastNotNull"],
-                  "fields": ""
-                },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "background",
-                "graphMode": "none",
-                "justifyMode": "center",
-                "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": null,
-                        "color": "green"
-                      },
-                      {
-                        "value": 1,
-                        "color": "orange"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  }
                 },
                 "overrides": []
               }
@@ -918,9 +627,9 @@
       "etcd-proposals": {
         "kind": "Panel",
         "spec": {
-          "id": 9,
-          "title": "Raft proposals",
-          "description": "Committed and failed proposals per second",
+          "id": 6,
+          "title": "Proposals",
+          "description": "Raft proposals committed and failed per second",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -985,28 +694,114 @@
                   "displayMode": "table",
                   "placement": "bottom",
                   "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
+                  "limit": 8,
                   "sortBy": "Last *",
                   "sortDesc": true
                 }
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "ops",
                   "color": {
                     "mode": "palette-classic"
                   },
+                  "unit": "ops",
                   "custom": {
                     "drawStyle": "line",
                     "lineInterpolation": "smooth",
                     "lineWidth": 2,
-                    "fillOpacity": 18,
+                    "fillOpacity": 10,
                     "gradientMode": "opacity",
                     "showPoints": "never",
                     "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
                     "axisSoftMin": 0,
+                    "axisBorderShow": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "etcd-elections": {
+        "kind": "Panel",
+        "spec": {
+          "id": 7,
+          "title": "Leader changes",
+          "description": "Leader elections per hour; frequent elections mean unstable members or disks",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "max(increase(etcd_server_leader_changes_seen_total{job=\"core-etcd\", namespace=\"$namespace\"}[1h]))",
+                        "legendFormat": "elections (1h)"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc",
+                  "hideZeros": false
+                },
+                "legend": {
+                  "showLegend": true,
+                  "displayMode": "table",
+                  "placement": "bottom",
+                  "calcs": ["lastNotNull", "max"],
+                  "limit": 8,
+                  "sortBy": "Last *",
+                  "sortDesc": true
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "short",
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "fillOpacity": 10,
+                    "gradientMode": "opacity",
+                    "showPoints": "never",
+                    "spanNulls": true,
+                    "axisSoftMin": 0,
+                    "axisBorderShow": false,
                     "stacking": {
                       "mode": "none",
                       "group": "A"
@@ -1025,7 +820,7 @@
       "etcd-fsync": {
         "kind": "Panel",
         "spec": {
-          "id": 10,
+          "id": 8,
           "title": "WAL fsync p99",
           "description": "Write-ahead log fsync latency per member; above 10 ms slows every write",
           "links": [],
@@ -1073,13 +868,16 @@
                   "displayMode": "table",
                   "placement": "bottom",
                   "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
+                  "limit": 8,
                   "sortBy": "Last *",
                   "sortDesc": true
                 }
               },
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
                   "unit": "s",
                   "thresholds": {
                     "mode": "absolute",
@@ -1094,20 +892,16 @@
                       }
                     ]
                   },
-                  "color": {
-                    "mode": "palette-classic"
-                  },
                   "custom": {
                     "drawStyle": "line",
                     "lineInterpolation": "smooth",
                     "lineWidth": 2,
-                    "fillOpacity": 18,
+                    "fillOpacity": 10,
                     "gradientMode": "opacity",
                     "showPoints": "never",
                     "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
                     "axisSoftMin": 0,
+                    "axisBorderShow": false,
                     "stacking": {
                       "mode": "none",
                       "group": "A"
@@ -1126,9 +920,9 @@
       "etcd-size": {
         "kind": "Panel",
         "spec": {
-          "id": 11,
-          "title": "Database size per member",
-          "description": "",
+          "id": 9,
+          "title": "Database size",
+          "description": "Database size per member",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1174,28 +968,27 @@
                   "displayMode": "table",
                   "placement": "bottom",
                   "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
+                  "limit": 8,
                   "sortBy": "Last *",
                   "sortDesc": true
                 }
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "bytes",
                   "color": {
                     "mode": "palette-classic"
                   },
+                  "unit": "bytes",
                   "custom": {
                     "drawStyle": "line",
                     "lineInterpolation": "smooth",
                     "lineWidth": 2,
-                    "fillOpacity": 18,
+                    "fillOpacity": 10,
                     "gradientMode": "opacity",
                     "showPoints": "never",
                     "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
                     "axisSoftMin": 0,
+                    "axisBorderShow": false,
                     "stacking": {
                       "mode": "none",
                       "group": "A"
@@ -1211,231 +1004,12 @@
           }
         }
       },
-      "pg-active": {
-        "kind": "Panel",
-        "spec": {
-          "id": 12,
-          "title": "Connections",
-          "description": "Connections to the kamiwaza database",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "max by (instance) (sum by (instance) (pg_stat_activity_count{job=\"postgres-exporter\", datname=\"kamiwaza\"}))",
-                        "legendFormat": ""
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "",
-            "spec": {
-              "options": {
-                "reduceOptions": {
-                  "values": false,
-                  "calcs": ["lastNotNull"],
-                  "fields": ""
-                },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "center",
-                "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "fixed",
-                    "fixedColor": "blue"
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "pg-size": {
-        "kind": "Panel",
-        "spec": {
-          "id": 13,
-          "title": "Database size",
-          "description": "Size of the kamiwaza database",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "max(pg_database_size_bytes{job=\"postgres-exporter\", datname=\"kamiwaza\"})",
-                        "legendFormat": ""
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "",
-            "spec": {
-              "options": {
-                "reduceOptions": {
-                  "values": false,
-                  "calcs": ["lastNotNull"],
-                  "fields": ""
-                },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "center",
-                "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "bytes",
-                  "color": {
-                    "mode": "fixed",
-                    "fixedColor": "blue"
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "pg-deadlocks": {
-        "kind": "Panel",
-        "spec": {
-          "id": 14,
-          "title": "Deadlocks (1h)",
-          "description": "Deadlocks detected in the last hour",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "round(max(increase(pg_stat_database_deadlocks{job=\"postgres-exporter\", datname=\"kamiwaza\"}[1h]))) or vector(0)",
-                        "legendFormat": "",
-                        "instant": true,
-                        "range": false
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "",
-            "spec": {
-              "options": {
-                "reduceOptions": {
-                  "values": false,
-                  "calcs": ["lastNotNull"],
-                  "fields": ""
-                },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "background",
-                "graphMode": "none",
-                "justifyMode": "center",
-                "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": null,
-                        "color": "green"
-                      },
-                      {
-                        "value": 1,
-                        "color": "red"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
       "pg-tx": {
         "kind": "Panel",
         "spec": {
-          "id": 15,
+          "id": 10,
           "title": "Transactions",
-          "description": "Commits and rollbacks per second, compared with the day before",
+          "description": "Commits per second, compared with the day before",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1453,29 +1027,10 @@
                       },
                       "spec": {
                         "expr": "sum(rate(pg_stat_database_xact_commit{job=\"postgres-exporter\", datname=\"kamiwaza\"}[$__rate_interval]))",
-                        "legendFormat": "commit"
+                        "legendFormat": "commits"
                       }
                     },
                     "refId": "A",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "sum(rate(pg_stat_database_xact_rollback{job=\"postgres-exporter\", datname=\"kamiwaza\"}[$__rate_interval]))",
-                        "legendFormat": "rollback"
-                      }
-                    },
-                    "refId": "B",
                     "hidden": false
                   }
                 }
@@ -1502,28 +1057,133 @@
                   "displayMode": "table",
                   "placement": "bottom",
                   "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
+                  "limit": 8,
                   "sortBy": "Last *",
                   "sortDesc": true
                 }
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "ops",
                   "color": {
                     "mode": "palette-classic"
                   },
+                  "unit": "ops",
                   "custom": {
                     "drawStyle": "line",
                     "lineInterpolation": "smooth",
                     "lineWidth": 2,
-                    "fillOpacity": 18,
+                    "fillOpacity": 10,
                     "gradientMode": "opacity",
                     "showPoints": "never",
                     "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
                     "axisSoftMin": 0,
+                    "axisBorderShow": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "pg-errors": {
+        "kind": "Panel",
+        "spec": {
+          "id": 11,
+          "title": "Rollbacks and deadlocks",
+          "description": "Rolled-back transactions and deadlocks per second",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(rate(pg_stat_database_xact_rollback{job=\"postgres-exporter\", datname=\"kamiwaza\"}[$__rate_interval]))",
+                        "legendFormat": "rollbacks"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(rate(pg_stat_database_deadlocks{job=\"postgres-exporter\", datname=\"kamiwaza\"}[$__rate_interval]))",
+                        "legendFormat": "deadlocks"
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc",
+                  "hideZeros": false
+                },
+                "legend": {
+                  "showLegend": true,
+                  "displayMode": "table",
+                  "placement": "bottom",
+                  "calcs": ["lastNotNull", "max"],
+                  "limit": 8,
+                  "sortBy": "Last *",
+                  "sortDesc": true
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "ops",
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "fillOpacity": 10,
+                    "gradientMode": "opacity",
+                    "showPoints": "never",
+                    "spanNulls": true,
+                    "axisSoftMin": 0,
+                    "axisBorderShow": false,
                     "stacking": {
                       "mode": "none",
                       "group": "A"
@@ -1542,9 +1202,9 @@
       "pg-states": {
         "kind": "Panel",
         "spec": {
-          "id": 16,
+          "id": 12,
           "title": "Connections by state",
-          "description": "",
+          "description": "Idle-in-transaction connections hold locks and are worth investigating",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1590,7 +1250,7 @@
                   "displayMode": "table",
                   "placement": "bottom",
                   "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
+                  "limit": 8,
                   "sortBy": "Last *",
                   "sortDesc": true
                 }
@@ -1604,15 +1264,14 @@
                     "drawStyle": "line",
                     "lineInterpolation": "smooth",
                     "lineWidth": 2,
-                    "fillOpacity": 18,
+                    "fillOpacity": 10,
                     "gradientMode": "opacity",
                     "showPoints": "never",
                     "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
                     "axisSoftMin": 0,
+                    "axisBorderShow": false,
                     "stacking": {
-                      "mode": "normal",
+                      "mode": "none",
                       "group": "A"
                     },
                     "thresholdsStyle": {
@@ -1626,12 +1285,12 @@
           }
         }
       },
-      "pg-rows": {
+      "pg-size": {
         "kind": "Panel",
         "spec": {
-          "id": 17,
-          "title": "Row activity",
-          "description": "Rows per second",
+          "id": 13,
+          "title": "Database size",
+          "description": "",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1648,68 +1307,11 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(rate(pg_stat_database_tup_fetched{job=\"postgres-exporter\", datname=\"kamiwaza\"}[$__rate_interval]))",
-                        "legendFormat": "fetched"
+                        "expr": "max(pg_database_size_bytes{job=\"postgres-exporter\", datname=\"kamiwaza\"})",
+                        "legendFormat": "kamiwaza"
                       }
                     },
                     "refId": "A",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "sum(rate(pg_stat_database_tup_inserted{job=\"postgres-exporter\", datname=\"kamiwaza\"}[$__rate_interval]))",
-                        "legendFormat": "inserted"
-                      }
-                    },
-                    "refId": "B",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "sum(rate(pg_stat_database_tup_updated{job=\"postgres-exporter\", datname=\"kamiwaza\"}[$__rate_interval]))",
-                        "legendFormat": "updated"
-                      }
-                    },
-                    "refId": "C",
-                    "hidden": false
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "sum(rate(pg_stat_database_tup_deleted{job=\"postgres-exporter\", datname=\"kamiwaza\"}[$__rate_interval]))",
-                        "legendFormat": "deleted"
-                      }
-                    },
-                    "refId": "D",
                     "hidden": false
                   }
                 }
@@ -1734,28 +1336,27 @@
                   "displayMode": "table",
                   "placement": "bottom",
                   "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
+                  "limit": 8,
                   "sortBy": "Last *",
                   "sortDesc": true
                 }
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "ops",
                   "color": {
                     "mode": "palette-classic"
                   },
+                  "unit": "bytes",
                   "custom": {
                     "drawStyle": "line",
                     "lineInterpolation": "smooth",
                     "lineWidth": 2,
-                    "fillOpacity": 18,
+                    "fillOpacity": 10,
                     "gradientMode": "opacity",
                     "showPoints": "never",
                     "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
                     "axisSoftMin": 0,
+                    "axisBorderShow": false,
                     "stacking": {
                       "mode": "none",
                       "group": "A"
@@ -1774,9 +1375,9 @@
       "jvm-heap": {
         "kind": "Panel",
         "spec": {
-          "id": 18,
-          "title": "Heap used vs maximum",
-          "description": "Heap per catalog service",
+          "id": 14,
+          "title": "Heap used",
+          "description": "Heap in use against its maximum per catalog service",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1841,28 +1442,27 @@
                   "displayMode": "table",
                   "placement": "bottom",
                   "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
+                  "limit": 8,
                   "sortBy": "Last *",
                   "sortDesc": true
                 }
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "bytes",
                   "color": {
                     "mode": "palette-classic"
                   },
+                  "unit": "bytes",
                   "custom": {
                     "drawStyle": "line",
                     "lineInterpolation": "smooth",
                     "lineWidth": 2,
-                    "fillOpacity": 18,
+                    "fillOpacity": 10,
                     "gradientMode": "opacity",
                     "showPoints": "never",
                     "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
                     "axisSoftMin": 0,
+                    "axisBorderShow": false,
                     "stacking": {
                       "mode": "none",
                       "group": "A"
@@ -1881,9 +1481,9 @@
       "jvm-gc": {
         "kind": "Panel",
         "spec": {
-          "id": 19,
-          "title": "Garbage collection time",
-          "description": "Share of wall time spent in GC",
+          "id": 15,
+          "title": "Garbage collection",
+          "description": "Share of wall time spent in GC; sustained values above 10% slow the catalog",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1900,8 +1500,8 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum by (job, gc) (rate(jvm_gc_collection_seconds_sum{job=~\"datahub-gms|datahub-frontend\", namespace=\"$namespace\"}[$__rate_interval]))",
-                        "legendFormat": "{{job}} · {{gc}}"
+                        "expr": "sum by (job) (rate(jvm_gc_collection_seconds_sum{job=~\"datahub-gms|datahub-frontend\", namespace=\"$namespace\"}[$__rate_interval]))",
+                        "legendFormat": "{{job}}"
                       }
                     },
                     "refId": "A",
@@ -1929,34 +1529,47 @@
                   "displayMode": "table",
                   "placement": "bottom",
                   "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
+                  "limit": 8,
                   "sortBy": "Last *",
                   "sortDesc": true
                 }
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "percentunit",
                   "color": {
                     "mode": "palette-classic"
+                  },
+                  "unit": "percentunit",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "green"
+                      },
+                      {
+                        "value": 0.1,
+                        "color": "red"
+                      }
+                    ]
                   },
                   "custom": {
                     "drawStyle": "line",
                     "lineInterpolation": "smooth",
                     "lineWidth": 2,
-                    "fillOpacity": 18,
+                    "fillOpacity": 10,
                     "gradientMode": "opacity",
                     "showPoints": "never",
                     "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
                     "axisSoftMin": 0,
+                    "axisSoftMax": 0.2,
+                    "axisBorderShow": false,
                     "stacking": {
                       "mode": "none",
                       "group": "A"
                     },
                     "thresholdsStyle": {
-                      "mode": "off"
+                      "mode": "dashed"
                     }
                   }
                 },
@@ -1969,9 +1582,9 @@
       "data-logs": {
         "kind": "Panel",
         "spec": {
-          "id": 20,
+          "id": 16,
           "title": "Coordination store and database errors",
-          "description": "etcd and PostgreSQL log lines at warning level or above",
+          "description": "etcd and PostgreSQL lines at warning level or above",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -2010,17 +1623,52 @@
             "spec": {
               "options": {
                 "showTime": true,
-                "showLabels": false,
+                "showLabels": true,
                 "showCommonLabels": false,
                 "wrapLogMessage": true,
                 "prettifyLogMessage": false,
                 "enableLogDetails": true,
                 "enableInfiniteScrolling": true,
                 "sortOrder": "Descending",
-                "dedupStrategy": "exact",
-                "syntaxHighlighting": true,
-                "fontSize": "default",
-                "detailsMode": "sidebar"
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "about": {
+        "kind": "Panel",
+        "spec": {
+          "id": 17,
+          "title": "About this dashboard",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "text",
+            "version": "",
+            "spec": {
+              "options": {
+                "mode": "markdown",
+                "content": "**Are the stores that hold platform state healthy and far from their limits?**\n\nThe top row is saturation, one gauge per store. Each section below follows the same order: traffic, errors, latency, then capacity.\n\n- **Coordination store** is etcd.\n- **Database** is the application's PostgreSQL.\n- **Metadata catalog** is the catalog's JVM.",
+                "code": {
+                  "language": "plaintext",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                }
               },
               "fieldConfig": {
                 "defaults": {},
@@ -2032,352 +1680,204 @@
       }
     },
     "layout": {
-      "kind": "TabsLayout",
+      "kind": "RowsLayout",
       "spec": {
-        "tabs": [
+        "rows": [
           {
-            "kind": "TabsLayoutTab",
+            "kind": "RowsLayoutRow",
             "spec": {
-              "title": "Overview",
+              "title": "Saturation",
+              "collapse": false,
+              "hideHeader": false,
+              "fillScreen": false,
               "layout": {
-                "kind": "RowsLayout",
+                "kind": "AutoGridLayout",
                 "spec": {
-                  "rows": [
-                    {
-                      "kind": "RowsLayoutRow",
-                      "spec": {
-                        "title": "Health",
-                        "collapse": false,
-                        "hideHeader": true,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "AutoGridLayout",
-                          "spec": {
-                            "maxColumnCount": 4,
-                            "columnWidthMode": "narrow",
-                            "rowHeightMode": "standard",
-                            "fillScreen": false,
-                            "items": [
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "pg-cache"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "pg-connections"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "catalog-heap"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "etcd-leader"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "kind": "RowsLayoutRow",
-                      "spec": {
-                        "title": "Capabilities",
-                        "collapse": false,
-                        "hideHeader": true,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "GridLayout",
-                          "spec": {
-                            "items": [
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 24,
-                                  "height": 7,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "data-capabilities"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          {
-            "kind": "TabsLayoutTab",
-            "spec": {
-              "title": "Coordination store",
-              "layout": {
-                "kind": "RowsLayout",
-                "spec": {
-                  "rows": [
-                    {
-                      "kind": "RowsLayoutRow",
-                      "spec": {
-                        "title": "Summary",
-                        "collapse": false,
-                        "hideHeader": true,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "AutoGridLayout",
-                          "spec": {
-                            "maxColumnCount": 3,
-                            "columnWidthMode": "narrow",
-                            "rowHeightMode": "short",
-                            "fillScreen": false,
-                            "items": [
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "etcd-members"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "etcd-db"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "etcd-elections"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "kind": "RowsLayoutRow",
-                      "spec": {
-                        "title": "Raft and disk",
-                        "collapse": false,
-                        "hideHeader": true,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "GridLayout",
-                          "spec": {
-                            "items": [
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 8,
-                                  "height": 9,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "etcd-proposals"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 8,
-                                  "y": 0,
-                                  "width": 8,
-                                  "height": 9,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "etcd-fsync"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 16,
-                                  "y": 0,
-                                  "width": 8,
-                                  "height": 9,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "etcd-size"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          {
-            "kind": "TabsLayoutTab",
-            "spec": {
-              "title": "Durable data",
-              "layout": {
-                "kind": "RowsLayout",
-                "spec": {
-                  "rows": [
-                    {
-                      "kind": "RowsLayoutRow",
-                      "spec": {
-                        "title": "Summary",
-                        "collapse": false,
-                        "hideHeader": true,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "AutoGridLayout",
-                          "spec": {
-                            "maxColumnCount": 3,
-                            "columnWidthMode": "narrow",
-                            "rowHeightMode": "short",
-                            "fillScreen": false,
-                            "items": [
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "pg-active"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "pg-size"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "pg-deadlocks"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "kind": "RowsLayoutRow",
-                      "spec": {
-                        "title": "Activity",
-                        "collapse": false,
-                        "hideHeader": true,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "GridLayout",
-                          "spec": {
-                            "items": [
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 8,
-                                  "height": 9,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "pg-tx"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 8,
-                                  "y": 0,
-                                  "width": 8,
-                                  "height": 9,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "pg-states"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 16,
-                                  "y": 0,
-                                  "width": 8,
-                                  "height": 9,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "pg-rows"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          {
-            "kind": "TabsLayoutTab",
-            "spec": {
-              "title": "Metadata catalog",
-              "layout": {
-                "kind": "GridLayout",
-                "spec": {
+                  "maxColumnCount": 5,
+                  "columnWidthMode": "narrow",
+                  "rowHeightMode": "standard",
+                  "fillScreen": false,
                   "items": [
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 0,
-                        "y": 0,
-                        "width": 12,
-                        "height": 10,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "etcd-leader"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "etcd-quota"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "pg-connections"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "pg-cache"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "catalog-heap"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "title": "Coordination store",
+              "collapse": false,
+              "hideHeader": false,
+              "fillScreen": false,
+              "layout": {
+                "kind": "AutoGridLayout",
+                "spec": {
+                  "maxColumnCount": 2,
+                  "columnWidthMode": "standard",
+                  "rowHeightMode": "standard",
+                  "fillScreen": false,
+                  "items": [
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "etcd-proposals"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "etcd-elections"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "etcd-fsync"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "etcd-size"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "title": "Database",
+              "collapse": false,
+              "hideHeader": false,
+              "fillScreen": false,
+              "layout": {
+                "kind": "AutoGridLayout",
+                "spec": {
+                  "maxColumnCount": 2,
+                  "columnWidthMode": "standard",
+                  "rowHeightMode": "standard",
+                  "fillScreen": false,
+                  "items": [
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "pg-tx"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "pg-errors"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "pg-states"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "pg-size"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "title": "Metadata catalog",
+              "collapse": false,
+              "hideHeader": false,
+              "fillScreen": false,
+              "layout": {
+                "kind": "AutoGridLayout",
+                "spec": {
+                  "maxColumnCount": 2,
+                  "columnWidthMode": "standard",
+                  "rowHeightMode": "standard",
+                  "fillScreen": false,
+                  "items": [
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
                         "element": {
                           "kind": "ElementReference",
                           "name": "jvm-heap"
@@ -2385,12 +1885,8 @@
                       }
                     },
                     {
-                      "kind": "GridLayoutItem",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "x": 12,
-                        "y": 0,
-                        "width": 12,
-                        "height": 10,
                         "element": {
                           "kind": "ElementReference",
                           "name": "jvm-gc"
@@ -2403,9 +1899,12 @@
             }
           },
           {
-            "kind": "TabsLayoutTab",
+            "kind": "RowsLayoutRow",
             "spec": {
               "title": "Logs",
+              "collapse": true,
+              "hideHeader": false,
+              "fillScreen": false,
               "layout": {
                 "kind": "GridLayout",
                 "spec": {
@@ -2416,10 +1915,39 @@
                         "x": 0,
                         "y": 0,
                         "width": 24,
-                        "height": 18,
+                        "height": 14,
                         "element": {
                           "kind": "ElementReference",
                           "name": "data-logs"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "title": "About this dashboard",
+              "collapse": true,
+              "hideHeader": false,
+              "fillScreen": false,
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 0,
+                        "width": 24,
+                        "height": 7,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "about"
                         }
                       }
                     }

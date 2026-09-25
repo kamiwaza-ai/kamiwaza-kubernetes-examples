@@ -6,7 +6,7 @@
   },
   "spec": {
     "title": "Kamiwaza · Inference & Delegated Compute",
-    "description": "Served models, the delegated-compute head and workers, and accelerators.",
+    "description": "Are served models and delegated compute healthy and within their limits?",
     "tags": ["kamiwaza"],
     "editable": false,
     "cursorSync": "Crosshair",
@@ -53,8 +53,8 @@
       "timezone": "browser",
       "from": "now-3h",
       "to": "now",
-      "autoRefresh": "30s",
-      "autoRefreshIntervals": ["10s", "30s", "1m", "5m", "15m", "1h"],
+      "autoRefresh": "1m",
+      "autoRefreshIntervals": ["30s", "1m", "5m", "15m"],
       "hideTimepicker": false,
       "fiscalYearStartMonth": 0
     },
@@ -184,18 +184,17 @@
                 },
                 "orientation": "auto",
                 "textMode": "auto",
-                "colorMode": "value",
+                "colorMode": "none",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
                   "color": {
                     "mode": "fixed",
-                    "fixedColor": "green"
+                    "fixedColor": "text"
                   }
                 },
                 "overrides": []
@@ -204,7 +203,7 @@
           }
         }
       },
-      "models-not-ready": {
+      "models-down": {
         "kind": "Panel",
         "spec": {
           "id": 2,
@@ -258,11 +257,13 @@
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -275,9 +276,6 @@
                         "color": "red"
                       }
                     ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
                   }
                 },
                 "overrides": []
@@ -286,12 +284,12 @@
           }
         }
       },
-      "serving-replicas": {
+      "replicas": {
         "kind": "Panel",
         "spec": {
           "id": 3,
-          "title": "Serving replicas",
-          "description": "Ready serving replicas across every ModelDeployment",
+          "title": "Serving replicas ready",
+          "description": "Ready of desired serving replicas across every ModelDeployment",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -308,75 +306,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(kamiwaza_model_deployment_ready_replicas{namespace=\"$namespace\"}) or vector(0)",
-                        "legendFormat": ""
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "",
-            "spec": {
-              "options": {
-                "reduceOptions": {
-                  "values": false,
-                  "calcs": ["lastNotNull"],
-                  "fields": ""
-                },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "center",
-                "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "fixed",
-                    "fixedColor": "blue"
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "model-serving-capability": {
-        "kind": "Panel",
-        "spec": {
-          "id": 4,
-          "title": "Model serving",
-          "description": "State the operator reports for the modelServing capability",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "max by (component) ((kamiwaza_platform_component_state{namespace=\"$namespace\", component=~\"modelServing\", state=\"DisabledByPlan\"} == 1) * 0 or (kamiwaza_platform_component_state{namespace=\"$namespace\", component=~\"modelServing\", state=~\"Ready|ExternalReady\"} == 1) * 1 or (kamiwaza_platform_component_state{namespace=\"$namespace\", component=~\"modelServing\", state=\"Progressing\"} == 1) * 2 or (kamiwaza_platform_component_state{namespace=\"$namespace\", component=~\"modelServing\", state=\"Blocked\"} == 1) * 3)",
+                        "expr": "sum(kamiwaza_model_deployment_ready_replicas{namespace=\"$namespace\"}) / sum(kamiwaza_model_deployment_desired_replicas{namespace=\"$namespace\"})",
                         "legendFormat": "",
                         "instant": true,
                         "range": false
@@ -408,50 +338,32 @@
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "unit": "percentunit",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
                         "value": null,
-                        "color": "#8e8e8e"
+                        "color": "red"
+                      },
+                      {
+                        "value": 0.01,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 1,
+                        "color": "green"
                       }
                     ]
                   },
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "mappings": [
-                    {
-                      "type": "value",
-                      "options": {
-                        "0": {
-                          "text": "Disabled",
-                          "color": "#8e8e8e",
-                          "index": 0
-                        },
-                        "1": {
-                          "text": "Ready",
-                          "color": "green",
-                          "index": 1
-                        },
-                        "2": {
-                          "text": "Progressing",
-                          "color": "orange",
-                          "index": 2
-                        },
-                        "3": {
-                          "text": "Blocked",
-                          "color": "red",
-                          "index": 3
-                        }
-                      }
-                    }
-                  ]
+                  "decimals": 0
                 },
                 "overrides": []
               }
@@ -459,12 +371,81 @@
           }
         }
       },
-      "model-timeline": {
+      "gpus": {
+        "kind": "Panel",
+        "spec": {
+          "id": 4,
+          "title": "GPUs",
+          "description": "GPUs reported by the NVIDIA DCGM exporter",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "count(DCGM_FI_DEV_GPU_UTIL{namespace=\"$namespace\"}) or vector(0)",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": ["lastNotNull"],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "none",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "fixed",
+                    "fixedColor": "text"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "model-history": {
         "kind": "Panel",
         "spec": {
           "id": 5,
-          "title": "Model readiness over time",
-          "description": "Each ModelDeployment's Ready condition",
+          "title": "Model readiness",
+          "description": "Each ModelDeployment's Ready condition over the time range",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -545,7 +526,7 @@
           }
         }
       },
-      "model-table": {
+      "models": {
         "kind": "Panel",
         "spec": {
           "id": 6,
@@ -747,12 +728,12 @@
           }
         }
       },
-      "serving-cpu": {
+      "model-cpu": {
         "kind": "Panel",
         "spec": {
           "id": 7,
-          "title": "Serving CPU by model",
-          "description": "CPU cores used by each ModelDeployment's pods",
+          "title": "CPU, % of limit",
+          "description": "Busiest container per model, as a share of its CPU limit",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -769,7 +750,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum by (label_serving_kamiwaza_ai_deployment_name) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container!=\"\"}[$__rate_interval]) * on (namespace, pod) group_left (label_serving_kamiwaza_ai_deployment_name) max by (namespace, pod, label_serving_kamiwaza_ai_deployment_name) (kube_pod_labels{namespace=\"$namespace\", label_serving_kamiwaza_ai_deployment_name!=\"\"}))",
+                        "expr": "100 * max by (label_serving_kamiwaza_ai_deployment_name) ((sum by (namespace, pod, container) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container!=\"\"}[$__rate_interval])) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"cpu\"})) * on (namespace, pod) group_left (label_serving_kamiwaza_ai_deployment_name) max by (namespace, pod, label_serving_kamiwaza_ai_deployment_name) (kube_pod_labels{namespace=\"$namespace\", label_serving_kamiwaza_ai_deployment_name!=\"\"}))",
                         "legendFormat": "{{label_serving_kamiwaza_ai_deployment_name}}"
                       }
                     },
@@ -796,36 +777,48 @@
                 "legend": {
                   "showLegend": true,
                   "displayMode": "table",
-                  "placement": "bottom",
-                  "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
+                  "placement": "right",
+                  "calcs": ["lastNotNull"],
+                  "limit": 8,
                   "sortBy": "Last *",
                   "sortDesc": true
                 }
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "short",
                   "color": {
                     "mode": "palette-classic"
+                  },
+                  "unit": "percent",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "green"
+                      },
+                      {
+                        "value": 90,
+                        "color": "red"
+                      }
+                    ]
                   },
                   "custom": {
                     "drawStyle": "line",
                     "lineInterpolation": "smooth",
                     "lineWidth": 2,
-                    "fillOpacity": 18,
+                    "fillOpacity": 10,
                     "gradientMode": "opacity",
                     "showPoints": "never",
                     "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
                     "axisSoftMin": 0,
+                    "axisBorderShow": false,
                     "stacking": {
                       "mode": "none",
                       "group": "A"
                     },
                     "thresholdsStyle": {
-                      "mode": "off"
+                      "mode": "dashed"
                     }
                   }
                 },
@@ -835,12 +828,12 @@
           }
         }
       },
-      "serving-memory": {
+      "model-memory": {
         "kind": "Panel",
         "spec": {
           "id": 8,
-          "title": "Serving memory by model",
-          "description": "Working-set memory of each ModelDeployment's pods",
+          "title": "Memory, % of limit",
+          "description": "Largest container per model, as a share of its memory limit",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -857,7 +850,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum by (label_serving_kamiwaza_ai_deployment_name) (container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\"} * on (namespace, pod) group_left (label_serving_kamiwaza_ai_deployment_name) max by (namespace, pod, label_serving_kamiwaza_ai_deployment_name) (kube_pod_labels{namespace=\"$namespace\", label_serving_kamiwaza_ai_deployment_name!=\"\"}))",
+                        "expr": "100 * max by (label_serving_kamiwaza_ai_deployment_name) ((sum by (namespace, pod, container) (container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\"}) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"memory\"})) * on (namespace, pod) group_left (label_serving_kamiwaza_ai_deployment_name) max by (namespace, pod, label_serving_kamiwaza_ai_deployment_name) (kube_pod_labels{namespace=\"$namespace\", label_serving_kamiwaza_ai_deployment_name!=\"\"}))",
                         "legendFormat": "{{label_serving_kamiwaza_ai_deployment_name}}"
                       }
                     },
@@ -884,36 +877,48 @@
                 "legend": {
                   "showLegend": true,
                   "displayMode": "table",
-                  "placement": "bottom",
-                  "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
+                  "placement": "right",
+                  "calcs": ["lastNotNull"],
+                  "limit": 8,
                   "sortBy": "Last *",
                   "sortDesc": true
                 }
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "bytes",
                   "color": {
                     "mode": "palette-classic"
+                  },
+                  "unit": "percent",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "green"
+                      },
+                      {
+                        "value": 90,
+                        "color": "red"
+                      }
+                    ]
                   },
                   "custom": {
                     "drawStyle": "line",
                     "lineInterpolation": "smooth",
                     "lineWidth": 2,
-                    "fillOpacity": 18,
+                    "fillOpacity": 10,
                     "gradientMode": "opacity",
                     "showPoints": "never",
                     "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
                     "axisSoftMin": 0,
+                    "axisBorderShow": false,
                     "stacking": {
                       "mode": "none",
                       "group": "A"
                     },
                     "thresholdsStyle": {
-                      "mode": "off"
+                      "mode": "dashed"
                     }
                   }
                 },
@@ -923,7 +928,7 @@
           }
         }
       },
-      "serving-logs": {
+      "model-logs": {
         "kind": "Panel",
         "spec": {
           "id": 9,
@@ -967,17 +972,15 @@
             "spec": {
               "options": {
                 "showTime": true,
-                "showLabels": false,
+                "showLabels": true,
                 "showCommonLabels": false,
                 "wrapLogMessage": true,
                 "prettifyLogMessage": false,
                 "enableLogDetails": true,
                 "enableInfiniteScrolling": true,
                 "sortOrder": "Descending",
-                "dedupStrategy": "exact",
-                "syntaxHighlighting": true,
-                "fontSize": "default",
-                "detailsMode": "sidebar"
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
               },
               "fieldConfig": {
                 "defaults": {},
@@ -987,12 +990,12 @@
           }
         }
       },
-      "compute-head": {
+      "head": {
         "kind": "Panel",
         "spec": {
           "id": 10,
-          "title": "Head ready",
-          "description": "Ready replicas of the delegated-compute head",
+          "title": "Head",
+          "description": "Ready head replicas of desired",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1009,8 +1012,10 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"core-raycluster-head\"}) or vector(0)",
-                        "legendFormat": ""
+                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"core-raycluster-head\"}) / sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"core-raycluster-head\"})",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
                       }
                     },
                     "refId": "A",
@@ -1036,14 +1041,17 @@
                 "orientation": "auto",
                 "textMode": "auto",
                 "colorMode": "background",
-                "graphMode": "area",
+                "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "unit": "percentunit",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -1052,14 +1060,16 @@
                         "color": "red"
                       },
                       {
+                        "value": 0.01,
+                        "color": "orange"
+                      },
+                      {
                         "value": 1,
                         "color": "green"
                       }
                     ]
                   },
-                  "color": {
-                    "mode": "thresholds"
-                  }
+                  "decimals": 0
                 },
                 "overrides": []
               }
@@ -1067,12 +1077,12 @@
           }
         }
       },
-      "compute-workers": {
+      "workers": {
         "kind": "Panel",
         "spec": {
           "id": 11,
-          "title": "Workers ready",
-          "description": "Ready replicas of the delegated-compute workers",
+          "title": "Workers",
+          "description": "Ready worker replicas of desired",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1089,8 +1099,10 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"core-raycluster-worker\"}) or vector(0)",
-                        "legendFormat": ""
+                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"core-raycluster-worker\"}) / sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"core-raycluster-worker\"})",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
                       }
                     },
                     "refId": "A",
@@ -1116,14 +1128,17 @@
                 "orientation": "auto",
                 "textMode": "auto",
                 "colorMode": "background",
-                "graphMode": "area",
+                "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "unit": "percentunit",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -1132,14 +1147,16 @@
                         "color": "red"
                       },
                       {
+                        "value": 0.01,
+                        "color": "orange"
+                      },
+                      {
                         "value": 1,
                         "color": "green"
                       }
                     ]
                   },
-                  "color": {
-                    "mode": "thresholds"
-                  }
+                  "decimals": 0
                 },
                 "overrides": []
               }
@@ -1147,7 +1164,7 @@
           }
         }
       },
-      "compute-targets": {
+      "targets": {
         "kind": "Panel",
         "spec": {
           "id": 12,
@@ -1201,11 +1218,13 @@
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -1218,9 +1237,6 @@
                         "color": "green"
                       }
                     ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
                   }
                 },
                 "overrides": []
@@ -1283,11 +1299,13 @@
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -1300,9 +1318,6 @@
                         "color": "orange"
                       }
                     ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
                   }
                 },
                 "overrides": []
@@ -1315,8 +1330,8 @@
         "kind": "Panel",
         "spec": {
           "id": 14,
-          "title": "Compute CPU",
-          "description": "CPU cores used by head and worker pods",
+          "title": "CPU, % of limit",
+          "description": "Busiest container per pod, as a share of its CPU limit",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1333,7 +1348,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", pod=~\"core-raycluster-.*\", container!=\"\"}[$__rate_interval]))",
+                        "expr": "100 * max by (pod) (sum by (namespace, pod, container) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container!=\"\", pod=~\"core-raycluster-.*\"}[$__rate_interval])) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"cpu\"}))",
                         "legendFormat": "{{pod}}"
                       }
                     },
@@ -1360,36 +1375,48 @@
                 "legend": {
                   "showLegend": true,
                   "displayMode": "table",
-                  "placement": "bottom",
-                  "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
+                  "placement": "right",
+                  "calcs": ["lastNotNull"],
+                  "limit": 8,
                   "sortBy": "Last *",
                   "sortDesc": true
                 }
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "short",
                   "color": {
                     "mode": "palette-classic"
+                  },
+                  "unit": "percent",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "green"
+                      },
+                      {
+                        "value": 90,
+                        "color": "red"
+                      }
+                    ]
                   },
                   "custom": {
                     "drawStyle": "line",
                     "lineInterpolation": "smooth",
                     "lineWidth": 2,
-                    "fillOpacity": 18,
+                    "fillOpacity": 10,
                     "gradientMode": "opacity",
                     "showPoints": "never",
                     "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
                     "axisSoftMin": 0,
+                    "axisBorderShow": false,
                     "stacking": {
                       "mode": "none",
                       "group": "A"
                     },
                     "thresholdsStyle": {
-                      "mode": "off"
+                      "mode": "dashed"
                     }
                   }
                 },
@@ -1403,8 +1430,8 @@
         "kind": "Panel",
         "spec": {
           "id": 15,
-          "title": "Compute memory",
-          "description": "Working-set memory of head and worker pods",
+          "title": "Memory, % of limit",
+          "description": "Largest container per pod, as a share of its memory limit",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -1421,7 +1448,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\", pod=~\"core-raycluster-.*\", container!=\"\"})",
+                        "expr": "100 * max by (pod) (sum by (namespace, pod, container) (container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\", pod=~\"core-raycluster-.*\"}) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"memory\"}))",
                         "legendFormat": "{{pod}}"
                       }
                     },
@@ -1448,171 +1475,49 @@
                 "legend": {
                   "showLegend": true,
                   "displayMode": "table",
-                  "placement": "bottom",
-                  "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
+                  "placement": "right",
+                  "calcs": ["lastNotNull"],
+                  "limit": 8,
                   "sortBy": "Last *",
                   "sortDesc": true
                 }
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "bytes",
                   "color": {
                     "mode": "palette-classic"
+                  },
+                  "unit": "percent",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "green"
+                      },
+                      {
+                        "value": 90,
+                        "color": "red"
+                      }
+                    ]
                   },
                   "custom": {
                     "drawStyle": "line",
                     "lineInterpolation": "smooth",
                     "lineWidth": 2,
-                    "fillOpacity": 18,
+                    "fillOpacity": 10,
                     "gradientMode": "opacity",
                     "showPoints": "never",
                     "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
                     "axisSoftMin": 0,
+                    "axisBorderShow": false,
                     "stacking": {
                       "mode": "none",
                       "group": "A"
                     },
                     "thresholdsStyle": {
-                      "mode": "off"
+                      "mode": "dashed"
                     }
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "compute-logs": {
-        "kind": "Panel",
-        "spec": {
-          "id": 16,
-          "title": "Compute errors",
-          "description": "Error lines from head and worker pods",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${loki_datasource}"
-                      },
-                      "spec": {
-                        "expr": "{namespace=\"$namespace\", app=\"core-raycluster\"} |~ \"(?i)(error|fatal|exception|traceback)\"",
-                        "legendFormat": ""
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {
-                "maxDataPoints": 500
-              }
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "logs",
-            "version": "",
-            "spec": {
-              "options": {
-                "showTime": true,
-                "showLabels": false,
-                "showCommonLabels": false,
-                "wrapLogMessage": true,
-                "prettifyLogMessage": false,
-                "enableLogDetails": true,
-                "enableInfiniteScrolling": true,
-                "sortOrder": "Descending",
-                "dedupStrategy": "exact",
-                "syntaxHighlighting": true,
-                "fontSize": "default",
-                "detailsMode": "sidebar"
-              },
-              "fieldConfig": {
-                "defaults": {},
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "gpus": {
-        "kind": "Panel",
-        "spec": {
-          "id": 17,
-          "title": "GPUs",
-          "description": "GPUs the NVIDIA DCGM exporter reports; 0 on CPU-only clusters",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "count(DCGM_FI_DEV_GPU_UTIL{namespace=\"$namespace\"}) or vector(0)",
-                        "legendFormat": "",
-                        "instant": true,
-                        "range": false
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "",
-            "spec": {
-              "options": {
-                "reduceOptions": {
-                  "values": false,
-                  "calcs": ["lastNotNull"],
-                  "fields": ""
-                },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "center",
-                "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "fixed",
-                    "fixedColor": "purple"
                   }
                 },
                 "overrides": []
@@ -1624,7 +1529,7 @@
       "gpu-util": {
         "kind": "Panel",
         "spec": {
-          "id": 18,
+          "id": 16,
           "title": "GPU utilisation",
           "description": "NVIDIA DCGM exporter",
           "links": [],
@@ -1672,28 +1577,27 @@
                   "displayMode": "table",
                   "placement": "bottom",
                   "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
+                  "limit": 8,
                   "sortBy": "Last *",
                   "sortDesc": true
                 }
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "percent",
                   "color": {
                     "mode": "palette-classic"
                   },
+                  "unit": "percent",
                   "custom": {
                     "drawStyle": "line",
                     "lineInterpolation": "smooth",
                     "lineWidth": 2,
-                    "fillOpacity": 18,
+                    "fillOpacity": 10,
                     "gradientMode": "opacity",
                     "showPoints": "never",
                     "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
                     "axisSoftMin": 0,
+                    "axisBorderShow": false,
                     "stacking": {
                       "mode": "none",
                       "group": "A"
@@ -1701,7 +1605,8 @@
                     "thresholdsStyle": {
                       "mode": "off"
                     }
-                  }
+                  },
+                  "max": 100
                 },
                 "overrides": []
               }
@@ -1712,7 +1617,7 @@
       "gpu-memory": {
         "kind": "Panel",
         "spec": {
-          "id": 19,
+          "id": 17,
           "title": "GPU memory used",
           "description": "NVIDIA DCGM exporter",
           "links": [],
@@ -1760,28 +1665,27 @@
                   "displayMode": "table",
                   "placement": "bottom",
                   "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
+                  "limit": 8,
                   "sortBy": "Last *",
                   "sortDesc": true
                 }
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "bytes",
                   "color": {
                     "mode": "palette-classic"
                   },
+                  "unit": "bytes",
                   "custom": {
                     "drawStyle": "line",
                     "lineInterpolation": "smooth",
                     "lineWidth": 2,
-                    "fillOpacity": 18,
+                    "fillOpacity": 10,
                     "gradientMode": "opacity",
                     "showPoints": "never",
                     "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
                     "axisSoftMin": 0,
+                    "axisBorderShow": false,
                     "stacking": {
                       "mode": "none",
                       "group": "A"
@@ -1796,16 +1700,118 @@
             }
           }
         }
+      },
+      "compute-logs": {
+        "kind": "Panel",
+        "spec": {
+          "id": 18,
+          "title": "Compute errors",
+          "description": "Error lines from head and worker pods",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${loki_datasource}"
+                      },
+                      "spec": {
+                        "expr": "{namespace=\"$namespace\", app=\"core-raycluster\"} |~ \"(?i)(error|fatal|exception|traceback)\"",
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "logs",
+            "version": "",
+            "spec": {
+              "options": {
+                "showTime": true,
+                "showLabels": true,
+                "showCommonLabels": false,
+                "wrapLogMessage": true,
+                "prettifyLogMessage": false,
+                "enableLogDetails": true,
+                "enableInfiniteScrolling": true,
+                "sortOrder": "Descending",
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "about": {
+        "kind": "Panel",
+        "spec": {
+          "id": 19,
+          "title": "About this dashboard",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "text",
+            "version": "",
+            "spec": {
+              "options": {
+                "mode": "markdown",
+                "content": "**Are served models and delegated compute healthy and within their limits?**\n\n- **Model serving** reads each ModelDeployment's Ready condition and replicas from the operator, then the serving pods' use of their CPU and memory limits.\n- **Delegated compute** covers the Ray head and workers.\n\nRequest rate and latency are not shown: the serving runtime publishes them only on its inference port, which this stack does not scrape. GPU charts appear only where the NVIDIA DCGM exporter runs.",
+                "code": {
+                  "language": "plaintext",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                }
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
       }
     },
     "layout": {
-      "kind": "TabsLayout",
+      "kind": "RowsLayout",
       "spec": {
-        "tabs": [
+        "rows": [
           {
-            "kind": "TabsLayoutTab",
+            "kind": "RowsLayoutRow",
             "spec": {
               "title": "Model serving",
+              "collapse": false,
+              "hideHeader": false,
+              "fillScreen": false,
               "layout": {
                 "kind": "RowsLayout",
                 "spec": {
@@ -1839,7 +1845,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "models-not-ready"
+                                    "name": "models-down"
                                   }
                                 }
                               },
@@ -1848,198 +1854,7 @@
                                 "spec": {
                                   "element": {
                                     "kind": "ElementReference",
-                                    "name": "serving-replicas"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "model-serving-capability"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "kind": "RowsLayoutRow",
-                      "spec": {
-                        "title": "Deployments",
-                        "collapse": false,
-                        "hideHeader": false,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "GridLayout",
-                          "spec": {
-                            "items": [
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 24,
-                                  "height": 6,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "model-timeline"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 6,
-                                  "width": 24,
-                                  "height": 5,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "model-table"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "kind": "RowsLayoutRow",
-                      "spec": {
-                        "title": "Resources",
-                        "collapse": false,
-                        "hideHeader": false,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "GridLayout",
-                          "spec": {
-                            "items": [
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 12,
-                                  "height": 9,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "serving-cpu"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 12,
-                                  "height": 9,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "serving-memory"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "kind": "RowsLayoutRow",
-                      "spec": {
-                        "title": "Errors",
-                        "collapse": true,
-                        "hideHeader": false,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "GridLayout",
-                          "spec": {
-                            "items": [
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 24,
-                                  "height": 12,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "serving-logs"
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          {
-            "kind": "TabsLayoutTab",
-            "spec": {
-              "title": "Delegated compute",
-              "layout": {
-                "kind": "RowsLayout",
-                "spec": {
-                  "rows": [
-                    {
-                      "kind": "RowsLayoutRow",
-                      "spec": {
-                        "title": "Summary",
-                        "collapse": false,
-                        "hideHeader": true,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "AutoGridLayout",
-                          "spec": {
-                            "maxColumnCount": 5,
-                            "columnWidthMode": "narrow",
-                            "rowHeightMode": "short",
-                            "fillScreen": false,
-                            "items": [
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "compute-head"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "compute-workers"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "compute-targets"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "compute-restarts"
+                                    "name": "replicas"
                                   }
                                 }
                               },
@@ -2060,16 +1875,197 @@
                     {
                       "kind": "RowsLayoutRow",
                       "spec": {
+                        "title": "Readiness",
+                        "collapse": false,
+                        "hideHeader": true,
+                        "fillScreen": false,
+                        "layout": {
+                          "kind": "GridLayout",
+                          "spec": {
+                            "items": [
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 24,
+                                  "height": 5,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "model-history"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 5,
+                                  "width": 24,
+                                  "height": 6,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "models"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
                         "title": "Resources",
                         "collapse": false,
-                        "hideHeader": false,
+                        "hideHeader": true,
                         "fillScreen": false,
                         "layout": {
                           "kind": "AutoGridLayout",
                           "spec": {
                             "maxColumnCount": 2,
                             "columnWidthMode": "standard",
-                            "rowHeightMode": "tall",
+                            "rowHeightMode": "standard",
+                            "fillScreen": false,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "model-cpu"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "model-memory"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Serving errors",
+                        "collapse": true,
+                        "hideHeader": false,
+                        "fillScreen": false,
+                        "layout": {
+                          "kind": "GridLayout",
+                          "spec": {
+                            "items": [
+                              {
+                                "kind": "GridLayoutItem",
+                                "spec": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 24,
+                                  "height": 12,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "model-logs"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "title": "Delegated compute",
+              "collapse": false,
+              "hideHeader": false,
+              "fillScreen": false,
+              "layout": {
+                "kind": "RowsLayout",
+                "spec": {
+                  "rows": [
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Summary",
+                        "collapse": false,
+                        "hideHeader": true,
+                        "fillScreen": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "maxColumnCount": 4,
+                            "columnWidthMode": "narrow",
+                            "rowHeightMode": "short",
+                            "fillScreen": false,
+                            "items": [
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "head"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "workers"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "targets"
+                                  }
+                                }
+                              },
+                              {
+                                "kind": "AutoGridLayoutItem",
+                                "spec": {
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "compute-restarts"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "Resources",
+                        "collapse": false,
+                        "hideHeader": true,
+                        "fillScreen": false,
+                        "layout": {
+                          "kind": "AutoGridLayout",
+                          "spec": {
+                            "maxColumnCount": 2,
+                            "columnWidthMode": "standard",
+                            "rowHeightMode": "standard",
                             "fillScreen": false,
                             "items": [
                               {
@@ -2146,7 +2142,7 @@
                     {
                       "kind": "RowsLayoutRow",
                       "spec": {
-                        "title": "Errors",
+                        "title": "Compute errors",
                         "collapse": true,
                         "hideHeader": false,
                         "fillScreen": false,
@@ -2169,6 +2165,35 @@
                               }
                             ]
                           }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "title": "About this dashboard",
+              "collapse": true,
+              "hideHeader": false,
+              "fillScreen": false,
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 0,
+                        "width": 24,
+                        "height": 7,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "about"
                         }
                       }
                     }

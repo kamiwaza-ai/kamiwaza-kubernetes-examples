@@ -6,7 +6,7 @@
   },
   "spec": {
     "title": "Kamiwaza · Auth & Identity",
-    "description": "Identity, authorization decisions, certificates, and authentication failures.",
+    "description": "Can users sign in, are authorization decisions fast and correct, and are certificates valid?",
     "tags": ["kamiwaza"],
     "editable": false,
     "cursorSync": "Crosshair",
@@ -53,8 +53,8 @@
       "timezone": "browser",
       "from": "now-3h",
       "to": "now",
-      "autoRefresh": "30s",
-      "autoRefreshIntervals": ["10s", "30s", "1m", "5m", "15m", "1h"],
+      "autoRefresh": "1m",
+      "autoRefreshIntervals": ["30s", "1m", "5m", "15m"],
       "hideTimepicker": false,
       "fiscalYearStartMonth": 0
     },
@@ -134,12 +134,12 @@
       }
     ],
     "elements": {
-      "identity-cap": {
+      "identity": {
         "kind": "Panel",
         "spec": {
           "id": 1,
           "title": "Identity capability",
-          "description": "State the operator reports for the identityAndAccess capability",
+          "description": "The operator's state for the identityAndAccess capability",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -188,11 +188,13 @@
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -201,9 +203,6 @@
                         "color": "#8e8e8e"
                       }
                     ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
                   },
                   "mappings": [
                     {
@@ -244,7 +243,7 @@
         "spec": {
           "id": 2,
           "title": "Identity provider",
-          "description": "Ready keycloak replicas",
+          "description": "Ready of desired keycloak replicas",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -261,8 +260,10 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"keycloak\"}) or vector(0)",
-                        "legendFormat": ""
+                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"keycloak\"}) / sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"keycloak\"})",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
                       }
                     },
                     "refId": "A",
@@ -288,14 +289,17 @@
                 "orientation": "auto",
                 "textMode": "auto",
                 "colorMode": "background",
-                "graphMode": "area",
+                "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "unit": "percentunit",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -304,14 +308,16 @@
                         "color": "red"
                       },
                       {
+                        "value": 0.01,
+                        "color": "orange"
+                      },
+                      {
                         "value": 1,
                         "color": "green"
                       }
                     ]
                   },
-                  "color": {
-                    "mode": "thresholds"
-                  }
+                  "decimals": 0
                 },
                 "overrides": []
               }
@@ -319,12 +325,12 @@
           }
         }
       },
-      "decisions": {
+      "authz": {
         "kind": "Panel",
         "spec": {
           "id": 3,
-          "title": "Decision service",
-          "description": "Ready authorization decision service replicas",
+          "title": "Authorization",
+          "description": "Ready of desired decision-service replicas",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -341,8 +347,10 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"spicedb\"}) or vector(0)",
-                        "legendFormat": ""
+                        "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\", deployment=~\"spicedb\"}) / sum(kube_deployment_spec_replicas{namespace=\"$namespace\", deployment=~\"spicedb\"})",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
                       }
                     },
                     "refId": "A",
@@ -368,14 +376,17 @@
                 "orientation": "auto",
                 "textMode": "auto",
                 "colorMode": "background",
-                "graphMode": "area",
+                "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "unit": "percentunit",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -384,14 +395,16 @@
                         "color": "red"
                       },
                       {
+                        "value": 0.01,
+                        "color": "orange"
+                      },
+                      {
                         "value": 1,
                         "color": "green"
                       }
                     ]
                   },
-                  "color": {
-                    "mode": "thresholds"
-                  }
+                  "decimals": 0
                 },
                 "overrides": []
               }
@@ -399,12 +412,12 @@
           }
         }
       },
-      "cert-soonest": {
+      "cert-next": {
         "kind": "Panel",
         "spec": {
           "id": 4,
           "title": "Next certificate expiry",
-          "description": "The earliest cert-manager certificate expiry in the platform namespace",
+          "description": "Earliest cert-manager certificate expiry in the platform namespace",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -453,11 +466,13 @@
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
                   "unit": "s",
                   "thresholds": {
                     "mode": "absolute",
@@ -475,9 +490,374 @@
                         "color": "green"
                       }
                     ]
-                  },
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "auth-failures": {
+        "kind": "Panel",
+        "spec": {
+          "id": 5,
+          "title": "Auth failures (range)",
+          "description": "401, 403, and unauthorized lines in the selected range",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${loki_datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(count_over_time({namespace=\"$namespace\"} != \"response body\" |~ \"(?i)( 401 | 403 |status[=: \\\"]*40[13]|unauthorized|forbidden|authentication.failed|invalid.token)\" [$__range])) or vector(0)",
+                        "legendFormat": "",
+                        "queryType": "instant"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": ["lastNotNull"],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "wideLayout": true,
+                "showPercentChange": false
+              },
+              "fieldConfig": {
+                "defaults": {
                   "color": {
                     "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "green"
+                      },
+                      {
+                        "value": 1,
+                        "color": "orange"
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "authz-rate": {
+        "kind": "Panel",
+        "spec": {
+          "id": 6,
+          "title": "Decision rate",
+          "description": "Authorization requests per second by method",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum by (grpc_method) (rate(grpc_server_handled_total{job=\"monitoring/authorization\", namespace=\"$namespace\"}[$__rate_interval]))",
+                        "legendFormat": "{{grpc_method}}"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc",
+                  "hideZeros": false
+                },
+                "legend": {
+                  "showLegend": true,
+                  "displayMode": "table",
+                  "placement": "bottom",
+                  "calcs": ["lastNotNull", "max"],
+                  "limit": 8,
+                  "sortBy": "Last *",
+                  "sortDesc": true
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "reqps",
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "fillOpacity": 10,
+                    "gradientMode": "opacity",
+                    "showPoints": "never",
+                    "spanNulls": true,
+                    "axisSoftMin": 0,
+                    "axisBorderShow": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "authz-errors": {
+        "kind": "Panel",
+        "spec": {
+          "id": 7,
+          "title": "Decision errors",
+          "description": "Share of authorization requests that did not return OK",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum(rate(grpc_server_handled_total{job=\"monitoring/authorization\", namespace=\"$namespace\", grpc_code!=\"OK\"}[$__rate_interval])) / sum(rate(grpc_server_handled_total{job=\"monitoring/authorization\", namespace=\"$namespace\"}[$__rate_interval])) or on () vector(0)",
+                        "legendFormat": "error ratio"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc",
+                  "hideZeros": false
+                },
+                "legend": {
+                  "showLegend": true,
+                  "displayMode": "table",
+                  "placement": "bottom",
+                  "calcs": ["lastNotNull", "max"],
+                  "limit": 8,
+                  "sortBy": "Last *",
+                  "sortDesc": true
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "percentunit",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "green"
+                      },
+                      {
+                        "value": 0.01,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "fillOpacity": 10,
+                    "gradientMode": "opacity",
+                    "showPoints": "never",
+                    "spanNulls": true,
+                    "axisSoftMin": 0,
+                    "axisSoftMax": 0.05,
+                    "axisBorderShow": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "dashed"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "authz-latency": {
+        "kind": "Panel",
+        "spec": {
+          "id": 8,
+          "title": "Decision latency p95",
+          "description": "95th percentile authorization latency by method; above 50 ms slows every request",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "histogram_quantile(0.95, sum by (le, grpc_method) (rate(grpc_server_handling_seconds_bucket{job=\"monitoring/authorization\", namespace=\"$namespace\"}[$__rate_interval])))",
+                        "legendFormat": "{{grpc_method}}"
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "",
+            "spec": {
+              "options": {
+                "tooltip": {
+                  "mode": "multi",
+                  "sort": "desc",
+                  "hideZeros": false
+                },
+                "legend": {
+                  "showLegend": true,
+                  "displayMode": "table",
+                  "placement": "bottom",
+                  "calcs": ["lastNotNull", "max"],
+                  "limit": 8,
+                  "sortBy": "Last *",
+                  "sortDesc": true
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "s",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "green"
+                      },
+                      {
+                        "value": 0.05,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "custom": {
+                    "drawStyle": "line",
+                    "lineInterpolation": "smooth",
+                    "lineWidth": 2,
+                    "fillOpacity": 10,
+                    "gradientMode": "opacity",
+                    "showPoints": "never",
+                    "spanNulls": true,
+                    "axisSoftMin": 0,
+                    "axisBorderShow": false,
+                    "stacking": {
+                      "mode": "none",
+                      "group": "A"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "dashed"
+                    }
                   }
                 },
                 "overrides": []
@@ -489,7 +869,7 @@
       "certs": {
         "kind": "Panel",
         "spec": {
-          "id": 5,
+          "id": 9,
           "title": "Certificates",
           "description": "Days until expiry for each cert-manager certificate in the platform namespace",
           "links": [],
@@ -654,514 +1034,11 @@
           }
         }
       },
-      "authz-rate": {
-        "kind": "Panel",
-        "spec": {
-          "id": 6,
-          "title": "Decisions by method",
-          "description": "Authorization gRPC requests per second",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "sum by (grpc_method) (rate(grpc_server_handled_total{job=\"monitoring/authorization\", namespace=\"$namespace\"}[$__rate_interval]))",
-                        "legendFormat": "{{grpc_method}}"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "",
-            "spec": {
-              "options": {
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "desc",
-                  "hideZeros": false
-                },
-                "legend": {
-                  "showLegend": true,
-                  "displayMode": "table",
-                  "placement": "bottom",
-                  "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
-                  "sortBy": "Last *",
-                  "sortDesc": true
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "reqps",
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "drawStyle": "line",
-                    "lineInterpolation": "smooth",
-                    "lineWidth": 2,
-                    "fillOpacity": 18,
-                    "gradientMode": "opacity",
-                    "showPoints": "never",
-                    "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
-                    "axisSoftMin": 0,
-                    "stacking": {
-                      "mode": "normal",
-                      "group": "A"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "authz-latency": {
-        "kind": "Panel",
-        "spec": {
-          "id": 7,
-          "title": "Decision latency p95",
-          "description": "95th percentile authorization latency by method",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "histogram_quantile(0.95, sum by (le, grpc_method) (rate(grpc_server_handling_seconds_bucket{job=\"monitoring/authorization\", namespace=\"$namespace\"}[$__rate_interval])))",
-                        "legendFormat": "{{grpc_method}}"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "",
-            "spec": {
-              "options": {
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "desc",
-                  "hideZeros": false
-                },
-                "legend": {
-                  "showLegend": true,
-                  "displayMode": "table",
-                  "placement": "bottom",
-                  "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
-                  "sortBy": "Last *",
-                  "sortDesc": true
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "s",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": null,
-                        "color": "green"
-                      },
-                      {
-                        "value": 0.05,
-                        "color": "red"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "drawStyle": "line",
-                    "lineInterpolation": "smooth",
-                    "lineWidth": 2,
-                    "fillOpacity": 18,
-                    "gradientMode": "opacity",
-                    "showPoints": "never",
-                    "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
-                    "axisSoftMin": 0,
-                    "stacking": {
-                      "mode": "none",
-                      "group": "A"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "dashed"
-                    }
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "authz-errors": {
-        "kind": "Panel",
-        "spec": {
-          "id": 8,
-          "title": "Decision errors",
-          "description": "Authorization responses other than OK",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "prometheus",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${datasource}"
-                      },
-                      "spec": {
-                        "expr": "sum by (grpc_method, grpc_code) (rate(grpc_server_handled_total{job=\"monitoring/authorization\", namespace=\"$namespace\", grpc_code!=\"OK\"}[$__rate_interval]))",
-                        "legendFormat": "{{grpc_method}} · {{grpc_code}}"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "",
-            "spec": {
-              "options": {
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "desc",
-                  "hideZeros": false
-                },
-                "legend": {
-                  "showLegend": true,
-                  "displayMode": "table",
-                  "placement": "bottom",
-                  "calcs": ["lastNotNull", "max"],
-                  "limit": 10,
-                  "sortBy": "Last *",
-                  "sortDesc": true
-                }
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "reqps",
-                  "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "drawStyle": "bars",
-                    "lineInterpolation": "smooth",
-                    "lineWidth": 2,
-                    "fillOpacity": 70,
-                    "gradientMode": "opacity",
-                    "showPoints": "never",
-                    "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
-                    "axisSoftMin": 0,
-                    "stacking": {
-                      "mode": "none",
-                      "group": "A"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "idp-errors": {
-        "kind": "Panel",
-        "spec": {
-          "id": 9,
-          "title": "Identity event errors",
-          "description": "Identity provider event errors in the selected range",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${loki_datasource}"
-                      },
-                      "spec": {
-                        "expr": "sum(count_over_time({namespace=\"$namespace\", app=\"keycloak\"} |= \"org.keycloak.events\" |= \"_ERROR\" [$__range])) or vector(0)",
-                        "legendFormat": "",
-                        "queryType": "instant"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "",
-            "spec": {
-              "options": {
-                "reduceOptions": {
-                  "values": false,
-                  "calcs": ["lastNotNull"],
-                  "fields": ""
-                },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "background",
-                "graphMode": "none",
-                "justifyMode": "center",
-                "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": null,
-                        "color": "green"
-                      },
-                      {
-                        "value": 1,
-                        "color": "orange"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "auth-failures": {
-        "kind": "Panel",
-        "spec": {
-          "id": 10,
-          "title": "Auth failures",
-          "description": "401, 403, and unauthorized lines across the platform namespace in the selected range",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${loki_datasource}"
-                      },
-                      "spec": {
-                        "expr": "sum(count_over_time({namespace=\"$namespace\"} != \"response body\" |~ \"(?i)( 401 | 403 |status[=: \\\"]*40[13]|unauthorized|forbidden|authentication.failed|invalid.token)\" [$__range])) or vector(0)",
-                        "legendFormat": "",
-                        "queryType": "instant"
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {}
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "stat",
-            "version": "",
-            "spec": {
-              "options": {
-                "reduceOptions": {
-                  "values": false,
-                  "calcs": ["lastNotNull"],
-                  "fields": ""
-                },
-                "orientation": "auto",
-                "textMode": "auto",
-                "colorMode": "background",
-                "graphMode": "none",
-                "justifyMode": "center",
-                "wideLayout": true,
-                "showPercentChange": false,
-                "percentChangeColorMode": "inverted"
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "value": null,
-                        "color": "green"
-                      },
-                      {
-                        "value": 1,
-                        "color": "orange"
-                      }
-                    ]
-                  },
-                  "color": {
-                    "mode": "thresholds"
-                  }
-                },
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
-      "idp-log": {
-        "kind": "Panel",
-        "spec": {
-          "id": 11,
-          "title": "Identity event errors",
-          "description": "Keycloak event errors (requires Keycloak event logging)",
-          "links": [],
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "query": {
-                      "kind": "DataQuery",
-                      "group": "loki",
-                      "version": "v0",
-                      "datasource": {
-                        "name": "${loki_datasource}"
-                      },
-                      "spec": {
-                        "expr": "{namespace=\"$namespace\", app=\"keycloak\"} |= \"org.keycloak.events\" |= \"_ERROR\"",
-                        "legendFormat": ""
-                      }
-                    },
-                    "refId": "A",
-                    "hidden": false
-                  }
-                }
-              ],
-              "transformations": [],
-              "queryOptions": {
-                "maxDataPoints": 500
-              }
-            }
-          },
-          "vizConfig": {
-            "kind": "VizConfig",
-            "group": "logs",
-            "version": "",
-            "spec": {
-              "options": {
-                "showTime": true,
-                "showLabels": false,
-                "showCommonLabels": false,
-                "wrapLogMessage": true,
-                "prettifyLogMessage": false,
-                "enableLogDetails": true,
-                "enableInfiniteScrolling": true,
-                "sortOrder": "Descending",
-                "dedupStrategy": "exact",
-                "syntaxHighlighting": true,
-                "fontSize": "default",
-                "detailsMode": "sidebar"
-              },
-              "fieldConfig": {
-                "defaults": {},
-                "overrides": []
-              }
-            }
-          }
-        }
-      },
       "auth-log": {
         "kind": "Panel",
         "spec": {
-          "id": 12,
-          "title": "HTTP authentication failures",
+          "id": 10,
+          "title": "Authentication failures",
           "description": "401, 403, and unauthorized lines across the platform namespace",
           "links": [],
           "data": {
@@ -1201,17 +1078,114 @@
             "spec": {
               "options": {
                 "showTime": true,
-                "showLabels": false,
+                "showLabels": true,
                 "showCommonLabels": false,
                 "wrapLogMessage": true,
                 "prettifyLogMessage": false,
                 "enableLogDetails": true,
                 "enableInfiniteScrolling": true,
                 "sortOrder": "Descending",
-                "dedupStrategy": "exact",
-                "syntaxHighlighting": true,
-                "fontSize": "default",
-                "detailsMode": "sidebar"
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "idp-log": {
+        "kind": "Panel",
+        "spec": {
+          "id": 11,
+          "title": "Identity provider event errors",
+          "description": "Keycloak event errors (requires Keycloak event logging)",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "loki",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${loki_datasource}"
+                      },
+                      "spec": {
+                        "expr": "{namespace=\"$namespace\", app=\"keycloak\"} |= \"org.keycloak.events\" |= \"_ERROR\"",
+                        "legendFormat": ""
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {
+                "maxDataPoints": 500
+              }
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "logs",
+            "version": "",
+            "spec": {
+              "options": {
+                "showTime": true,
+                "showLabels": true,
+                "showCommonLabels": false,
+                "wrapLogMessage": true,
+                "prettifyLogMessage": false,
+                "enableLogDetails": true,
+                "enableInfiniteScrolling": true,
+                "sortOrder": "Descending",
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "about": {
+        "kind": "Panel",
+        "spec": {
+          "id": 12,
+          "title": "About this dashboard",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "text",
+            "version": "",
+            "spec": {
+              "options": {
+                "mode": "markdown",
+                "content": "**Can users sign in, are authorization decisions fast and correct, and are certificates valid?**\n\n- **Authorization** follows RED for the decision service: request rate, error ratio, and p95 latency.\n- **Certificates** lists every cert-manager certificate in the platform namespace by days left.\n- **Authentication failures** counts 401, 403, and unauthorized log lines.\n\nIdentity-provider sessions and logins are not shown: the identity provider image ships without its metrics endpoint.",
+                "code": {
+                  "language": "plaintext",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                }
               },
               "fieldConfig": {
                 "defaults": {},
@@ -1223,99 +1197,66 @@
       }
     },
     "layout": {
-      "kind": "TabsLayout",
+      "kind": "RowsLayout",
       "spec": {
-        "tabs": [
+        "rows": [
           {
-            "kind": "TabsLayoutTab",
+            "kind": "RowsLayoutRow",
             "spec": {
-              "title": "Overview",
+              "title": "Status",
+              "collapse": false,
+              "hideHeader": false,
+              "fillScreen": false,
               "layout": {
-                "kind": "RowsLayout",
+                "kind": "AutoGridLayout",
                 "spec": {
-                  "rows": [
+                  "maxColumnCount": 5,
+                  "columnWidthMode": "narrow",
+                  "rowHeightMode": "short",
+                  "fillScreen": false,
+                  "items": [
                     {
-                      "kind": "RowsLayoutRow",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "title": "Summary",
-                        "collapse": false,
-                        "hideHeader": true,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "AutoGridLayout",
-                          "spec": {
-                            "maxColumnCount": 4,
-                            "columnWidthMode": "narrow",
-                            "rowHeightMode": "short",
-                            "fillScreen": false,
-                            "items": [
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "identity-cap"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "idp"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "decisions"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "cert-soonest"
-                                  }
-                                }
-                              }
-                            ]
-                          }
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "identity"
                         }
                       }
                     },
                     {
-                      "kind": "RowsLayoutRow",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "title": "Certificates",
-                        "collapse": false,
-                        "hideHeader": false,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "GridLayout",
-                          "spec": {
-                            "items": [
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 24,
-                                  "height": 9,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "certs"
-                                  }
-                                }
-                              }
-                            ]
-                          }
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "idp"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "authz"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "cert-next"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "auth-failures"
                         }
                       }
                     }
@@ -1325,96 +1266,44 @@
             }
           },
           {
-            "kind": "TabsLayoutTab",
+            "kind": "RowsLayoutRow",
             "spec": {
               "title": "Authorization",
+              "collapse": false,
+              "hideHeader": false,
+              "fillScreen": false,
               "layout": {
-                "kind": "RowsLayout",
+                "kind": "AutoGridLayout",
                 "spec": {
-                  "rows": [
+                  "maxColumnCount": 3,
+                  "columnWidthMode": "standard",
+                  "rowHeightMode": "standard",
+                  "fillScreen": false,
+                  "items": [
                     {
-                      "kind": "RowsLayoutRow",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "title": "Decisions",
-                        "collapse": false,
-                        "hideHeader": true,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "GridLayout",
-                          "spec": {
-                            "items": [
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 12,
-                                  "height": 9,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "authz-rate"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 12,
-                                  "height": 9,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "authz-latency"
-                                  }
-                                }
-                              }
-                            ]
-                          }
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "authz-rate"
                         }
                       }
                     },
                     {
-                      "kind": "RowsLayoutRow",
+                      "kind": "AutoGridLayoutItem",
                       "spec": {
-                        "title": "Errors",
-                        "collapse": false,
-                        "hideHeader": true,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "AutoGridLayout",
-                          "spec": {
-                            "maxColumnCount": 1,
-                            "columnWidthMode": "standard",
-                            "rowHeightMode": "standard",
-                            "fillScreen": false,
-                            "items": [
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "authz-errors"
-                                  },
-                                  "conditionalRendering": {
-                                    "kind": "ConditionalRenderingGroup",
-                                    "spec": {
-                                      "visibility": "show",
-                                      "condition": "and",
-                                      "items": [
-                                        {
-                                          "kind": "ConditionalRenderingData",
-                                          "spec": {
-                                            "value": true
-                                          }
-                                        }
-                                      ]
-                                    }
-                                  }
-                                }
-                              }
-                            ]
-                          }
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "authz-errors"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "authz-latency"
                         }
                       }
                     }
@@ -1424,90 +1313,97 @@
             }
           },
           {
-            "kind": "TabsLayoutTab",
+            "kind": "RowsLayoutRow",
             "spec": {
-              "title": "Authentication",
+              "title": "Certificates",
+              "collapse": false,
+              "hideHeader": false,
+              "fillScreen": false,
               "layout": {
-                "kind": "RowsLayout",
+                "kind": "GridLayout",
                 "spec": {
-                  "rows": [
+                  "items": [
                     {
-                      "kind": "RowsLayoutRow",
+                      "kind": "GridLayoutItem",
                       "spec": {
-                        "title": "Summary",
-                        "collapse": false,
-                        "hideHeader": true,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "AutoGridLayout",
-                          "spec": {
-                            "maxColumnCount": 2,
-                            "columnWidthMode": "narrow",
-                            "rowHeightMode": "short",
-                            "fillScreen": false,
-                            "items": [
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "idp-errors"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "AutoGridLayoutItem",
-                                "spec": {
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "auth-failures"
-                                  }
-                                }
-                              }
-                            ]
-                          }
+                        "x": 0,
+                        "y": 0,
+                        "width": 24,
+                        "height": 9,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "certs"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "title": "Authentication failures",
+              "collapse": true,
+              "hideHeader": false,
+              "fillScreen": false,
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 0,
+                        "width": 12,
+                        "height": 14,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "auth-log"
                         }
                       }
                     },
                     {
-                      "kind": "RowsLayoutRow",
+                      "kind": "GridLayoutItem",
                       "spec": {
-                        "title": "Logs",
-                        "collapse": false,
-                        "hideHeader": true,
-                        "fillScreen": false,
-                        "layout": {
-                          "kind": "GridLayout",
-                          "spec": {
-                            "items": [
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 12,
-                                  "height": 16,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "auth-log"
-                                  }
-                                }
-                              },
-                              {
-                                "kind": "GridLayoutItem",
-                                "spec": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 12,
-                                  "height": 16,
-                                  "element": {
-                                    "kind": "ElementReference",
-                                    "name": "idp-log"
-                                  }
-                                }
-                              }
-                            ]
-                          }
+                        "x": 12,
+                        "y": 0,
+                        "width": 12,
+                        "height": 14,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "idp-log"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "title": "About this dashboard",
+              "collapse": true,
+              "hideHeader": false,
+              "fillScreen": false,
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 0,
+                        "width": 24,
+                        "height": 7,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "about"
                         }
                       }
                     }

@@ -6,7 +6,7 @@
   },
   "spec": {
     "title": "Kamiwaza · Log Explorer",
-    "description": "Every container log line in the platform namespace, with pre-built diagnostics.",
+    "description": "What are the workloads saying?",
     "tags": ["kamiwaza"],
     "editable": false,
     "cursorSync": "Crosshair",
@@ -53,8 +53,8 @@
       "timezone": "browser",
       "from": "now-3h",
       "to": "now",
-      "autoRefresh": "30s",
-      "autoRefreshIntervals": ["10s", "30s", "1m", "5m", "15m", "1h"],
+      "autoRefresh": "1m",
+      "autoRefreshIntervals": ["30s", "1m", "5m", "15m"],
       "hideTimepicker": false,
       "fiscalYearStartMonth": 0
     },
@@ -103,13 +103,13 @@
         "kind": "QueryVariable",
         "spec": {
           "name": "namespace",
-          "label": "Platform namespace",
+          "label": "Namespace",
           "hide": "dontHide",
           "refresh": "onTimeRangeChanged",
           "skipUrlSync": false,
           "current": {
-            "text": "",
-            "value": ""
+            "text": "kamiwaza",
+            "value": "kamiwaza"
           },
           "options": [],
           "multi": false,
@@ -117,17 +117,18 @@
           "allowCustomValue": false,
           "regex": "",
           "sort": "alphabeticalAsc",
-          "definition": "label_values(kamiwaza_platform_condition, namespace)",
+          "definition": "label_values(namespace)",
           "query": {
             "kind": "DataQuery",
-            "group": "prometheus",
+            "group": "loki",
             "version": "v0",
             "datasource": {
-              "name": "${datasource}"
+              "name": "${loki_datasource}"
             },
             "spec": {
-              "query": "label_values(kamiwaza_platform_condition, namespace)",
-              "refId": "PrometheusVariableQueryEditor-VariableQuery"
+              "label": "namespace",
+              "type": 1,
+              "refId": "LokiVariableQueryEditor-VariableQuery"
             }
           }
         }
@@ -147,7 +148,7 @@
           "options": [],
           "multi": true,
           "includeAll": true,
-          "allValue": ".+",
+          "allValue": ".*",
           "allowCustomValue": false,
           "regex": "",
           "sort": "alphabeticalAsc",
@@ -180,8 +181,8 @@
           "allowCustomValue": false,
           "query": "all : .*, warning : (?i)(warn|error|critical|fatal|panic), error : (?i)(error|critical|fatal|panic)",
           "current": {
-            "text": "error",
-            "value": "(?i)(error|critical|fatal|panic)"
+            "text": "warning",
+            "value": "(?i)(warn|error|critical|fatal|panic)"
           },
           "options": [
             {
@@ -190,12 +191,12 @@
               "value": ".*"
             },
             {
-              "selected": false,
+              "selected": true,
               "text": "warning",
               "value": "(?i)(warn|error|critical|fatal|panic)"
             },
             {
-              "selected": true,
+              "selected": false,
               "text": "error",
               "value": "(?i)(error|critical|fatal|panic)"
             }
@@ -208,8 +209,8 @@
         "kind": "Panel",
         "spec": {
           "id": 1,
-          "title": "Log volume by workload",
-          "description": "Lines per second by app.kubernetes.io/name",
+          "title": "Log volume",
+          "description": "Lines per second by workload",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -226,7 +227,7 @@
                         "name": "${loki_datasource}"
                       },
                       "spec": {
-                        "expr": "sum by (app) (rate({namespace=\"$namespace\", app=~\"$app\"}[$__auto]))",
+                        "expr": "sum by (app) (rate({namespace=\"$namespace\", app=~\"$app\"} | label_format app=\"{{ or .app .container .job }}\" [$__auto]))",
                         "legendFormat": "{{app}}"
                       }
                     },
@@ -255,27 +256,27 @@
                   "displayMode": "table",
                   "placement": "right",
                   "calcs": ["sum"],
-                  "limit": 10,
+                  "limit": 8,
+                  "sortBy": "Total",
                   "sortDesc": true
                 }
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "short",
                   "color": {
                     "mode": "palette-classic"
                   },
+                  "unit": "short",
                   "custom": {
                     "drawStyle": "bars",
                     "lineInterpolation": "smooth",
                     "lineWidth": 2,
-                    "fillOpacity": 70,
+                    "fillOpacity": 60,
                     "gradientMode": "opacity",
                     "showPoints": "never",
                     "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
                     "axisSoftMin": 0,
+                    "axisBorderShow": false,
                     "stacking": {
                       "mode": "normal",
                       "group": "A"
@@ -295,7 +296,7 @@
         "kind": "Panel",
         "spec": {
           "id": 2,
-          "title": "Error lines by workload",
+          "title": "Error lines",
           "description": "Error-level lines per second by workload",
           "links": [],
           "data": {
@@ -313,7 +314,7 @@
                         "name": "${loki_datasource}"
                       },
                       "spec": {
-                        "expr": "sum by (app) (rate({namespace=\"$namespace\", app=~\"$app\"} |~ \"(?i)(error|fatal|critical)\" [$__auto]))",
+                        "expr": "sum by (app) (rate({namespace=\"$namespace\", app=~\"$app\"} |~ \"(?i)(error|fatal|critical)\" | label_format app=\"{{ or .app .container .job }}\" [$__auto]))",
                         "legendFormat": "{{app}}"
                       }
                     },
@@ -342,27 +343,27 @@
                   "displayMode": "table",
                   "placement": "right",
                   "calcs": ["sum"],
-                  "limit": 10,
+                  "limit": 8,
+                  "sortBy": "Total",
                   "sortDesc": true
                 }
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "short",
                   "color": {
                     "mode": "palette-classic"
                   },
+                  "unit": "short",
                   "custom": {
                     "drawStyle": "bars",
                     "lineInterpolation": "smooth",
                     "lineWidth": 2,
-                    "fillOpacity": 70,
+                    "fillOpacity": 60,
                     "gradientMode": "opacity",
                     "showPoints": "never",
                     "spanNulls": true,
-                    "barAlignment": 0,
-                    "axisBorderShow": false,
                     "axisSoftMin": 0,
+                    "axisBorderShow": false,
                     "stacking": {
                       "mode": "normal",
                       "group": "A"
@@ -383,7 +384,7 @@
         "spec": {
           "id": 3,
           "title": "Log stream",
-          "description": "Every line for the selected workloads at or above the selected level",
+          "description": "Lines from the selected workloads at or above the selected level",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -422,17 +423,15 @@
             "spec": {
               "options": {
                 "showTime": true,
-                "showLabels": false,
+                "showLabels": true,
                 "showCommonLabels": false,
                 "wrapLogMessage": true,
                 "prettifyLogMessage": false,
                 "enableLogDetails": true,
                 "enableInfiniteScrolling": true,
                 "sortOrder": "Descending",
-                "dedupStrategy": "exact",
-                "syntaxHighlighting": true,
-                "fontSize": "default",
-                "detailsMode": "sidebar"
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
               },
               "fieldConfig": {
                 "defaults": {},
@@ -447,7 +446,7 @@
         "spec": {
           "id": 4,
           "title": "All errors",
-          "description": "Error-level lines across the platform namespace",
+          "description": "Error-level lines across the namespace",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -486,17 +485,15 @@
             "spec": {
               "options": {
                 "showTime": true,
-                "showLabels": false,
+                "showLabels": true,
                 "showCommonLabels": false,
                 "wrapLogMessage": true,
                 "prettifyLogMessage": false,
                 "enableLogDetails": true,
                 "enableInfiniteScrolling": true,
                 "sortOrder": "Descending",
-                "dedupStrategy": "exact",
-                "syntaxHighlighting": true,
-                "fontSize": "default",
-                "detailsMode": "sidebar"
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
               },
               "fieldConfig": {
                 "defaults": {},
@@ -510,7 +507,7 @@
         "kind": "Panel",
         "spec": {
           "id": 5,
-          "title": "Auth failures",
+          "title": "Authentication failures",
           "description": "401, 403, and unauthorized lines",
           "links": [],
           "data": {
@@ -550,17 +547,15 @@
             "spec": {
               "options": {
                 "showTime": true,
-                "showLabels": false,
+                "showLabels": true,
                 "showCommonLabels": false,
                 "wrapLogMessage": true,
                 "prettifyLogMessage": false,
                 "enableLogDetails": true,
                 "enableInfiniteScrolling": true,
                 "sortOrder": "Descending",
-                "dedupStrategy": "exact",
-                "syntaxHighlighting": true,
-                "fontSize": "default",
-                "detailsMode": "sidebar"
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
               },
               "fieldConfig": {
                 "defaults": {},
@@ -570,12 +565,12 @@
           }
         }
       },
-      "etcd-elections": {
+      "elections": {
         "kind": "Panel",
         "spec": {
           "id": 6,
           "title": "Coordination store elections",
-          "description": "etcd leader and raft lines",
+          "description": "etcd leader election lines",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -614,17 +609,15 @@
             "spec": {
               "options": {
                 "showTime": true,
-                "showLabels": false,
+                "showLabels": true,
                 "showCommonLabels": false,
                 "wrapLogMessage": true,
                 "prettifyLogMessage": false,
                 "enableLogDetails": true,
                 "enableInfiniteScrolling": true,
                 "sortOrder": "Descending",
-                "dedupStrategy": "exact",
-                "syntaxHighlighting": true,
-                "fontSize": "default",
-                "detailsMode": "sidebar"
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
               },
               "fieldConfig": {
                 "defaults": {},
@@ -634,12 +627,12 @@
           }
         }
       },
-      "compute-crashes": {
+      "crashes": {
         "kind": "Panel",
         "spec": {
           "id": 7,
           "title": "Delegated compute crashes",
-          "description": "Head and worker crash lines",
+          "description": "Ray head and worker crash lines",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -678,17 +671,15 @@
             "spec": {
               "options": {
                 "showTime": true,
-                "showLabels": false,
+                "showLabels": true,
                 "showCommonLabels": false,
                 "wrapLogMessage": true,
                 "prettifyLogMessage": false,
                 "enableLogDetails": true,
                 "enableInfiniteScrolling": true,
                 "sortOrder": "Descending",
-                "dedupStrategy": "exact",
-                "syntaxHighlighting": true,
-                "fontSize": "default",
-                "detailsMode": "sidebar"
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
               },
               "fieldConfig": {
                 "defaults": {},
@@ -703,7 +694,7 @@
         "spec": {
           "id": 8,
           "title": "OOMKill events",
-          "description": "OOMKilled containers in the platform namespace",
+          "description": "Out-of-memory kills",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -742,17 +733,15 @@
             "spec": {
               "options": {
                 "showTime": true,
-                "showLabels": false,
+                "showLabels": true,
                 "showCommonLabels": false,
                 "wrapLogMessage": true,
                 "prettifyLogMessage": false,
                 "enableLogDetails": true,
                 "enableInfiniteScrolling": true,
                 "sortOrder": "Descending",
-                "dedupStrategy": "exact",
-                "syntaxHighlighting": true,
-                "fontSize": "default",
-                "detailsMode": "sidebar"
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
               },
               "fieldConfig": {
                 "defaults": {},
@@ -762,7 +751,7 @@
           }
         }
       },
-      "operator-errors": {
+      "operator": {
         "kind": "Panel",
         "spec": {
           "id": 9,
@@ -806,17 +795,52 @@
             "spec": {
               "options": {
                 "showTime": true,
-                "showLabels": false,
+                "showLabels": true,
                 "showCommonLabels": false,
                 "wrapLogMessage": true,
                 "prettifyLogMessage": false,
                 "enableLogDetails": true,
                 "enableInfiniteScrolling": true,
                 "sortOrder": "Descending",
-                "dedupStrategy": "exact",
-                "syntaxHighlighting": true,
-                "fontSize": "default",
-                "detailsMode": "sidebar"
+                "dedupStrategy": "none",
+                "syntaxHighlighting": true
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "about": {
+        "kind": "Panel",
+        "spec": {
+          "id": 10,
+          "title": "About this dashboard",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "text",
+            "version": "",
+            "spec": {
+              "options": {
+                "mode": "markdown",
+                "content": "**What are the workloads saying?**\n\nPick a namespace, one or more workloads (`app.kubernetes.io/name`), and a minimum level. The namespace selector lists every namespace Alloy collects from, not only the platform's. **Diagnostics** holds ready-made queries for the platform namespace; an empty panel means nothing matched.",
+                "code": {
+                  "language": "plaintext",
+                  "showLineNumbers": false,
+                  "showMiniMap": false
+                }
               },
               "fieldConfig": {
                 "defaults": {},
@@ -847,16 +871,16 @@
                         "hideHeader": true,
                         "fillScreen": false,
                         "layout": {
-                          "kind": "GridLayout",
+                          "kind": "AutoGridLayout",
                           "spec": {
+                            "maxColumnCount": 2,
+                            "columnWidthMode": "standard",
+                            "rowHeightMode": "standard",
+                            "fillScreen": false,
                             "items": [
                               {
-                                "kind": "GridLayoutItem",
+                                "kind": "AutoGridLayoutItem",
                                 "spec": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 12,
-                                  "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "volume"
@@ -864,12 +888,8 @@
                                 }
                               },
                               {
-                                "kind": "GridLayoutItem",
+                                "kind": "AutoGridLayoutItem",
                                 "spec": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 12,
-                                  "height": 8,
                                   "element": {
                                     "kind": "ElementReference",
                                     "name": "errors"
@@ -923,7 +943,7 @@
                 "kind": "AutoGridLayout",
                 "spec": {
                   "maxColumnCount": 2,
-                  "columnWidthMode": "narrow",
+                  "columnWidthMode": "standard",
                   "rowHeightMode": "tall",
                   "fillScreen": false,
                   "items": [
@@ -933,21 +953,6 @@
                         "element": {
                           "kind": "ElementReference",
                           "name": "all-errors"
-                        },
-                        "conditionalRendering": {
-                          "kind": "ConditionalRenderingGroup",
-                          "spec": {
-                            "visibility": "show",
-                            "condition": "and",
-                            "items": [
-                              {
-                                "kind": "ConditionalRenderingData",
-                                "spec": {
-                                  "value": true
-                                }
-                              }
-                            ]
-                          }
                         }
                       }
                     },
@@ -957,21 +962,6 @@
                         "element": {
                           "kind": "ElementReference",
                           "name": "auth-failures"
-                        },
-                        "conditionalRendering": {
-                          "kind": "ConditionalRenderingGroup",
-                          "spec": {
-                            "visibility": "show",
-                            "condition": "and",
-                            "items": [
-                              {
-                                "kind": "ConditionalRenderingData",
-                                "spec": {
-                                  "value": true
-                                }
-                              }
-                            ]
-                          }
                         }
                       }
                     },
@@ -980,22 +970,7 @@
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
-                          "name": "etcd-elections"
-                        },
-                        "conditionalRendering": {
-                          "kind": "ConditionalRenderingGroup",
-                          "spec": {
-                            "visibility": "show",
-                            "condition": "and",
-                            "items": [
-                              {
-                                "kind": "ConditionalRenderingData",
-                                "spec": {
-                                  "value": true
-                                }
-                              }
-                            ]
-                          }
+                          "name": "elections"
                         }
                       }
                     },
@@ -1004,22 +979,7 @@
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
-                          "name": "compute-crashes"
-                        },
-                        "conditionalRendering": {
-                          "kind": "ConditionalRenderingGroup",
-                          "spec": {
-                            "visibility": "show",
-                            "condition": "and",
-                            "items": [
-                              {
-                                "kind": "ConditionalRenderingData",
-                                "spec": {
-                                  "value": true
-                                }
-                              }
-                            ]
-                          }
+                          "name": "crashes"
                         }
                       }
                     },
@@ -1029,21 +989,6 @@
                         "element": {
                           "kind": "ElementReference",
                           "name": "oom"
-                        },
-                        "conditionalRendering": {
-                          "kind": "ConditionalRenderingGroup",
-                          "spec": {
-                            "visibility": "show",
-                            "condition": "and",
-                            "items": [
-                              {
-                                "kind": "ConditionalRenderingData",
-                                "spec": {
-                                  "value": true
-                                }
-                              }
-                            ]
-                          }
                         }
                       }
                     },
@@ -1052,18 +997,45 @@
                       "spec": {
                         "element": {
                           "kind": "ElementReference",
-                          "name": "operator-errors"
-                        },
-                        "conditionalRendering": {
-                          "kind": "ConditionalRenderingGroup",
+                          "name": "operator"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "TabsLayoutTab",
+            "spec": {
+              "title": "About",
+              "layout": {
+                "kind": "RowsLayout",
+                "spec": {
+                  "rows": [
+                    {
+                      "kind": "RowsLayoutRow",
+                      "spec": {
+                        "title": "About this dashboard",
+                        "collapse": true,
+                        "hideHeader": false,
+                        "fillScreen": false,
+                        "layout": {
+                          "kind": "GridLayout",
                           "spec": {
-                            "visibility": "show",
-                            "condition": "and",
                             "items": [
                               {
-                                "kind": "ConditionalRenderingData",
+                                "kind": "GridLayoutItem",
                                 "spec": {
-                                  "value": true
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 24,
+                                  "height": 7,
+                                  "element": {
+                                    "kind": "ElementReference",
+                                    "name": "about"
+                                  }
                                 }
                               }
                             ]

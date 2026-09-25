@@ -147,20 +147,20 @@ The chart stores the generated Grafana admin password in `Secret/monitoring/kube
 
 ## Dashboards
 
-The dashboards are Grafana v2 dashboard resources and need Grafana 13 or later. They use tabs, auto-grid layouts, show/hide rules, state timelines, time comparison, and the revamped gauge.
+The dashboards are Grafana v2 dashboard resources and need Grafana 13 or later. Start at **kam-01 Platform Overview**; its tiles link to the dashboard for each component.
 
-| Dashboard                                  | Tabs                                                               |
-| ------------------------------------------ | ------------------------------------------------------------------ |
-| **kam-01 Platform Overview**               | Health, Stability, Resources, Events                               |
-| **kam-02 Inference & Delegated Compute**   | Model serving, Delegated compute                                   |
-| **kam-03 Application API & Web Interface** | Overview, Resources, Logs                                          |
-| **kam-04 Data Infrastructure**             | Overview, Coordination store, Durable data, Metadata catalog, Logs |
-| **kam-05 Extensions & Platform Operator**  | Extensions, Platform operator, Logs                                |
-| **kam-06 Auth & Identity**                 | Overview, Authorization, Authentication                            |
-| **kam-07 Kubernetes Events & Stability**   | Stability, Events                                                  |
-| **kam-08 Log Explorer**                    | Explore, Diagnostics                                               |
+| Dashboard                                  | Question it answers                                                        |
+| ------------------------------------------ | -------------------------------------------------------------------------- |
+| **kam-01 Platform Overview**               | Is the platform healthy, and where should I look if it is not?             |
+| **kam-02 Inference & Delegated Compute**   | Are served models and delegated compute healthy and within their limits?   |
+| **kam-03 Application API & Web Interface** | Are the application workloads up, erroring, or short of resources?         |
+| **kam-04 Data Infrastructure**             | Are the stores that hold platform state healthy and far from their limits? |
+| **kam-05 Extensions & Platform Operator**  | Are extensions healthy, and is the operator reconciling without errors?    |
+| **kam-06 Auth & Identity**                 | Can users sign in, are decisions fast and correct, are certificates valid? |
+| **kam-07 Kubernetes Events & Stability**   | Which pods are failing or short of resources?                              |
+| **kam-08 Log Explorer**                    | What are the workloads saying?                                             |
 
-See [dashboards/README.md](dashboards/README.md) for what each dashboard shows, how to install them without the sidecar, and which panels hide themselves when their data does not exist.
+See [dashboards/README.md](dashboards/README.md) for the design rules they follow, how to install them without the sidecar, and which panels hide themselves when their data cannot exist.
 
 ## Files
 
