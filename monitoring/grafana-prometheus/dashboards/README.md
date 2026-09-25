@@ -81,13 +81,13 @@ done
 
 ## Datasource requirements
 
-| Datasource | Required for                                  | Default URL                                                                 |
-| ---------- | --------------------------------------------- | --------------------------------------------------------------------------- |
-| Prometheus | kam-01 through kam-07, kam-09                 | `http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090` |
-| Loki       | Log panels on every dashboard                 | `http://loki.monitoring.svc.cluster.local:3100`                             |
-| PostgreSQL | kam-09 model, turn, and connector-tool panels | The **Tomo database** datasource that `../tomo/connect-tomo.sh` provisions  |
+| Datasource | Required for                                  | Default URL                                                                                          |
+| ---------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Prometheus | kam-01 through kam-07, kam-09                 | `http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090`                          |
+| Loki       | Log panels on every dashboard                 | `http://loki.monitoring.svc.cluster.local:3100`                                                      |
+| PostgreSQL | kam-09 model, turn, and connector-tool panels | One **Tomo · &lt;install&gt;** datasource per Tomo install, provisioned by `../tomo/connect-tomo.sh` |
 
-The **Metrics**, **Logs**, and **Tomo database** selectors pick the datasource by type (`prometheus`, `loki`, `grafana-postgresql-datasource`), so no name mapping is needed.
+The **Metrics** and **Logs** selectors pick the datasource by type (`prometheus`, `loki`), so no name mapping is needed. kam-09 picks the PostgreSQL datasource named for the selected Tomo install.
 
 ## Where the data comes from
 

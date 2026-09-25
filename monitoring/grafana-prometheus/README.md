@@ -9,7 +9,7 @@
 | Component                | Path                                                                         | Purpose                                                                                                                                                                                                                                                    |
 | ------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Dashboards**           | `dashboards/`                                                                | 9 Grafana dashboards: kam-01 through kam-08 cover platform capabilities, inference and compute, the application API, data infrastructure, extensions and the operator, auth, events, and logs; kam-09 covers the Tomo extension's models, turns, and tools |
-| **Tomo connection**      | `tomo/`                                                                      | Script that adds Tomo's metrics scrape and a read-only, content-free **Tomo database** datasource for kam-09                                                                                                                                               |
+| **Tomo connection**      | `tomo/`                                                                      | Script that connects every Tomo install: its metrics scrape, and a read-only, content-free database datasource for kam-09                                                                                                                                  |
 | **Scrape configuration** | `servicemonitors/`                                                           | ServiceMonitors and PodMonitors for etcd, delegated compute, the metadata catalog, the authorization decision service, and cert-manager, plus the NetworkPolicies that admit Prometheus to those metrics ports                                             |
 | **Operator metrics**     | `operator-metrics/`                                                          | Serving certificate and Helm values that turn on the operator's authenticated metrics endpoint, ServiceMonitor, and alert rules                                                                                                                            |
 | **Postgres exporter**    | `exporters/`                                                                 | Helm values for `prometheus-postgres-exporter` against `core-postgres`                                                                                                                                                                                     |
@@ -91,7 +91,7 @@ helm upgrade --install kamiwaza-platform-operator <operator chart> \
 
 The operator chart creates its own ServiceMonitor and PrometheusRule in the operator namespace. It requires the Prometheus Operator CRDs, so install kube-prometheus-stack first.
 
-If the Tomo extension is installed, connect it for kam-09 once its API is ready. See [tomo/README.md](tomo/README.md) for what it grants:
+If Tomo is installed, connect every install for kam-09, and run the script again whenever an install is added or removed. See [tomo/README.md](tomo/README.md) for what it grants:
 
 ```bash
 monitoring/grafana-prometheus/tomo/connect-tomo.sh
@@ -184,4 +184,4 @@ See [dashboards/README.md](dashboards/README.md) for the design rules they follo
 | `operator-metrics/certificate.yaml`           | Self-signed serving certificate for the operator's metrics endpoint                                                            |
 | `operator-metrics/values.yaml`                | Operator Helm values enabling authenticated metrics, ServiceMonitor, and PrometheusRule                                        |
 | `exporters/postgres-exporter-values.yaml`     | Helm values for postgres-exporter against `core-postgres`                                                                      |
-| `tomo/connect-tomo.sh`                        | Connects an installed Tomo extension: scrape, NetworkPolicies, read-only database role, and the Tomo database datasource       |
+| `tomo/connect-tomo.sh`                        | Connects every Tomo install: scrape, NetworkPolicies, read-only database role, and a datasource per install                    |

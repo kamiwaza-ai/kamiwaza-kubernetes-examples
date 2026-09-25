@@ -121,26 +121,6 @@
         }
       },
       {
-        "kind": "DatasourceVariable",
-        "spec": {
-          "name": "tomo_db",
-          "pluginId": "grafana-postgresql-datasource",
-          "refresh": "onDashboardLoad",
-          "regex": "",
-          "current": {
-            "text": "",
-            "value": ""
-          },
-          "options": [],
-          "multi": false,
-          "includeAll": false,
-          "label": "Tomo database",
-          "hide": "dontHide",
-          "skipUrlSync": false,
-          "allowCustomValue": false
-        }
-      },
-      {
         "kind": "QueryVariable",
         "spec": {
           "name": "namespace",
@@ -205,6 +185,26 @@
             }
           }
         }
+      },
+      {
+        "kind": "DatasourceVariable",
+        "spec": {
+          "name": "tomo_db",
+          "pluginId": "grafana-postgresql-datasource",
+          "refresh": "onDashboardLoad",
+          "regex": "/^Tomo · ${extension}$/",
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "options": [],
+          "multi": false,
+          "includeAll": false,
+          "label": "Tomo database",
+          "hide": "hideVariable",
+          "skipUrlSync": false,
+          "allowCustomValue": false
+        }
       }
     ],
     "elements": {
@@ -213,7 +213,7 @@
         "spec": {
           "id": 1,
           "title": "Tomo",
-          "description": "The Extension's Ready condition, as the platform operator reports it",
+          "description": "The Extension's Ready condition and its reason, as the platform operator reports them. ComponentMissing means a component has not been created yet",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -230,8 +230,8 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "max(kamiwaza_extension_condition{namespace=\"$namespace\", name=\"$extension\", type=\"Ready\"}) or vector(0)",
-                        "legendFormat": "",
+                        "expr": "max by (reason) (kamiwaza_extension_condition{namespace=\"$namespace\", name=\"$extension\", type=\"Ready\"}) or on () label_replace(vector(0), \"reason\", \"NotInstalled\", \"\", \"\")",
+                        "legendFormat": "{{reason}}",
                         "instant": true,
                         "range": false
                       }
@@ -257,7 +257,7 @@
                   "fields": ""
                 },
                 "orientation": "auto",
-                "textMode": "auto",
+                "textMode": "value_and_name",
                 "colorMode": "background",
                 "graphMode": "none",
                 "justifyMode": "center",
@@ -310,8 +310,8 @@
         "kind": "Panel",
         "spec": {
           "id": 2,
-          "title": "Components",
-          "description": "Tomo pods ready against Tomo pods scheduled",
+          "title": "Pods ready",
+          "description": "Tomo pods ready against Tomo pods scheduled. A component the operator has not created yet has no pod, so it appears only in the Tomo tile's reason",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -328,7 +328,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "count(kube_pod_status_ready{namespace=\"$namespace\", condition=\"true\"} == 1 and on (namespace, pod) kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension=\"$extension\"}) or vector(0)",
+                        "expr": "count(kube_pod_status_ready{namespace=\"$namespace\", condition=\"true\"} == 1 and on (namespace, pod) kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension=\"$extension\", label_kamiwaza_ai_extension!=\"\"}) or vector(0)",
                         "legendFormat": "ready",
                         "instant": true,
                         "range": false
@@ -349,7 +349,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "count(kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension=\"$extension\"} and on (namespace, pod) (kube_pod_status_phase{namespace=\"$namespace\", phase=~\"Pending|Running\"} == 1))",
+                        "expr": "count(kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension=\"$extension\", label_kamiwaza_ai_extension!=\"\"} and on (namespace, pod) (kube_pod_status_phase{namespace=\"$namespace\", phase=~\"Pending|Running\"} == 1))",
                         "legendFormat": "desired",
                         "instant": true,
                         "range": false
@@ -370,7 +370,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "count(kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension=\"$extension\"} and on (namespace, pod) (kube_pod_status_phase{namespace=\"$namespace\", phase=~\"Pending|Running\"} == 1))",
+                        "expr": "count(kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension=\"$extension\", label_kamiwaza_ai_extension!=\"\"} and on (namespace, pod) (kube_pod_status_phase{namespace=\"$namespace\", phase=~\"Pending|Running\"} == 1))",
                         "legendFormat": "desired",
                         "instant": true,
                         "range": false
@@ -476,7 +476,7 @@
         "spec": {
           "id": 3,
           "title": "Dependencies down",
-          "description": "Tomo's own probes of its database, queue, object store, model platform, and sandbox",
+          "description": "Tomo's own probes of its database, queue, object store, model platform, and sandbox. Unknown while Tomo's API is not scraped.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -493,7 +493,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "count(max by (dependency) (kaizen_dependency_up{extension=\"$extension\"}) == 0) or vector(0)",
+                        "expr": "((count(max by (dependency) (kaizen_dependency_up{extension=\"$extension\"}) == 0) or vector(0)) and on () (max(up{job=\"tomo\", extension=\"$extension\", component=\"api-backend\"}) == 1)) or on () vector(-2)",
                         "legendFormat": "",
                         "instant": true,
                         "range": false
@@ -544,7 +544,19 @@
                         "color": "red"
                       }
                     ]
-                  }
+                  },
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "-2": {
+                          "text": "Unknown",
+                          "color": "#8e8e8e",
+                          "index": 90
+                        }
+                      }
+                    }
+                  ]
                 },
                 "overrides": []
               }
@@ -557,7 +569,7 @@
         "spec": {
           "id": 4,
           "title": "Answered turns",
-          "description": "Member and task turns that finished in the time range",
+          "description": "Member and task turns that finished in the time range. Unknown until this install's database is connected.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -613,7 +625,20 @@
                   "color": {
                     "mode": "fixed",
                     "fixedColor": "text"
-                  }
+                  },
+                  "mappings": [
+                    {
+                      "type": "special",
+                      "options": {
+                        "match": "null+nan",
+                        "result": {
+                          "text": "Unknown",
+                          "color": "#8e8e8e",
+                          "index": 91
+                        }
+                      }
+                    }
+                  ]
                 },
                 "overrides": []
               }
@@ -626,7 +651,7 @@
         "spec": {
           "id": 5,
           "title": "Failed turns",
-          "description": "Turns that ended in failure in the time range",
+          "description": "Turns that ended in failure in the time range. Unknown until this install's database is connected.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -694,7 +719,20 @@
                         "color": "orange"
                       }
                     ]
-                  }
+                  },
+                  "mappings": [
+                    {
+                      "type": "special",
+                      "options": {
+                        "match": "null+nan",
+                        "result": {
+                          "text": "Unknown",
+                          "color": "#8e8e8e",
+                          "index": 91
+                        }
+                      }
+                    }
+                  ]
                 },
                 "overrides": []
               }
@@ -707,7 +745,7 @@
         "spec": {
           "id": 6,
           "title": "Model call errors (1h)",
-          "description": "Share of model calls in the last hour that did not return an answer",
+          "description": "Share of model calls in the last hour that did not return an answer. Unknown while Tomo's API or background worker is not scraped.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -724,7 +762,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "100 * sum(increase(kaizen_llm_request_total{extension=\"$extension\", outcome!=\"ok\"}[1h])) / sum(increase(kaizen_llm_request_total{extension=\"$extension\"}[1h]))",
+                        "expr": "(100 * sum(increase(kaizen_llm_request_total{extension=\"$extension\", outcome!=\"ok\"}[1h])) / sum(increase(kaizen_llm_request_total{extension=\"$extension\"}[1h]))) or on () (vector(-1) and on () ((max(up{job=\"tomo\", extension=\"$extension\", component=\"api-backend\"}) == 1) and on () (max(up{job=\"tomo\", extension=\"$extension\", component=\"background-worker\"}) == 1))) or on () vector(-2)",
                         "legendFormat": "",
                         "instant": true,
                         "range": false
@@ -782,7 +820,28 @@
                     ]
                   },
                   "decimals": 1,
-                  "noValue": "No calls"
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "-1": {
+                          "text": "No calls",
+                          "color": "text",
+                          "index": 0
+                        }
+                      }
+                    },
+                    {
+                      "type": "value",
+                      "options": {
+                        "-2": {
+                          "text": "Unknown",
+                          "color": "#8e8e8e",
+                          "index": 90
+                        }
+                      }
+                    }
+                  ]
                 },
                 "overrides": []
               }
@@ -795,7 +854,7 @@
         "spec": {
           "id": 7,
           "title": "Tool failures (1h)",
-          "description": "First-party tool calls that failed, raised, timed out, or were abandoned in the last hour",
+          "description": "First-party tool calls that failed, raised, timed out, or were abandoned in the last hour. Unknown while Tomo's API or background worker is not scraped.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -812,7 +871,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "round(sum(increase(tool_run_total{extension=\"$extension\", outcome=~\"error|raised|timeout|abandoned\"}[1h]))) or vector(0)",
+                        "expr": "((round(sum(increase(tool_run_total{extension=\"$extension\", outcome=~\"error|raised|timeout|abandoned\"}[1h]))) or vector(0)) and on () ((max(up{job=\"tomo\", extension=\"$extension\", component=\"api-backend\"}) == 1) and on () (max(up{job=\"tomo\", extension=\"$extension\", component=\"background-worker\"}) == 1))) or on () vector(-2)",
                         "legendFormat": "",
                         "instant": true,
                         "range": false
@@ -863,7 +922,19 @@
                         "color": "orange"
                       }
                     ]
-                  }
+                  },
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "-2": {
+                          "text": "Unknown",
+                          "color": "#8e8e8e",
+                          "index": 90
+                        }
+                      }
+                    }
+                  ]
                 },
                 "overrides": []
               }
@@ -2069,7 +2140,7 @@
         "spec": {
           "id": 17,
           "title": "In progress",
-          "description": "Turns queued or running now",
+          "description": "Turns queued or running now. Unknown until this install's database is connected.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -2125,7 +2196,20 @@
                   "color": {
                     "mode": "fixed",
                     "fixedColor": "text"
-                  }
+                  },
+                  "mappings": [
+                    {
+                      "type": "special",
+                      "options": {
+                        "match": "null+nan",
+                        "result": {
+                          "text": "Unknown",
+                          "color": "#8e8e8e",
+                          "index": 91
+                        }
+                      }
+                    }
+                  ]
                 },
                 "overrides": []
               }
@@ -3179,7 +3263,7 @@
         "spec": {
           "id": 26,
           "title": "Queued jobs",
-          "description": "Jobs waiting in the background worker queue",
+          "description": "Jobs waiting in the background worker queue. Unknown while Tomo's background worker is not scraped.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -3196,7 +3280,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "max(worker_queue_depth{extension=\"$extension\"}) or vector(0)",
+                        "expr": "((max(worker_queue_depth{extension=\"$extension\"}) or vector(0)) and on () (max(up{job=\"tomo\", extension=\"$extension\", component=\"background-worker\"}) == 1)) or on () vector(-2)",
                         "legendFormat": "",
                         "instant": true,
                         "range": false
@@ -3251,7 +3335,19 @@
                         "color": "red"
                       }
                     ]
-                  }
+                  },
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "-2": {
+                          "text": "Unknown",
+                          "color": "#8e8e8e",
+                          "index": 90
+                        }
+                      }
+                    }
+                  ]
                 },
                 "overrides": []
               }
@@ -3264,7 +3360,7 @@
         "spec": {
           "id": 27,
           "title": "Sandbox workers",
-          "description": "Sandbox workers leased to a run, and the pool they come from",
+          "description": "Sandbox workers leased to a run, and the pool they come from. Unknown while Tomo's background worker is not scraped.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -3281,7 +3377,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(max by (state) (sandbox_workers{extension=\"$extension\", state=\"busy\"})) or vector(0)",
+                        "expr": "((sum(max by (state) (sandbox_workers{extension=\"$extension\", state=\"busy\"})) or vector(0)) and on () (max(up{job=\"tomo\", extension=\"$extension\", component=\"background-worker\"}) == 1)) or on () vector(-2)",
                         "legendFormat": "busy",
                         "instant": true,
                         "range": false
@@ -3302,7 +3398,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "sum(max by (state) (sandbox_workers{extension=\"$extension\"})) or vector(0)",
+                        "expr": "((sum(max by (state) (sandbox_workers{extension=\"$extension\"})) or vector(0)) and on () (max(up{job=\"tomo\", extension=\"$extension\", component=\"background-worker\"}) == 1)) or on () vector(-2)",
                         "legendFormat": "pool",
                         "instant": true,
                         "range": false
@@ -3342,7 +3438,19 @@
                     "mode": "fixed",
                     "fixedColor": "text"
                   },
-                  "decimals": 0
+                  "decimals": 0,
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "-2": {
+                          "text": "Unknown",
+                          "color": "#8e8e8e",
+                          "index": 90
+                        }
+                      }
+                    }
+                  ]
                 },
                 "overrides": []
               }
@@ -3355,7 +3463,7 @@
         "spec": {
           "id": 28,
           "title": "Oldest pending task",
-          "description": "Age of the oldest queued or retrying scheduled-task run",
+          "description": "Age of the oldest queued or retrying scheduled-task run. Unknown while Tomo's background worker is not scraped.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -3372,7 +3480,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "max(kaizen_task_oldest_pending_seconds{extension=\"$extension\"}) or vector(0)",
+                        "expr": "((max(kaizen_task_oldest_pending_seconds{extension=\"$extension\"}) or vector(0)) and on () (max(up{job=\"tomo\", extension=\"$extension\", component=\"background-worker\"}) == 1)) or on () vector(-2)",
                         "legendFormat": "",
                         "instant": true,
                         "range": false
@@ -3428,7 +3536,19 @@
                         "color": "red"
                       }
                     ]
-                  }
+                  },
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "-2": {
+                          "text": "Unknown",
+                          "color": "#8e8e8e",
+                          "index": 90
+                        }
+                      }
+                    }
+                  ]
                 },
                 "overrides": []
               }
@@ -3632,7 +3752,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "100 * max by (label_kamiwaza_ai_component) ((sum by (namespace, pod, container) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container!=\"\"}[$__rate_interval])) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"cpu\"})) * on (namespace, pod) group_left (label_kamiwaza_ai_component) max by (namespace, pod, label_kamiwaza_ai_component) (kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension=\"$extension\", label_kamiwaza_ai_component!=\"\"}))",
+                        "expr": "100 * max by (label_kamiwaza_ai_component) ((sum by (namespace, pod, container) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container!=\"\"}[$__rate_interval])) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"cpu\"})) * on (namespace, pod) group_left (label_kamiwaza_ai_component) max by (namespace, pod, label_kamiwaza_ai_component) (kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension=\"$extension\", label_kamiwaza_ai_extension!=\"\", label_kamiwaza_ai_component!=\"\"}))",
                         "legendFormat": "{{label_kamiwaza_ai_component}}"
                       }
                     },
@@ -3732,7 +3852,7 @@
                         "name": "${datasource}"
                       },
                       "spec": {
-                        "expr": "100 * max by (label_kamiwaza_ai_component) ((sum by (namespace, pod, container) (container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\"}) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"memory\"})) * on (namespace, pod) group_left (label_kamiwaza_ai_component) max by (namespace, pod, label_kamiwaza_ai_component) (kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension=\"$extension\", label_kamiwaza_ai_component!=\"\"}))",
+                        "expr": "100 * max by (label_kamiwaza_ai_component) ((sum by (namespace, pod, container) (container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\"}) / on (namespace, pod, container) max by (namespace, pod, container) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"memory\"})) * on (namespace, pod) group_left (label_kamiwaza_ai_component) max by (namespace, pod, label_kamiwaza_ai_component) (kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension=\"$extension\", label_kamiwaza_ai_extension!=\"\", label_kamiwaza_ai_component!=\"\"}))",
                         "legendFormat": "{{label_kamiwaza_ai_component}}"
                       }
                     },
@@ -3894,7 +4014,7 @@
             "spec": {
               "options": {
                 "mode": "markdown",
-                "content": "**Is Tomo answering members, and how are its models and tools doing?**\n\n- **Status** is the operator's view of the extension, Tomo's own dependency probes, and the last hour of model and tool failures.\n- **Models** comes from Tomo's model-call audit log, so it names each model and keeps history across restarts. **Failures by reason** is live from Tomo's metrics, which carry the provider route but not the model.\n- **Turns** are member and task requests. Duration runs from when a worker starts the turn to when it finishes.\n- **Tools** counts first-party tools from Tomo's metrics, and connector tools from Tomo's capability receipts.\n\nMetrics need `tomo/connect-tomo.sh`, which adds the scrape and the **Tomo database** datasource. That datasource reads only content-free columns: no message text, prompt, or member identity. It is bound to the Tomo install the script connected; run the script again after reinstalling Tomo.",
+                "content": "**Is Tomo answering members, and how are its models and tools doing?**\n\n- **Tomo installs** lists every install with its readiness and how many of its metrics targets Prometheus reaches. Click one, or pick it with **Tomo install**, to show it below.\n- **Selected install** is the operator's view of the extension, Tomo's own dependency probes, and the last hour of model and tool failures. A tile reads **Unknown** when the Tomo process that publishes it is down or has not been created; it never shows a healthy zero it could not observe.\n- **Failing components** lists every Tomo pod that is not ready and why. A component the operator has not created yet has no pod; the Tomo tile then reads **ComponentMissing**.\n- **Models** comes from Tomo's model-call audit log, so it names each model and keeps history across restarts. **Failures by reason** is live from Tomo's metrics, which carry the provider route but not the model.\n- **Turns** are member and task requests. Duration runs from when a worker starts the turn to when it finishes.\n- **Tools** counts first-party tools from Tomo's metrics, and connector tools from Tomo's capability receipts.\n\nMetrics need `tomo/connect-tomo.sh`, which connects every install: a scrape, and a datasource named **Tomo · <install>** that this dashboard selects with the install. That datasource reads only content-free columns: no message text, prompt, or member identity. Run the script again after installing, reinstalling, or removing Tomo.",
                 "code": {
                   "language": "plaintext",
                   "showLineNumbers": false,
@@ -3908,6 +4028,582 @@
             }
           }
         }
+      },
+      "failing": {
+        "kind": "Panel",
+        "spec": {
+          "id": 35,
+          "title": "Failing components",
+          "description": "Every Tomo pod that is not ready, with its phase, the reason its container is waiting, restarts, and how it last exited",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queryOptions": {},
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "A",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "max by (pod, label_kamiwaza_ai_component, phase) (((kube_pod_status_ready{namespace=\"$namespace\", condition=\"false\"} == 1) unless on (namespace, pod) (kube_pod_status_phase{namespace=\"$namespace\", phase=\"Succeeded\"} == 1)) * on (namespace, pod) group_left (label_kamiwaza_ai_component) max by (namespace, pod, label_kamiwaza_ai_component) (kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension=\"$extension\", label_kamiwaza_ai_extension!=\"\", label_kamiwaza_ai_component!=\"\"}) * on (namespace, pod) group_left (phase) (kube_pod_status_phase{namespace=\"$namespace\"} == 1))",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false,
+                        "format": "table"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "B",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "max by (pod, waiting) (label_replace(kube_pod_container_status_waiting_reason{namespace=\"$namespace\"} == 1, \"waiting\", \"$1\", \"reason\", \"(.*)\")) and on (pod) ((kube_pod_status_ready{namespace=\"$namespace\", condition=\"false\"} == 1) unless on (namespace, pod) (kube_pod_status_phase{namespace=\"$namespace\", phase=\"Succeeded\"} == 1)) * on (namespace, pod) group_left (label_kamiwaza_ai_component) max by (namespace, pod, label_kamiwaza_ai_component) (kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension=\"$extension\", label_kamiwaza_ai_extension!=\"\", label_kamiwaza_ai_component!=\"\"})",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false,
+                        "format": "table"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "C",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "round(sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\"}[1h]))) and on (pod) ((kube_pod_status_ready{namespace=\"$namespace\", condition=\"false\"} == 1) unless on (namespace, pod) (kube_pod_status_phase{namespace=\"$namespace\", phase=\"Succeeded\"} == 1)) * on (namespace, pod) group_left (label_kamiwaza_ai_component) max by (namespace, pod, label_kamiwaza_ai_component) (kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension=\"$extension\", label_kamiwaza_ai_extension!=\"\", label_kamiwaza_ai_component!=\"\"})",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false,
+                        "format": "table"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "D",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "max by (pod, last_exit) (label_replace(kube_pod_container_status_last_terminated_reason{namespace=\"$namespace\"} == 1, \"last_exit\", \"$1\", \"reason\", \"(.*)\")) and on (pod) ((kube_pod_status_ready{namespace=\"$namespace\", condition=\"false\"} == 1) unless on (namespace, pod) (kube_pod_status_phase{namespace=\"$namespace\", phase=\"Succeeded\"} == 1)) * on (namespace, pod) group_left (label_kamiwaza_ai_component) max by (namespace, pod, label_kamiwaza_ai_component) (kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension=\"$extension\", label_kamiwaza_ai_extension!=\"\", label_kamiwaza_ai_component!=\"\"})",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false,
+                        "format": "table"
+                      }
+                    }
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "kind": "joinByField",
+                  "spec": {
+                    "id": "joinByField",
+                    "options": {
+                      "byField": "pod",
+                      "mode": "outer"
+                    }
+                  }
+                },
+                {
+                  "kind": "filterFieldsByName",
+                  "spec": {
+                    "id": "filterFieldsByName",
+                    "options": {
+                      "include": {
+                        "names": [
+                          "label_kamiwaza_ai_component",
+                          "phase",
+                          "waiting",
+                          "Value #C",
+                          "last_exit",
+                          "pod"
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "organize",
+                  "spec": {
+                    "id": "organize",
+                    "options": {
+                      "excludeByName": {},
+                      "indexByName": {
+                        "label_kamiwaza_ai_component": 0,
+                        "phase": 1,
+                        "waiting": 2,
+                        "Value #C": 3,
+                        "last_exit": 4,
+                        "pod": 5
+                      },
+                      "renameByName": {
+                        "label_kamiwaza_ai_component": "Component",
+                        "phase": "Phase",
+                        "waiting": "Waiting",
+                        "Value #C": "Restarts (1h)",
+                        "last_exit": "Last exit",
+                        "pod": "Pod"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "showHeader": true,
+                "footer": {
+                  "show": false,
+                  "reducer": ["sum"],
+                  "fields": ""
+                },
+                "sortBy": [
+                  {
+                    "displayName": "Component",
+                    "desc": false
+                  }
+                ]
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "noValue": "Every Tomo pod is ready",
+                  "custom": {
+                    "align": "auto",
+                    "filterable": true,
+                    "cellOptions": {
+                      "type": "auto"
+                    },
+                    "inspect": false
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Waiting"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "fixed",
+                          "fixedColor": "red"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Restarts (1h)"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      },
+                      {
+                        "id": "thresholds",
+                        "value": {
+                          "mode": "absolute",
+                          "steps": [
+                            {
+                              "value": null,
+                              "color": "green"
+                            },
+                            {
+                              "value": 1,
+                              "color": "orange"
+                            },
+                            {
+                              "value": 5,
+                              "color": "red"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "id": "color",
+                        "value": {
+                          "mode": "thresholds"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "installs": {
+        "kind": "Panel",
+        "spec": {
+          "id": 36,
+          "title": "Tomo installs",
+          "description": "Every Tomo install in the platform namespace. Metrics shows how many of its API and worker targets Prometheus reaches. Click an install to show it.",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queryOptions": {},
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "A",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "max by (name, version) (kamiwaza_extension_info{namespace=\"$namespace\", product=\"kaizen\"})",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false,
+                        "format": "table"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "B",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "max by (name, reason) (kamiwaza_extension_condition{namespace=\"$namespace\", type=\"Ready\"}) and on (name) kamiwaza_extension_info{namespace=\"$namespace\", product=\"kaizen\"}",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false,
+                        "format": "table"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "C",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "count by (name) (label_replace((kube_pod_status_ready{namespace=\"$namespace\", condition=\"true\"} == 1) * on (namespace, pod) group_left (label_kamiwaza_ai_extension) max by (namespace, pod, label_kamiwaza_ai_extension) (kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension!=\"\"}), \"name\", \"$1\", \"label_kamiwaza_ai_extension\", \"(.*)\"))",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false,
+                        "format": "table"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "D",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "count by (name) (label_replace(max by (namespace, pod, label_kamiwaza_ai_extension) (kube_pod_labels{namespace=\"$namespace\", label_kamiwaza_ai_extension!=\"\"}) and on (namespace, pod) (kube_pod_status_phase{namespace=\"$namespace\", phase=~\"Pending|Running\"} == 1), \"name\", \"$1\", \"label_kamiwaza_ai_extension\", \"(.*)\"))",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false,
+                        "format": "table"
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "E",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "sum by (name) (label_replace(up{job=\"tomo\"}, \"name\", \"$1\", \"extension\", \"(.*)\"))",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false,
+                        "format": "table"
+                      }
+                    }
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "kind": "joinByField",
+                  "spec": {
+                    "id": "joinByField",
+                    "options": {
+                      "byField": "name",
+                      "mode": "outer"
+                    }
+                  }
+                },
+                {
+                  "kind": "filterByValue",
+                  "spec": {
+                    "id": "filterByValue",
+                    "options": {
+                      "type": "include",
+                      "match": "any",
+                      "filters": [
+                        {
+                          "fieldName": "Value #A",
+                          "config": {
+                            "id": "isNotNull",
+                            "options": {}
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "kind": "filterFieldsByName",
+                  "spec": {
+                    "id": "filterFieldsByName",
+                    "options": {
+                      "include": {
+                        "names": [
+                          "name",
+                          "version",
+                          "Value #B",
+                          "reason",
+                          "Value #C",
+                          "Value #D",
+                          "Value #E"
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "organize",
+                  "spec": {
+                    "id": "organize",
+                    "options": {
+                      "excludeByName": {},
+                      "indexByName": {
+                        "name": 0,
+                        "version": 1,
+                        "Value #B": 2,
+                        "reason": 3,
+                        "Value #C": 4,
+                        "Value #D": 5,
+                        "Value #E": 6
+                      },
+                      "renameByName": {
+                        "name": "Install",
+                        "version": "Version",
+                        "Value #B": "Ready",
+                        "reason": "Reason",
+                        "Value #C": "Pods ready",
+                        "Value #D": "Pods",
+                        "Value #E": "Metrics"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "showHeader": true,
+                "footer": {
+                  "show": false,
+                  "reducer": ["sum"],
+                  "fields": ""
+                },
+                "sortBy": [
+                  {
+                    "displayName": "Install",
+                    "desc": false
+                  }
+                ]
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "noValue": "No Tomo install in this namespace",
+                  "custom": {
+                    "align": "auto",
+                    "filterable": true,
+                    "cellOptions": {
+                      "type": "auto"
+                    },
+                    "inspect": false
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Install"
+                    },
+                    "properties": [
+                      {
+                        "id": "links",
+                        "value": [
+                          {
+                            "title": "Show this install",
+                            "url": "/d/kam-09?${__url_time_range}&${namespace:queryparam}&var-extension=${__value.raw}"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Ready"
+                    },
+                    "properties": [
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "0": {
+                                "text": "Not ready",
+                                "color": "red",
+                                "index": 0
+                              },
+                              "1": {
+                                "text": "Ready",
+                                "color": "green",
+                                "index": 1
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Metrics"
+                    },
+                    "properties": [
+                      {
+                        "id": "decimals",
+                        "value": 0
+                      },
+                      {
+                        "id": "noValue",
+                        "value": "Not scraped"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "layout": {
@@ -3917,7 +4613,36 @@
           {
             "kind": "RowsLayoutRow",
             "spec": {
-              "title": "Status",
+              "title": "Tomo installs",
+              "collapse": false,
+              "hideHeader": false,
+              "fillScreen": false,
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 0,
+                        "width": 24,
+                        "height": 5,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "installs"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "title": "Selected install",
               "collapse": false,
               "hideHeader": false,
               "fillScreen": false,
@@ -3989,6 +4714,35 @@
                         "element": {
                           "kind": "ElementReference",
                           "name": "tool-errors"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "title": "Failing components",
+              "collapse": false,
+              "hideHeader": true,
+              "fillScreen": false,
+              "layout": {
+                "kind": "GridLayout",
+                "spec": {
+                  "items": [
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 0,
+                        "y": 0,
+                        "width": 24,
+                        "height": 5,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "failing"
                         }
                       }
                     }
