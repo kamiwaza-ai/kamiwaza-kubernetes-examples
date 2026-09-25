@@ -184,7 +184,7 @@
         "spec": {
           "id": 1,
           "title": "Active members",
-          "description": "Members who sent at least one message. The arrow compares with the previous period of the same length.",
+          "description": "Members who sent a message or used any feature. The line above compares it with the previous period of the same length.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -203,7 +203,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeFrom()::timestamptz AS time, (SELECT count(DISTINCT member_key) FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE kind IN ('message', 'steer')) AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT count(DISTINCT member_key) FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind IN ('message', 'steer'))\nORDER BY 1",
+                        "rawSql": "WITH periods AS (\nSELECT $__timeFrom()::timestamptz AS time, (SELECT count(*) FROM (SELECT member_key FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE kind IN ('message', 'steer') UNION SELECT member_key FROM member_events(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz)) AS seen) AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT count(*) FROM (SELECT member_key FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind IN ('message', 'steer') UNION SELECT member_key FROM member_events($__timeFrom()::timestamptz, $__timeTo()::timestamptz)) AS seen)\nORDER BY 1\n\n),\np AS (SELECT (SELECT value FROM periods WHERE time = $__timeFrom()::timestamptz) AS prev, (SELECT value FROM periods WHERE time > $__timeFrom()::timestamptz) AS cur)\nSELECT $__timeTo()::timestamptz AS time,\n       CASE WHEN cur IS NULL THEN ''\n            WHEN prev IS NULL OR prev = 0 THEN 'Nothing in the previous period'\n            WHEN cur = prev THEN 'Same as the previous period'\n            WHEN cur > prev THEN '▲ ' || round(100 * (cur - prev) / prev) || '% on the previous period'\n            ELSE '▼ ' || round(100 * (prev - cur) / prev) || '% on the previous period' END AS metric,\n       cur AS value\n  FROM p",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -228,13 +228,12 @@
                   "fields": ""
                 },
                 "orientation": "auto",
-                "textMode": "value",
+                "textMode": "value_and_name",
                 "colorMode": "none",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": true,
-                "percentChangeColorMode": "standard"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
@@ -256,7 +255,7 @@
         "spec": {
           "id": 2,
           "title": "New members",
-          "description": "Members whose first message ever fell in the period. The arrow compares with the previous period of the same length.",
+          "description": "Members whose first activity ever fell in the period. The line above compares it with the previous period of the same length.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -275,7 +274,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeFrom()::timestamptz AS time, (SELECT count(*) FROM members($__timeFrom()::timestamptz) WHERE first_input_at >= ($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz))) AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT count(*) FROM members($__timeTo()::timestamptz) WHERE first_input_at >= $__timeFrom()::timestamptz)\nORDER BY 1",
+                        "rawSql": "WITH periods AS (\nSELECT $__timeFrom()::timestamptz AS time, (SELECT count(*) FROM members($__timeFrom()::timestamptz) WHERE first_seen_at >= ($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz))) AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT count(*) FROM members($__timeTo()::timestamptz) WHERE first_seen_at >= $__timeFrom()::timestamptz)\nORDER BY 1\n\n),\np AS (SELECT (SELECT value FROM periods WHERE time = $__timeFrom()::timestamptz) AS prev, (SELECT value FROM periods WHERE time > $__timeFrom()::timestamptz) AS cur)\nSELECT $__timeTo()::timestamptz AS time,\n       CASE WHEN cur IS NULL THEN ''\n            WHEN prev IS NULL OR prev = 0 THEN 'Nothing in the previous period'\n            WHEN cur = prev THEN 'Same as the previous period'\n            WHEN cur > prev THEN '▲ ' || round(100 * (cur - prev) / prev) || '% on the previous period'\n            ELSE '▼ ' || round(100 * (prev - cur) / prev) || '% on the previous period' END AS metric,\n       cur AS value\n  FROM p",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -300,13 +299,12 @@
                   "fields": ""
                 },
                 "orientation": "auto",
-                "textMode": "value",
+                "textMode": "value_and_name",
                 "colorMode": "none",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": true,
-                "percentChangeColorMode": "standard"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
@@ -328,7 +326,7 @@
         "spec": {
           "id": 3,
           "title": "Messages",
-          "description": "Messages members sent, in chat and to scheduled tasks. The arrow compares with the previous period of the same length.",
+          "description": "Messages members sent, in chat and to scheduled tasks. The line above compares it with the previous period of the same length.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -347,7 +345,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeFrom()::timestamptz AS time, (SELECT count(*) FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE kind = 'message') AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT count(*) FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind = 'message')\nORDER BY 1",
+                        "rawSql": "WITH periods AS (\nSELECT $__timeFrom()::timestamptz AS time, (SELECT count(*) FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE kind = 'message') AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT count(*) FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind = 'message')\nORDER BY 1\n\n),\np AS (SELECT (SELECT value FROM periods WHERE time = $__timeFrom()::timestamptz) AS prev, (SELECT value FROM periods WHERE time > $__timeFrom()::timestamptz) AS cur)\nSELECT $__timeTo()::timestamptz AS time,\n       CASE WHEN cur IS NULL THEN ''\n            WHEN prev IS NULL OR prev = 0 THEN 'Nothing in the previous period'\n            WHEN cur = prev THEN 'Same as the previous period'\n            WHEN cur > prev THEN '▲ ' || round(100 * (cur - prev) / prev) || '% on the previous period'\n            ELSE '▼ ' || round(100 * (prev - cur) / prev) || '% on the previous period' END AS metric,\n       cur AS value\n  FROM p",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -372,13 +370,12 @@
                   "fields": ""
                 },
                 "orientation": "auto",
-                "textMode": "value",
+                "textMode": "value_and_name",
                 "colorMode": "none",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": true,
-                "percentChangeColorMode": "standard"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
@@ -400,7 +397,7 @@
         "spec": {
           "id": 4,
           "title": "Messages per member",
-          "description": "Messages per active member. The arrow compares with the previous period of the same length.",
+          "description": "Messages per active member. The line above compares it with the previous period of the same length.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -419,7 +416,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeFrom()::timestamptz AS time, (SELECT count(*)::numeric / NULLIF(count(DISTINCT member_key), 0) FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE kind = 'message') AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT count(*)::numeric / NULLIF(count(DISTINCT member_key), 0) FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind = 'message')\nORDER BY 1",
+                        "rawSql": "WITH periods AS (\nSELECT $__timeFrom()::timestamptz AS time, (SELECT count(*)::numeric / NULLIF(count(DISTINCT member_key), 0) FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE kind = 'message') AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT count(*)::numeric / NULLIF(count(DISTINCT member_key), 0) FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind = 'message')\nORDER BY 1\n\n),\np AS (SELECT (SELECT value FROM periods WHERE time = $__timeFrom()::timestamptz) AS prev, (SELECT value FROM periods WHERE time > $__timeFrom()::timestamptz) AS cur)\nSELECT $__timeTo()::timestamptz AS time,\n       CASE WHEN cur IS NULL THEN ''\n            WHEN prev IS NULL OR prev = 0 THEN 'Nothing in the previous period'\n            WHEN cur = prev THEN 'Same as the previous period'\n            WHEN cur > prev THEN '▲ ' || round(100 * (cur - prev) / prev) || '% on the previous period'\n            ELSE '▼ ' || round(100 * (prev - cur) / prev) || '% on the previous period' END AS metric,\n       cur AS value\n  FROM p",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -444,13 +441,12 @@
                   "fields": ""
                 },
                 "orientation": "auto",
-                "textMode": "value",
+                "textMode": "value_and_name",
                 "colorMode": "none",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": true,
-                "percentChangeColorMode": "standard"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
@@ -472,7 +468,7 @@
         "spec": {
           "id": 5,
           "title": "Answered",
-          "description": "Share of finished messages that ended in an answer. The arrow compares with the previous period of the same length.",
+          "description": "Share of finished messages that ended in an answer. The line above compares it with the previous period of the same length.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -491,7 +487,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeFrom()::timestamptz AS time, (SELECT 100.0 * count(*) FILTER (WHERE status IN ('completed', 'salvaged')) / NULLIF(count(*) FILTER (WHERE status IN ('completed', 'salvaged', 'failed')), 0) FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE kind = 'message') AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT 100.0 * count(*) FILTER (WHERE status IN ('completed', 'salvaged')) / NULLIF(count(*) FILTER (WHERE status IN ('completed', 'salvaged', 'failed')), 0) FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind = 'message')\nORDER BY 1",
+                        "rawSql": "WITH periods AS (\nSELECT $__timeFrom()::timestamptz AS time, (SELECT 100.0 * count(*) FILTER (WHERE status IN ('completed', 'salvaged')) / NULLIF(count(*) FILTER (WHERE status IN ('completed', 'salvaged', 'failed')), 0) FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE kind = 'message') AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT 100.0 * count(*) FILTER (WHERE status IN ('completed', 'salvaged')) / NULLIF(count(*) FILTER (WHERE status IN ('completed', 'salvaged', 'failed')), 0) FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind = 'message')\nORDER BY 1\n\n),\np AS (SELECT (SELECT value FROM periods WHERE time = $__timeFrom()::timestamptz) AS prev, (SELECT value FROM periods WHERE time > $__timeFrom()::timestamptz) AS cur)\nSELECT $__timeTo()::timestamptz AS time,\n       CASE WHEN cur IS NULL THEN ''\n            WHEN prev IS NULL OR prev = 0 THEN 'Nothing in the previous period'\n            WHEN cur = prev THEN 'Same as the previous period'\n            WHEN cur > prev THEN '▲ ' || round(100 * (cur - prev) / prev) || '% on the previous period'\n            ELSE '▼ ' || round(100 * (prev - cur) / prev) || '% on the previous period' END AS metric,\n       cur AS value\n  FROM p",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -516,13 +512,12 @@
                   "fields": ""
                 },
                 "orientation": "auto",
-                "textMode": "value",
+                "textMode": "value_and_name",
                 "colorMode": "none",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": true,
-                "percentChangeColorMode": "standard"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
@@ -545,7 +540,7 @@
         "spec": {
           "id": 6,
           "title": "Rated helpful",
-          "description": "Share of thumbs-up among member votes on answers. The arrow compares with the previous period of the same length.",
+          "description": "Share of thumbs-up among member votes on answers. The line above compares it with the previous period of the same length.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -564,7 +559,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeFrom()::timestamptz AS time, (SELECT 100.0 * count(*) FILTER (WHERE vote = 'up') / NULLIF(count(*), 0) FROM answer_votes(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE true) AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT 100.0 * count(*) FILTER (WHERE vote = 'up') / NULLIF(count(*), 0) FROM answer_votes($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE true)\nORDER BY 1",
+                        "rawSql": "WITH periods AS (\nSELECT $__timeFrom()::timestamptz AS time, (SELECT 100.0 * count(*) FILTER (WHERE vote = 'up') / NULLIF(count(*), 0) FROM answer_votes(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE true) AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT 100.0 * count(*) FILTER (WHERE vote = 'up') / NULLIF(count(*), 0) FROM answer_votes($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE true)\nORDER BY 1\n\n),\np AS (SELECT (SELECT value FROM periods WHERE time = $__timeFrom()::timestamptz) AS prev, (SELECT value FROM periods WHERE time > $__timeFrom()::timestamptz) AS cur)\nSELECT $__timeTo()::timestamptz AS time,\n       CASE WHEN cur IS NULL THEN ''\n            WHEN prev IS NULL OR prev = 0 THEN 'Nothing in the previous period'\n            WHEN cur = prev THEN 'Same as the previous period'\n            WHEN cur > prev THEN '▲ ' || round(100 * (cur - prev) / prev) || '% on the previous period'\n            ELSE '▼ ' || round(100 * (prev - cur) / prev) || '% on the previous period' END AS metric,\n       cur AS value\n  FROM p",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -589,13 +584,12 @@
                   "fields": ""
                 },
                 "orientation": "auto",
-                "textMode": "value",
+                "textMode": "value_and_name",
                 "colorMode": "none",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": true,
-                "percentChangeColorMode": "standard"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
@@ -618,7 +612,7 @@
         "spec": {
           "id": 7,
           "title": "Median wait",
-          "description": "Median time from sending a message to its finished answer. The arrow compares with the previous period of the same length.",
+          "description": "Median time from sending a message to its finished answer. The line above compares it with the previous period of the same length.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -637,7 +631,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeFrom()::timestamptz AS time, (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM completed_at - accepted_at)) FILTER (WHERE status IN ('completed', 'salvaged')) FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE kind = 'message') AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM completed_at - accepted_at)) FILTER (WHERE status IN ('completed', 'salvaged')) FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind = 'message')\nORDER BY 1",
+                        "rawSql": "WITH periods AS (\nSELECT $__timeFrom()::timestamptz AS time, (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM completed_at - accepted_at)) FILTER (WHERE status IN ('completed', 'salvaged')) FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE kind = 'message') AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM completed_at - accepted_at)) FILTER (WHERE status IN ('completed', 'salvaged')) FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind = 'message')\nORDER BY 1\n\n),\np AS (SELECT (SELECT value FROM periods WHERE time = $__timeFrom()::timestamptz) AS prev, (SELECT value FROM periods WHERE time > $__timeFrom()::timestamptz) AS cur)\nSELECT $__timeTo()::timestamptz AS time,\n       CASE WHEN cur IS NULL THEN ''\n            WHEN prev IS NULL OR prev = 0 THEN 'Nothing in the previous period'\n            WHEN cur = prev THEN 'Same as the previous period'\n            WHEN cur > prev THEN '▲ ' || round(100 * (cur - prev) / prev) || '% on the previous period'\n            ELSE '▼ ' || round(100 * (prev - cur) / prev) || '% on the previous period' END AS metric,\n       cur AS value\n  FROM p",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -662,13 +656,12 @@
                   "fields": ""
                 },
                 "orientation": "auto",
-                "textMode": "value",
+                "textMode": "value_and_name",
                 "colorMode": "none",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": true,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
@@ -691,7 +684,7 @@
         "spec": {
           "id": 8,
           "title": "Active members",
-          "description": "Members active each day, and in the seven days up to it",
+          "description": "Members who sent a message or used any feature each day, and in the seven days up to it",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -710,7 +703,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "WITH t AS (SELECT accepted_at, member_key FROM turns($__timeFrom()::timestamptz - interval '6 days', $__timeTo()::timestamptz) WHERE kind IN ('message', 'steer')),\ndays AS (SELECT generate_series(date_trunc('day', $__timeFrom()::timestamptz), $__timeTo()::timestamptz, interval '1 day') AS day)\nSELECT day AS time,\n       (SELECT count(DISTINCT member_key) FROM t WHERE accepted_at >= day AND accepted_at < day + interval '1 day') AS \"That day\",\n       (SELECT count(DISTINCT member_key) FROM t WHERE accepted_at >= day - interval '6 days' AND accepted_at < day + interval '1 day') AS \"In the last 7 days\"\n  FROM days ORDER BY 1",
+                        "rawSql": "WITH t AS (SELECT accepted_at, member_key FROM turns($__timeFrom()::timestamptz - interval '6 days', $__timeTo()::timestamptz) WHERE kind IN ('message', 'steer') UNION ALL SELECT occurred_at, member_key FROM member_events($__timeFrom()::timestamptz - interval '6 days', $__timeTo()::timestamptz)),\ndays AS (SELECT generate_series(date_trunc('day', $__timeFrom()::timestamptz), $__timeTo()::timestamptz, interval '1 day') AS day)\nSELECT day AS time,\n       (SELECT count(DISTINCT member_key) FROM t WHERE accepted_at >= day AND accepted_at < day + interval '1 day') AS \"That day\",\n       (SELECT count(DISTINCT member_key) FROM t WHERE accepted_at >= day - interval '6 days' AND accepted_at < day + interval '1 day') AS \"In the last 7 days\"\n  FROM days ORDER BY 1",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -777,7 +770,7 @@
         "spec": {
           "id": 9,
           "title": "Daily return",
-          "description": "Average share of the week's active members who come back on a given day (daily ÷ weekly active). The arrow compares with the previous period of the same length.",
+          "description": "Average share of the week's active members who come back on a given day (daily ÷ weekly active). The line above compares it with the previous period of the same length.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -796,7 +789,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "WITH t AS (SELECT accepted_at, member_key FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)) - interval '6 days', $__timeTo()::timestamptz) WHERE kind IN ('message', 'steer')),\ndays AS (SELECT day, day >= date_trunc('day', $__timeFrom()::timestamptz) AS current FROM generate_series(date_trunc('day', ($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz))), $__timeTo()::timestamptz - interval '1 day', interval '1 day') AS day),\nratio AS (\n    SELECT current,\n           (SELECT count(DISTINCT member_key) FROM t WHERE accepted_at >= day AND accepted_at < day + interval '1 day')::numeric\n         / NULLIF((SELECT count(DISTINCT member_key) FROM t WHERE accepted_at >= day - interval '6 days' AND accepted_at < day + interval '1 day'), 0) AS r\n      FROM days)\nSELECT $__timeFrom()::timestamptz AS time, 100 * avg(r) FILTER (WHERE NOT current) AS value FROM ratio\nUNION ALL SELECT $__timeTo()::timestamptz, 100 * avg(r) FILTER (WHERE current) FROM ratio ORDER BY 1",
+                        "rawSql": "WITH periods AS (\nWITH t AS (SELECT accepted_at, member_key FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)) - interval '6 days', $__timeTo()::timestamptz) WHERE kind IN ('message', 'steer') UNION ALL SELECT occurred_at, member_key FROM member_events(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)) - interval '6 days', $__timeTo()::timestamptz)),\ndays AS (SELECT day, day >= date_trunc('day', $__timeFrom()::timestamptz) AS current FROM generate_series(date_trunc('day', ($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz))), $__timeTo()::timestamptz - interval '1 day', interval '1 day') AS day),\nratio AS (\n    SELECT current,\n           (SELECT count(DISTINCT member_key) FROM t WHERE accepted_at >= day AND accepted_at < day + interval '1 day')::numeric\n         / NULLIF((SELECT count(DISTINCT member_key) FROM t WHERE accepted_at >= day - interval '6 days' AND accepted_at < day + interval '1 day'), 0) AS r\n      FROM days)\nSELECT $__timeFrom()::timestamptz AS time, 100 * avg(r) FILTER (WHERE NOT current) AS value FROM ratio\nUNION ALL SELECT $__timeTo()::timestamptz, 100 * avg(r) FILTER (WHERE current) FROM ratio ORDER BY 1\n\n),\np AS (SELECT (SELECT value FROM periods WHERE time = $__timeFrom()::timestamptz) AS prev, (SELECT value FROM periods WHERE time > $__timeFrom()::timestamptz) AS cur)\nSELECT $__timeTo()::timestamptz AS time,\n       CASE WHEN cur IS NULL THEN ''\n            WHEN prev IS NULL OR prev = 0 THEN 'Nothing in the previous period'\n            WHEN cur = prev THEN 'Same as the previous period'\n            WHEN cur > prev THEN '▲ ' || round(100 * (cur - prev) / prev) || '% on the previous period'\n            ELSE '▼ ' || round(100 * (prev - cur) / prev) || '% on the previous period' END AS metric,\n       cur AS value\n  FROM p",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -821,13 +814,12 @@
                   "fields": ""
                 },
                 "orientation": "auto",
-                "textMode": "value",
+                "textMode": "value_and_name",
                 "colorMode": "none",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": true,
-                "percentChangeColorMode": "standard"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
@@ -1130,7 +1122,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT * FROM (WITH catalog(feature, kind) AS (VALUES\n            ('Chat', 'Turn'),\n            ('Custom agents', 'Turn'),\n            ('Scheduled tasks', 'Turn'),\n            ('Connectors in a conversation', 'Turn'),\n            ('Sub-agents', 'Turn'),\n            ('High reasoning', 'Turn'),\n            ('Redirecting a running answer', 'Turn'),\n            ('Projects', 'Action'),\n            ('Shared conversations', 'Action'),\n            ('Documents', 'Action'),\n            ('Collections', 'Action'),\n            ('Saved prompts', 'Action'),\n            ('Managing tasks', 'Action'),\n            ('Web and knowledge search', 'Action'),\n            ('Code execution', 'Action'),\n            ('Writing to other systems', 'Action'),\n            ('Delegating to another agent', 'Action'),\n            ('Approving tool use', 'Action'),\n            ('Rating answers', 'Action'),\n            ('Plain Speak and compression', 'Action'),\n            ('Sharing artifacts', 'Action'),\n            ('Choosing an agent', 'Action')),\nactive AS (SELECT count(DISTINCT member_key) AS members FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind IN ('message', 'steer')),\nturn_use AS (\n    SELECT f.feature, t.member_key, t.accepted_at AS at, t.accepted_at >= $__timeFrom()::timestamptz AS current,\n           t.status IN ('completed', 'salvaged') AS ok, t.kind = 'message' AND t.status IN ('completed', 'salvaged', 'failed') AS finished\n      FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeTo()::timestamptz) AS t\n      JOIN LATERAL (VALUES\n            ('Chat', kind = 'message' AND execution_mode = 'interactive' AND agent_name IS NULL),('Custom agents', kind = 'message' AND agent_name IS NOT NULL),('Scheduled tasks', kind = 'message' AND execution_mode <> 'interactive'),('Connectors in a conversation', kind = 'message' AND uses_connectors),('Sub-agents', kind = 'message' AND uses_subagents),('High reasoning', kind = 'message' AND reasoning_effort IN ('high', 'xhigh')),('Redirecting a running answer', kind = 'steer')) AS f(feature, applies) ON f.applies),\nevent_use AS (\n    SELECT f.feature, e.member_key, e.occurred_at AS at, e.occurred_at >= $__timeFrom()::timestamptz AS current,\n           e.outcome = 'ok' AS ok, true AS finished\n      FROM member_events(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeTo()::timestamptz) AS e\n      JOIN (VALUES\n            ('Projects', 'member.project.%'),\n            ('Shared conversations', 'member.conversation.invitation.%'),\n            ('Documents', 'member.document.%'),\n            ('Collections', 'member.collection.%'),\n            ('Saved prompts', 'member.prompt%'),\n            ('Managing tasks', 'member.task.%'),\n            ('Web and knowledge search', 'chat.search_tool.invoke'),\n            ('Code execution', 'chat.tool.run_code'),\n            ('Writing to other systems', 'chat.tool.write'),\n            ('Delegating to another agent', 'chat.agent.delegated'),\n            ('Approving tool use', 'member.tool.approval.%'),\n            ('Rating answers', 'member.chat.feedback'),\n            ('Plain Speak and compression', 'member.compression.%'),\n            ('Sharing artifacts', 'member.artifact.shared'),\n            ('Choosing an agent', 'member.conversation.agent.selected')) AS f(feature, pattern) ON e.action LIKE f.pattern),\nused AS (SELECT * FROM turn_use UNION ALL SELECT * FROM event_use),\nper_member AS (\n    SELECT feature, member_key, count(DISTINCT at::date) AS days\n      FROM used WHERE current GROUP BY 1, 2),\nvotes AS (\n    SELECT f.feature, count(*) AS votes, 100.0 * count(*) FILTER (WHERE v.vote = 'up') / count(*) AS helpful\n      FROM answer_votes($__timeFrom()::timestamptz, $__timeTo()::timestamptz) AS v\n      JOIN LATERAL (VALUES\n            ('Chat', execution_mode = 'interactive' AND agent_name IS NULL),('Custom agents', agent_name IS NOT NULL),('Scheduled tasks', execution_mode <> 'interactive'),('High reasoning', reasoning_effort IN ('high', 'xhigh'))) AS f(feature, applies) ON f.applies\n     GROUP BY 1),\nscored AS (\n    SELECT c.feature, c.kind,\n           count(DISTINCT u.member_key) FILTER (WHERE u.current) AS members,\n           100.0 * count(DISTINCT u.member_key) FILTER (WHERE u.current) / NULLIF((SELECT members FROM active), 0) AS reach,\n           count(u.at) FILTER (WHERE u.current) AS uses,\n           count(u.at) FILTER (WHERE NOT u.current) AS previous_uses,\n           100.0 * count(*) FILTER (WHERE u.current AND u.ok) / NULLIF(count(*) FILTER (WHERE u.current AND u.finished), 0) AS success,\n           count(*) FILTER (WHERE u.current AND u.finished) AS finished\n      FROM catalog AS c LEFT JOIN used AS u USING (feature)\n     GROUP BY 1, 2)\nSELECT s.feature,\n       CASE\n           WHEN s.members = 0 THEN 'Not used'\n           WHEN s.finished >= 10 AND s.success < 90 THEN 'Often fails'\n           WHEN v.votes >= 10 AND v.helpful < 70 THEN 'Answers disliked'\n           WHEN s.reach < 10 THEN 'Few members try it'\n           WHEN s.members >= 5 AND 100.0 * (SELECT count(*) FROM per_member AS p WHERE p.feature = s.feature AND p.days >= 2) / s.members < 30\n               THEN 'Tried, not kept'\n           WHEN s.previous_uses >= 10 AND s.uses < 0.7 * s.previous_uses THEN 'Use is falling'\n           ELSE 'Working'\n       END AS signal,\n       s.members, s.reach,\n       100.0 * (SELECT count(*) FROM per_member AS p WHERE p.feature = s.feature AND p.days >= 2) / NULLIF(s.members, 0) AS repeat,\n       s.success, v.helpful,\n       100.0 * (s.uses - s.previous_uses) / NULLIF(s.previous_uses, 0) AS change,\n       s.uses, s.uses::numeric / NULLIF(s.members, 0) AS per_member, s.kind\n  FROM scored AS s LEFT JOIN votes AS v USING (feature)) AS scorecard\n ORDER BY array_position(ARRAY['Often fails', 'Answers disliked', 'Tried, not kept', 'Use is falling', 'Few members try it', 'Not used', 'Working'], signal),\n          members DESC, feature",
+                        "rawSql": "SELECT * FROM (WITH catalog(feature, kind) AS (VALUES\n            ('Chat', 'Turn'),\n            ('Custom agents', 'Turn'),\n            ('Scheduled tasks', 'Turn'),\n            ('Connectors in a conversation', 'Turn'),\n            ('Sub-agents', 'Turn'),\n            ('High reasoning', 'Turn'),\n            ('Redirecting a running answer', 'Turn'),\n            ('Projects', 'Action'),\n            ('Shared conversations', 'Action'),\n            ('Documents', 'Action'),\n            ('Collections', 'Action'),\n            ('Saved prompts', 'Action'),\n            ('Managing tasks', 'Action'),\n            ('Web and knowledge search', 'Action'),\n            ('Code execution', 'Action'),\n            ('Writing to other systems', 'Action'),\n            ('Delegating to another agent', 'Action'),\n            ('Approving tool use', 'Action'),\n            ('Rating answers', 'Action'),\n            ('Plain Speak and compression', 'Action'),\n            ('Sharing artifacts', 'Action'),\n            ('Choosing an agent', 'Action')),\nactive AS (SELECT count(*) AS members FROM (SELECT member_key FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind IN ('message', 'steer') UNION SELECT member_key FROM member_events($__timeFrom()::timestamptz, $__timeTo()::timestamptz)) AS seen),\nturn_use AS (\n    SELECT f.feature, t.member_key, t.accepted_at AS at, t.accepted_at >= $__timeFrom()::timestamptz AS current,\n           t.status IN ('completed', 'salvaged') AS ok, t.kind = 'message' AND t.status IN ('completed', 'salvaged', 'failed') AS finished\n      FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeTo()::timestamptz) AS t\n      JOIN LATERAL (VALUES\n            ('Chat', kind = 'message' AND execution_mode = 'interactive' AND agent_name IS NULL),('Custom agents', kind = 'message' AND agent_name IS NOT NULL),('Scheduled tasks', kind = 'message' AND execution_mode <> 'interactive'),('Connectors in a conversation', kind = 'message' AND uses_connectors),('Sub-agents', kind = 'message' AND uses_subagents),('High reasoning', kind = 'message' AND reasoning_effort IN ('high', 'xhigh')),('Redirecting a running answer', kind = 'steer')) AS f(feature, applies) ON f.applies),\nevent_use AS (\n    SELECT f.feature, e.member_key, e.occurred_at AS at, e.occurred_at >= $__timeFrom()::timestamptz AS current,\n           e.outcome = 'ok' AS ok, true AS finished\n      FROM member_events(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeTo()::timestamptz) AS e\n      JOIN (VALUES\n            ('Projects', 'member.project.%'),\n            ('Shared conversations', 'member.conversation.invitation.%'),\n            ('Documents', 'member.document.%'),\n            ('Collections', 'member.collection.%'),\n            ('Saved prompts', 'member.prompt%'),\n            ('Managing tasks', 'member.task.%'),\n            ('Web and knowledge search', 'chat.search_tool.invoke'),\n            ('Code execution', 'chat.tool.run_code'),\n            ('Writing to other systems', 'chat.tool.write'),\n            ('Delegating to another agent', 'chat.agent.delegated'),\n            ('Approving tool use', 'member.tool.approval.%'),\n            ('Rating answers', 'member.chat.feedback'),\n            ('Plain Speak and compression', 'member.compression.%'),\n            ('Sharing artifacts', 'member.artifact.shared'),\n            ('Choosing an agent', 'member.conversation.agent.selected')) AS f(feature, pattern) ON e.action LIKE f.pattern),\nused AS (SELECT * FROM turn_use UNION ALL SELECT * FROM event_use),\nper_member AS (\n    SELECT feature, member_key, count(DISTINCT at::date) AS days\n      FROM used WHERE current GROUP BY 1, 2),\nvotes AS (\n    SELECT f.feature, count(*) AS votes, 100.0 * count(*) FILTER (WHERE v.vote = 'up') / count(*) AS helpful\n      FROM answer_votes($__timeFrom()::timestamptz, $__timeTo()::timestamptz) AS v\n      JOIN LATERAL (VALUES\n            ('Chat', execution_mode = 'interactive' AND agent_name IS NULL),('Custom agents', agent_name IS NOT NULL),('Scheduled tasks', execution_mode <> 'interactive'),('High reasoning', reasoning_effort IN ('high', 'xhigh'))) AS f(feature, applies) ON f.applies\n     GROUP BY 1),\nscored AS (\n    SELECT c.feature, c.kind,\n           count(DISTINCT u.member_key) FILTER (WHERE u.current) AS members,\n           100.0 * count(DISTINCT u.member_key) FILTER (WHERE u.current) / NULLIF((SELECT members FROM active), 0) AS reach,\n           count(u.at) FILTER (WHERE u.current) AS uses,\n           count(u.at) FILTER (WHERE NOT u.current) AS previous_uses,\n           100.0 * count(*) FILTER (WHERE u.current AND u.ok) / NULLIF(count(*) FILTER (WHERE u.current AND u.finished), 0) AS success,\n           count(*) FILTER (WHERE u.current AND u.finished) AS finished\n      FROM catalog AS c LEFT JOIN used AS u USING (feature)\n     GROUP BY 1, 2)\nSELECT s.feature,\n       CASE\n           WHEN s.members = 0 THEN 'Not used'\n           WHEN s.finished >= 10 AND s.success < 90 THEN 'Often fails'\n           WHEN v.votes >= 10 AND v.helpful < 70 THEN 'Answers disliked'\n           WHEN s.reach < 10 THEN 'Few members try it'\n           WHEN s.members >= 5 AND 100.0 * (SELECT count(*) FROM per_member AS p WHERE p.feature = s.feature AND p.days >= 2) / s.members < 30\n               THEN 'Tried, not kept'\n           WHEN s.previous_uses >= 10 AND s.uses < 0.7 * s.previous_uses THEN 'Use is falling'\n           ELSE 'Working'\n       END AS signal,\n       s.members, s.reach,\n       100.0 * (SELECT count(*) FROM per_member AS p WHERE p.feature = s.feature AND p.days >= 2) / NULLIF(s.members, 0) AS repeat,\n       s.success, v.helpful,\n       100.0 * (s.uses - s.previous_uses) / NULLIF(s.previous_uses, 0) AS change,\n       s.uses, s.uses::numeric / NULLIF(s.members, 0) AS per_member, s.kind\n  FROM scored AS s LEFT JOIN votes AS v USING (feature)) AS scorecard\n ORDER BY array_position(ARRAY['Often fails', 'Answers disliked', 'Tried, not kept', 'Use is falling', 'Few members try it', 'Not used', 'Working'], signal),\n          members DESC, feature",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "table"
@@ -1170,9 +1162,21 @@
                     },
                     "inspect": false
                   },
-                  "noValue": "–"
+                  "noValue": "No member activity in the period"
                 },
                 "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": ".*"
+                    },
+                    "properties": [
+                      {
+                        "id": "noValue",
+                        "value": "–"
+                      }
+                    ]
+                  },
                   {
                     "matcher": {
                       "id": "byName",
@@ -1341,6 +1345,22 @@
                         "value": {
                           "type": "color-text"
                         }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "special",
+                            "options": {
+                              "match": "null+nan",
+                              "result": {
+                                "text": "–",
+                                "color": "text",
+                                "index": 99
+                              }
+                            }
+                          }
+                        ]
                       }
                     ]
                   },
@@ -1401,6 +1421,22 @@
                         "value": {
                           "type": "color-text"
                         }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "special",
+                            "options": {
+                              "match": "null+nan",
+                              "result": {
+                                "text": "–",
+                                "color": "text",
+                                "index": 99
+                              }
+                            }
+                          }
+                        ]
                       }
                     ]
                   },
@@ -1461,6 +1497,22 @@
                         "value": {
                           "type": "color-text"
                         }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "special",
+                            "options": {
+                              "match": "null+nan",
+                              "result": {
+                                "text": "–",
+                                "color": "text",
+                                "index": 99
+                              }
+                            }
+                          }
+                        ]
                       }
                     ]
                   },
@@ -1525,6 +1577,22 @@
                         "value": {
                           "type": "color-text"
                         }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "special",
+                            "options": {
+                              "match": "null+nan",
+                              "result": {
+                                "text": "–",
+                                "color": "text",
+                                "index": 99
+                              }
+                            }
+                          }
+                        ]
                       }
                     ]
                   },
@@ -1665,9 +1733,21 @@
                     },
                     "inspect": false
                   },
-                  "noValue": "–"
+                  "noValue": "No messages in the period"
                 },
                 "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": ".*"
+                    },
+                    "properties": [
+                      {
+                        "id": "noValue",
+                        "value": "–"
+                      }
+                    ]
+                  },
                   {
                     "matcher": {
                       "id": "byName",
@@ -1729,6 +1809,22 @@
                         "value": {
                           "type": "color-text"
                         }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "special",
+                            "options": {
+                              "match": "null+nan",
+                              "result": {
+                                "text": "–",
+                                "color": "text",
+                                "index": 99
+                              }
+                            }
+                          }
+                        ]
                       }
                     ]
                   },
@@ -1777,6 +1873,22 @@
                         "value": {
                           "type": "color-text"
                         }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "special",
+                            "options": {
+                              "match": "null+nan",
+                              "result": {
+                                "text": "–",
+                                "color": "text",
+                                "index": 99
+                              }
+                            }
+                          }
+                        ]
                       }
                     ]
                   },
@@ -1995,9 +2107,21 @@
                     },
                     "inspect": false
                   },
-                  "noValue": "–"
+                  "noValue": "No messages in the period"
                 },
                 "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": ".*"
+                    },
+                    "properties": [
+                      {
+                        "id": "noValue",
+                        "value": "–"
+                      }
+                    ]
+                  },
                   {
                     "matcher": {
                       "id": "byName",
@@ -2059,6 +2183,22 @@
                         "value": {
                           "type": "color-text"
                         }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "special",
+                            "options": {
+                              "match": "null+nan",
+                              "result": {
+                                "text": "–",
+                                "color": "text",
+                                "index": 99
+                              }
+                            }
+                          }
+                        ]
                       }
                     ]
                   },
@@ -2107,6 +2247,22 @@
                         "value": {
                           "type": "color-text"
                         }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "special",
+                            "options": {
+                              "match": "null+nan",
+                              "result": {
+                                "text": "–",
+                                "color": "text",
+                                "index": 99
+                              }
+                            }
+                          }
+                        ]
                       }
                     ]
                   },
@@ -2325,9 +2481,21 @@
                     },
                     "inspect": false
                   },
-                  "noValue": "–"
+                  "noValue": "No messages in the period"
                 },
                 "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": ".*"
+                    },
+                    "properties": [
+                      {
+                        "id": "noValue",
+                        "value": "–"
+                      }
+                    ]
+                  },
                   {
                     "matcher": {
                       "id": "byName",
@@ -2389,6 +2557,22 @@
                         "value": {
                           "type": "color-text"
                         }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "special",
+                            "options": {
+                              "match": "null+nan",
+                              "result": {
+                                "text": "–",
+                                "color": "text",
+                                "index": 99
+                              }
+                            }
+                          }
+                        ]
                       }
                     ]
                   },
@@ -2437,6 +2621,22 @@
                         "value": {
                           "type": "color-text"
                         }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "special",
+                            "options": {
+                              "match": "null+nan",
+                              "result": {
+                                "text": "–",
+                                "color": "text",
+                                "index": 99
+                              }
+                            }
+                          }
+                        ]
                       }
                     ]
                   },
@@ -2590,7 +2790,7 @@
         "spec": {
           "id": 17,
           "title": "Failed answers",
-          "description": "Share of finished messages that failed. The arrow compares with the previous period of the same length.",
+          "description": "Share of finished messages that failed. The line above compares it with the previous period of the same length.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -2609,7 +2809,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeFrom()::timestamptz AS time, (SELECT 100.0 * count(*) FILTER (WHERE status = 'failed') / NULLIF(count(*) FILTER (WHERE status IN ('completed', 'salvaged', 'failed')), 0) FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE kind = 'message') AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT 100.0 * count(*) FILTER (WHERE status = 'failed') / NULLIF(count(*) FILTER (WHERE status IN ('completed', 'salvaged', 'failed')), 0) FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind = 'message')\nORDER BY 1",
+                        "rawSql": "WITH periods AS (\nSELECT $__timeFrom()::timestamptz AS time, (SELECT 100.0 * count(*) FILTER (WHERE status = 'failed') / NULLIF(count(*) FILTER (WHERE status IN ('completed', 'salvaged', 'failed')), 0) FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE kind = 'message') AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT 100.0 * count(*) FILTER (WHERE status = 'failed') / NULLIF(count(*) FILTER (WHERE status IN ('completed', 'salvaged', 'failed')), 0) FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind = 'message')\nORDER BY 1\n\n),\np AS (SELECT (SELECT value FROM periods WHERE time = $__timeFrom()::timestamptz) AS prev, (SELECT value FROM periods WHERE time > $__timeFrom()::timestamptz) AS cur)\nSELECT $__timeTo()::timestamptz AS time,\n       CASE WHEN cur IS NULL THEN ''\n            WHEN prev IS NULL OR prev = 0 THEN 'Nothing in the previous period'\n            WHEN cur = prev THEN 'Same as the previous period'\n            WHEN cur > prev THEN '▲ ' || round(100 * (cur - prev) / prev) || '% on the previous period'\n            ELSE '▼ ' || round(100 * (prev - cur) / prev) || '% on the previous period' END AS metric,\n       cur AS value\n  FROM p",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -2634,13 +2834,12 @@
                   "fields": ""
                 },
                 "orientation": "auto",
-                "textMode": "value",
+                "textMode": "value_and_name",
                 "colorMode": "none",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": true,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
@@ -2662,8 +2861,8 @@
         "kind": "Panel",
         "spec": {
           "id": 18,
-          "title": "Stopped by member",
-          "description": "Stops and cancels members sent, per 100 messages. The arrow compares with the previous period of the same length.",
+          "title": "Stopped",
+          "description": "Stops and cancels members sent to a running answer, per 100 messages. The line above compares it with the previous period of the same length.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -2682,7 +2881,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeFrom()::timestamptz AS time, (SELECT 100.0 * count(*) FILTER (WHERE kind IN ('stop', 'cancel')) / NULLIF(count(*) FILTER (WHERE kind = 'message'), 0) FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE true) AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT 100.0 * count(*) FILTER (WHERE kind IN ('stop', 'cancel')) / NULLIF(count(*) FILTER (WHERE kind = 'message'), 0) FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE true)\nORDER BY 1",
+                        "rawSql": "WITH periods AS (\nSELECT $__timeFrom()::timestamptz AS time, (SELECT 100.0 * count(*) FILTER (WHERE kind IN ('stop', 'cancel')) / NULLIF(count(*) FILTER (WHERE kind = 'message'), 0) FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE true) AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT 100.0 * count(*) FILTER (WHERE kind IN ('stop', 'cancel')) / NULLIF(count(*) FILTER (WHERE kind = 'message'), 0) FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE true)\nORDER BY 1\n\n),\np AS (SELECT (SELECT value FROM periods WHERE time = $__timeFrom()::timestamptz) AS prev, (SELECT value FROM periods WHERE time > $__timeFrom()::timestamptz) AS cur)\nSELECT $__timeTo()::timestamptz AS time,\n       CASE WHEN cur IS NULL THEN ''\n            WHEN prev IS NULL OR prev = 0 THEN 'Nothing in the previous period'\n            WHEN cur = prev THEN 'Same as the previous period'\n            WHEN cur > prev THEN '▲ ' || round(100 * (cur - prev) / prev) || '% on the previous period'\n            ELSE '▼ ' || round(100 * (prev - cur) / prev) || '% on the previous period' END AS metric,\n       cur AS value\n  FROM p",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -2707,13 +2906,12 @@
                   "fields": ""
                 },
                 "orientation": "auto",
-                "textMode": "value",
+                "textMode": "value_and_name",
                 "colorMode": "none",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": true,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
@@ -2735,8 +2933,8 @@
         "kind": "Panel",
         "spec": {
           "id": 19,
-          "title": "Redirected mid-answer",
-          "description": "Steers members sent to a running answer, per 100 messages. The arrow compares with the previous period of the same length.",
+          "title": "Redirected",
+          "description": "Steers members sent to a running answer, per 100 messages. The line above compares it with the previous period of the same length.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -2755,7 +2953,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeFrom()::timestamptz AS time, (SELECT 100.0 * count(*) FILTER (WHERE kind = 'steer') / NULLIF(count(*) FILTER (WHERE kind = 'message'), 0) FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE true) AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT 100.0 * count(*) FILTER (WHERE kind = 'steer') / NULLIF(count(*) FILTER (WHERE kind = 'message'), 0) FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE true)\nORDER BY 1",
+                        "rawSql": "WITH periods AS (\nSELECT $__timeFrom()::timestamptz AS time, (SELECT 100.0 * count(*) FILTER (WHERE kind = 'steer') / NULLIF(count(*) FILTER (WHERE kind = 'message'), 0) FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE true) AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT 100.0 * count(*) FILTER (WHERE kind = 'steer') / NULLIF(count(*) FILTER (WHERE kind = 'message'), 0) FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE true)\nORDER BY 1\n\n),\np AS (SELECT (SELECT value FROM periods WHERE time = $__timeFrom()::timestamptz) AS prev, (SELECT value FROM periods WHERE time > $__timeFrom()::timestamptz) AS cur)\nSELECT $__timeTo()::timestamptz AS time,\n       CASE WHEN cur IS NULL THEN ''\n            WHEN prev IS NULL OR prev = 0 THEN 'Nothing in the previous period'\n            WHEN cur = prev THEN 'Same as the previous period'\n            WHEN cur > prev THEN '▲ ' || round(100 * (cur - prev) / prev) || '% on the previous period'\n            ELSE '▼ ' || round(100 * (prev - cur) / prev) || '% on the previous period' END AS metric,\n       cur AS value\n  FROM p",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -2780,13 +2978,12 @@
                   "fields": ""
                 },
                 "orientation": "auto",
-                "textMode": "value",
+                "textMode": "value_and_name",
                 "colorMode": "none",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": true,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
@@ -2809,7 +3006,7 @@
         "spec": {
           "id": 20,
           "title": "Rated unhelpful",
-          "description": "Share of thumbs-down among member votes. The arrow compares with the previous period of the same length.",
+          "description": "Share of thumbs-down among member votes. The line above compares it with the previous period of the same length.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -2828,7 +3025,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeFrom()::timestamptz AS time, (SELECT 100.0 * count(*) FILTER (WHERE vote = 'down') / NULLIF(count(*), 0) FROM answer_votes(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE true) AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT 100.0 * count(*) FILTER (WHERE vote = 'down') / NULLIF(count(*), 0) FROM answer_votes($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE true)\nORDER BY 1",
+                        "rawSql": "WITH periods AS (\nSELECT $__timeFrom()::timestamptz AS time, (SELECT 100.0 * count(*) FILTER (WHERE vote = 'down') / NULLIF(count(*), 0) FROM answer_votes(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE true) AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT 100.0 * count(*) FILTER (WHERE vote = 'down') / NULLIF(count(*), 0) FROM answer_votes($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE true)\nORDER BY 1\n\n),\np AS (SELECT (SELECT value FROM periods WHERE time = $__timeFrom()::timestamptz) AS prev, (SELECT value FROM periods WHERE time > $__timeFrom()::timestamptz) AS cur)\nSELECT $__timeTo()::timestamptz AS time,\n       CASE WHEN cur IS NULL THEN ''\n            WHEN prev IS NULL OR prev = 0 THEN 'Nothing in the previous period'\n            WHEN cur = prev THEN 'Same as the previous period'\n            WHEN cur > prev THEN '▲ ' || round(100 * (cur - prev) / prev) || '% on the previous period'\n            ELSE '▼ ' || round(100 * (prev - cur) / prev) || '% on the previous period' END AS metric,\n       cur AS value\n  FROM p",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -2853,13 +3050,12 @@
                   "fields": ""
                 },
                 "orientation": "auto",
-                "textMode": "value",
+                "textMode": "value_and_name",
                 "colorMode": "none",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": true,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
@@ -2881,8 +3077,8 @@
         "kind": "Panel",
         "spec": {
           "id": 21,
-          "title": "Left after a failure",
-          "description": "Conversations whose last message failed or was cancelled, with nothing sent after it for an hour. The arrow compares with the previous period of the same length.",
+          "title": "Left after failure",
+          "description": "Conversations whose last message failed or was cancelled, with nothing sent after it for an hour. The line above compares it with the previous period of the same length.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -2901,7 +3097,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeFrom()::timestamptz AS time, (SELECT count(*) FILTER (WHERE last IN ('failed', 'cancelled') AND at < now() - interval '1 hour') FROM (SELECT (array_agg(status ORDER BY accepted_at DESC))[1] AS last, max(accepted_at) AS at FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE kind = 'message' GROUP BY conversation_key) AS c WHERE true) AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT count(*) FILTER (WHERE last IN ('failed', 'cancelled') AND at < now() - interval '1 hour') FROM (SELECT (array_agg(status ORDER BY accepted_at DESC))[1] AS last, max(accepted_at) AS at FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind = 'message' GROUP BY conversation_key) AS c WHERE true)\nORDER BY 1",
+                        "rawSql": "WITH periods AS (\nSELECT $__timeFrom()::timestamptz AS time, (SELECT count(*) FILTER (WHERE last IN ('failed', 'cancelled') AND at < now() - interval '1 hour') FROM (SELECT (array_agg(status ORDER BY accepted_at DESC))[1] AS last, max(accepted_at) AS at FROM turns(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE kind = 'message' GROUP BY conversation_key) AS c WHERE true) AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT count(*) FILTER (WHERE last IN ('failed', 'cancelled') AND at < now() - interval '1 hour') FROM (SELECT (array_agg(status ORDER BY accepted_at DESC))[1] AS last, max(accepted_at) AS at FROM turns($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE kind = 'message' GROUP BY conversation_key) AS c WHERE true)\nORDER BY 1\n\n),\np AS (SELECT (SELECT value FROM periods WHERE time = $__timeFrom()::timestamptz) AS prev, (SELECT value FROM periods WHERE time > $__timeFrom()::timestamptz) AS cur)\nSELECT $__timeTo()::timestamptz AS time,\n       CASE WHEN cur IS NULL THEN ''\n            WHEN prev IS NULL OR prev = 0 THEN 'Nothing in the previous period'\n            WHEN cur = prev THEN 'Same as the previous period'\n            WHEN cur > prev THEN '▲ ' || round(100 * (cur - prev) / prev) || '% on the previous period'\n            ELSE '▼ ' || round(100 * (prev - cur) / prev) || '% on the previous period' END AS metric,\n       cur AS value\n  FROM p",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -2926,13 +3122,12 @@
                   "fields": ""
                 },
                 "orientation": "auto",
-                "textMode": "value",
+                "textMode": "value_and_name",
                 "colorMode": "none",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": true,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
@@ -2953,8 +3148,8 @@
         "kind": "Panel",
         "spec": {
           "id": 22,
-          "title": "Denied actions",
-          "description": "Member actions refused: access, sharing, search, approvals denied by the member, and sandbox isolation. The arrow compares with the previous period of the same length.",
+          "title": "Refused",
+          "description": "Member actions refused or failed: access, sharing, search, approvals denied by the member, and sandbox isolation. The line above compares it with the previous period of the same length.",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -2973,7 +3168,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "SELECT $__timeFrom()::timestamptz AS time, (SELECT count(*) FROM member_events(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE (outcome <> 'ok' OR action LIKE '%denied%' OR action LIKE '%.deny')) AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT count(*) FROM member_events($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE (outcome <> 'ok' OR action LIKE '%denied%' OR action LIKE '%.deny'))\nORDER BY 1",
+                        "rawSql": "WITH periods AS (\nSELECT $__timeFrom()::timestamptz AS time, (SELECT count(*) FROM member_events(($__timeFrom()::timestamptz - ($__timeTo()::timestamptz - $__timeFrom()::timestamptz)), $__timeFrom()::timestamptz) WHERE (outcome <> 'ok' OR action LIKE '%denied%' OR action LIKE '%.deny')) AS value\nUNION ALL SELECT $__timeTo()::timestamptz, (SELECT count(*) FROM member_events($__timeFrom()::timestamptz, $__timeTo()::timestamptz) WHERE (outcome <> 'ok' OR action LIKE '%denied%' OR action LIKE '%.deny'))\nORDER BY 1\n\n),\np AS (SELECT (SELECT value FROM periods WHERE time = $__timeFrom()::timestamptz) AS prev, (SELECT value FROM periods WHERE time > $__timeFrom()::timestamptz) AS cur)\nSELECT $__timeTo()::timestamptz AS time,\n       CASE WHEN cur IS NULL THEN ''\n            WHEN prev IS NULL OR prev = 0 THEN 'Nothing in the previous period'\n            WHEN cur = prev THEN 'Same as the previous period'\n            WHEN cur > prev THEN '▲ ' || round(100 * (cur - prev) / prev) || '% on the previous period'\n            ELSE '▼ ' || round(100 * (prev - cur) / prev) || '% on the previous period' END AS metric,\n       cur AS value\n  FROM p",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "time_series"
@@ -2998,13 +3193,12 @@
                   "fields": ""
                 },
                 "orientation": "auto",
-                "textMode": "value",
+                "textMode": "value_and_name",
                 "colorMode": "none",
                 "graphMode": "none",
                 "justifyMode": "center",
                 "wideLayout": true,
-                "showPercentChange": true,
-                "percentChangeColorMode": "inverted"
+                "showPercentChange": false
               },
               "fieldConfig": {
                 "defaults": {
@@ -3257,9 +3451,21 @@
                     },
                     "inspect": false
                   },
-                  "noValue": "–"
+                  "noValue": "No refused or failed member actions in the period"
                 },
                 "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": ".*"
+                    },
+                    "properties": [
+                      {
+                        "id": "noValue",
+                        "value": "–"
+                      }
+                    ]
+                  },
                   {
                     "matcher": {
                       "id": "byName",
@@ -3339,7 +3545,7 @@
         "spec": {
           "id": 26,
           "title": "Do members come back?",
-          "description": "Members grouped by the week of their first message, and the share of each group that sent a message in each following week. Weeks that have not happened yet are blank",
+          "description": "Members grouped by the week of their first activity, and the share of each group active in each following week. Weeks that have not happened yet are blank",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -3358,7 +3564,7 @@
                         "name": "${tomo_db}"
                       },
                       "spec": {
-                        "rawSql": "WITH m AS (SELECT member_key, date_trunc('week', first_input_at) AS cohort FROM members(now())\n            WHERE first_input_at >= date_trunc('week', now()) - interval '7 weeks'),\na AS (SELECT DISTINCT member_key, date_trunc('week', accepted_at) AS week\n        FROM turns(date_trunc('week', now()) - interval '7 weeks', now()) WHERE kind IN ('message', 'steer'))\nSELECT to_char(m.cohort, 'YYYY-MM-DD') AS \"First week\", count(DISTINCT m.member_key) AS \"Members\",\n       CASE WHEN m.cohort + interval '1 week' <= now() THEN 100.0 * count(DISTINCT a.member_key) FILTER (WHERE a.week = m.cohort + interval '1 week') / count(DISTINCT m.member_key) END AS \"Week 1\",\n       CASE WHEN m.cohort + interval '2 week' <= now() THEN 100.0 * count(DISTINCT a.member_key) FILTER (WHERE a.week = m.cohort + interval '2 week') / count(DISTINCT m.member_key) END AS \"Week 2\",\n       CASE WHEN m.cohort + interval '3 week' <= now() THEN 100.0 * count(DISTINCT a.member_key) FILTER (WHERE a.week = m.cohort + interval '3 week') / count(DISTINCT m.member_key) END AS \"Week 3\",\n       CASE WHEN m.cohort + interval '4 week' <= now() THEN 100.0 * count(DISTINCT a.member_key) FILTER (WHERE a.week = m.cohort + interval '4 week') / count(DISTINCT m.member_key) END AS \"Week 4\",\n       CASE WHEN m.cohort + interval '5 week' <= now() THEN 100.0 * count(DISTINCT a.member_key) FILTER (WHERE a.week = m.cohort + interval '5 week') / count(DISTINCT m.member_key) END AS \"Week 5\",\n       CASE WHEN m.cohort + interval '6 week' <= now() THEN 100.0 * count(DISTINCT a.member_key) FILTER (WHERE a.week = m.cohort + interval '6 week') / count(DISTINCT m.member_key) END AS \"Week 6\",\n       CASE WHEN m.cohort + interval '7 week' <= now() THEN 100.0 * count(DISTINCT a.member_key) FILTER (WHERE a.week = m.cohort + interval '7 week') / count(DISTINCT m.member_key) END AS \"Week 7\"\n  FROM m LEFT JOIN a USING (member_key)\n GROUP BY m.cohort ORDER BY m.cohort DESC",
+                        "rawSql": "WITH m AS (SELECT member_key, date_trunc('week', first_seen_at) AS cohort FROM members(now())\n            WHERE first_seen_at >= date_trunc('week', now()) - interval '7 weeks'),\na AS (SELECT DISTINCT member_key, date_trunc('week', at) AS week FROM (\n        SELECT member_key, accepted_at AS at FROM turns(date_trunc('week', now()) - interval '7 weeks', now()) WHERE kind IN ('message', 'steer')\n        UNION ALL SELECT member_key, occurred_at FROM member_events(date_trunc('week', now()) - interval '7 weeks', now())) AS activity)\nSELECT to_char(m.cohort, 'YYYY-MM-DD') AS \"First week\", count(DISTINCT m.member_key) AS \"Members\",\n       CASE WHEN m.cohort + interval '1 week' <= now() THEN 100.0 * count(DISTINCT a.member_key) FILTER (WHERE a.week = m.cohort + interval '1 week') / count(DISTINCT m.member_key) END AS \"Week 1\",\n       CASE WHEN m.cohort + interval '2 week' <= now() THEN 100.0 * count(DISTINCT a.member_key) FILTER (WHERE a.week = m.cohort + interval '2 week') / count(DISTINCT m.member_key) END AS \"Week 2\",\n       CASE WHEN m.cohort + interval '3 week' <= now() THEN 100.0 * count(DISTINCT a.member_key) FILTER (WHERE a.week = m.cohort + interval '3 week') / count(DISTINCT m.member_key) END AS \"Week 3\",\n       CASE WHEN m.cohort + interval '4 week' <= now() THEN 100.0 * count(DISTINCT a.member_key) FILTER (WHERE a.week = m.cohort + interval '4 week') / count(DISTINCT m.member_key) END AS \"Week 4\",\n       CASE WHEN m.cohort + interval '5 week' <= now() THEN 100.0 * count(DISTINCT a.member_key) FILTER (WHERE a.week = m.cohort + interval '5 week') / count(DISTINCT m.member_key) END AS \"Week 5\",\n       CASE WHEN m.cohort + interval '6 week' <= now() THEN 100.0 * count(DISTINCT a.member_key) FILTER (WHERE a.week = m.cohort + interval '6 week') / count(DISTINCT m.member_key) END AS \"Week 6\",\n       CASE WHEN m.cohort + interval '7 week' <= now() THEN 100.0 * count(DISTINCT a.member_key) FILTER (WHERE a.week = m.cohort + interval '7 week') / count(DISTINCT m.member_key) END AS \"Week 7\"\n  FROM m LEFT JOIN a USING (member_key)\n GROUP BY m.cohort ORDER BY m.cohort DESC",
                         "rawQuery": true,
                         "editorMode": "code",
                         "format": "table"
@@ -3398,9 +3604,21 @@
                     },
                     "inspect": false
                   },
-                  "noValue": "–"
+                  "noValue": "No new members in the last eight weeks"
                 },
                 "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": ".*"
+                    },
+                    "properties": [
+                      {
+                        "id": "noValue",
+                        "value": "–"
+                      }
+                    ]
+                  },
                   {
                     "matcher": {
                       "id": "byRegexp",
@@ -3494,7 +3712,7 @@
             "spec": {
               "options": {
                 "mode": "markdown",
-                "content": "**How do members use Tomo, where do they struggle, and which features earn their place?**\n\n- **Adoption** compares the selected period with the one before it.\n- **How members use Tomo** shows who comes back each day, when they work, how much, and how long conversations run.\n- **Feature scorecard** is the place to decide whether a feature needs a different approach. Read the signal with the columns beside it: *Few members try it* points at discovery, *Tried, not kept* at value, *Often fails* at reliability, and *Answers disliked* at quality. A turn feature is something a member's message asked for; an action feature is a member action in Tomo's audit log.\n- **Models, agents, and reasoning level** show whether each choice earns its wait.\n- **Where members struggle** tracks failures, stops, redirects, unhelpful votes, members who left after a failure, and refused actions.\n- **Do members come back?** follows each week's new members over the following weeks.\n\nEvery number comes from the selected install's own database through `tomo/connect-tomo.sh`. The reporting functions return no message text, prompts, names, or emails; a member is counted only by a keyed hash. A vote is attributed to the latest finished message in its conversation. Signal thresholds are starting points; change them in the scorecard query to match your product goals.",
+                "content": "**How do members use Tomo, where do they struggle, and which features earn their place?**\n\n- **Adoption** compares the selected period with the one before it. An active member is one who sent a message or used any feature.\n- **How members use Tomo** shows who comes back each day, when they work, how much, and how long conversations run.\n- **Feature scorecard** is the place to decide whether a feature needs a different approach. Read the signal with the columns beside it: *Few members try it* points at discovery, *Tried, not kept* at value, *Often fails* at reliability, and *Answers disliked* at quality. A turn feature is something a member's message asked for; an action feature is a member action in Tomo's audit log.\n- **Models, agents, and reasoning level** show whether each choice earns its wait.\n- **Where members struggle** tracks failures, stops, redirects, unhelpful votes, members who left after a failure, and refused actions.\n- **Do members come back?** follows each week's new members over the following weeks.\n\nEvery number comes from the selected install's own database through `tomo/connect-tomo.sh`. The reporting functions return no message text, prompts, names, or emails; a member is counted only by a keyed hash. A vote is attributed to the latest finished message in its conversation. Signal thresholds are starting points; change them in the scorecard query to match your product goals.",
                 "code": {
                   "language": "plaintext",
                   "showLineNumbers": false,
@@ -3503,6 +3721,90 @@
               },
               "fieldConfig": {
                 "defaults": {},
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "server-errors": {
+        "kind": "Panel",
+        "spec": {
+          "id": 28,
+          "title": "Errors",
+          "description": "Member requests Tomo failed on the server in the period, from its metrics. A message Tomo refuses before it starts, for example when no chat model is available, leaves no row in its database and appears only here",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "refId": "A",
+                    "hidden": false,
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "prometheus",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "${datasource}"
+                      },
+                      "spec": {
+                        "expr": "round(sum(increase(kaizen_member_request_total{extension=\"$extension\", outcome=\"server_error\"}[$__range]))) or vector(0)",
+                        "legendFormat": "",
+                        "instant": true,
+                        "range": false
+                      }
+                    }
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "",
+            "spec": {
+              "options": {
+                "reduceOptions": {
+                  "values": false,
+                  "calcs": ["lastNotNull"],
+                  "fields": ""
+                },
+                "orientation": "auto",
+                "textMode": "value",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "wideLayout": true,
+                "showPercentChange": false,
+                "percentChangeColorMode": "inverted"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "decimals": 0,
+                  "noValue": "None yet",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": null,
+                        "color": "green"
+                      },
+                      {
+                        "value": 1,
+                        "color": "red"
+                      }
+                    ]
+                  }
+                },
                 "overrides": []
               }
             }
@@ -3791,7 +4093,7 @@
                       "spec": {
                         "x": 4,
                         "y": 0,
-                        "width": 4,
+                        "width": 3,
                         "height": 5,
                         "element": {
                           "kind": "ElementReference",
@@ -3802,9 +4104,9 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 8,
+                        "x": 7,
                         "y": 0,
-                        "width": 4,
+                        "width": 3,
                         "height": 5,
                         "element": {
                           "kind": "ElementReference",
@@ -3815,7 +4117,7 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 12,
+                        "x": 10,
                         "y": 0,
                         "width": 4,
                         "height": 5,
@@ -3828,7 +4130,7 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 16,
+                        "x": 14,
                         "y": 0,
                         "width": 4,
                         "height": 5,
@@ -3841,13 +4143,26 @@
                     {
                       "kind": "GridLayoutItem",
                       "spec": {
-                        "x": 20,
+                        "x": 18,
                         "y": 0,
-                        "width": 4,
+                        "width": 3,
                         "height": 5,
                         "element": {
                           "kind": "ElementReference",
                           "name": "denied"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "GridLayoutItem",
+                      "spec": {
+                        "x": 21,
+                        "y": 0,
+                        "width": 3,
+                        "height": 5,
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "server-errors"
                         }
                       }
                     },

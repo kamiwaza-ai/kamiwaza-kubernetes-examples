@@ -68,14 +68,27 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
      WHERE accepted_at >= p_from AND accepted_at < p_to
 $$;
 
--- Each member's first and last input across all history, for new members and retention.
+-- Each member's first and last activity across all history, a message or any
+-- action in the audit log, for new members and retention. Grouping by the raw
+-- principal first hashes each member once rather than once per row.
+DROP FUNCTION IF EXISTS tomo_reporting.members(timestamptz);
 CREATE OR REPLACE FUNCTION tomo_reporting.members(p_to timestamptz)
-RETURNS TABLE (member_key text, first_input_at timestamptz, last_input_at timestamptz)
+RETURNS TABLE (member_key text, first_seen_at timestamptz, last_seen_at timestamptz)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
-    SELECT tomo_reporting.member_key(actor_sub), min(accepted_at), max(accepted_at)
-      FROM public.conversation_input
-     WHERE kind IN ('message', 'steer') AND accepted_at < p_to
-     GROUP BY actor_sub
+    SELECT tomo_reporting.member_key(principal), min(first_at), max(last_at)
+      FROM (
+          SELECT actor_sub AS principal, min(accepted_at) AS first_at, max(accepted_at) AS last_at
+            FROM public.conversation_input
+           WHERE kind IN ('message', 'steer') AND accepted_at < p_to
+           GROUP BY actor_sub
+          UNION ALL
+          SELECT CASE WHEN actor_id LIKE 'google:%' THEN substr(actor_id, 8) ELSE actor_id END,
+                 min(occurred_at), max(occurred_at)
+            FROM public.audit_event
+           WHERE actor_kind = 'requester' AND occurred_at < p_to
+           GROUP BY actor_id
+      ) AS seen
+     GROUP BY principal
 $$;
 
 -- One row per member action in the audit log: the action name and outcome only, never the payload.
