@@ -78,10 +78,10 @@ kubeStateMetrics:
 # free text and are never exported.
 kube-state-metrics:
   # Pod labels the dashboards group resource usage by: the platform workload,
-  # the served model, and the extension each pod belongs to. The operator sets
-  # all three on the pods it renders.
+  # the served model, and the extension and extension component each pod
+  # belongs to. The operator sets all four on the pods it renders.
   metricLabelsAllowlist:
-    - pods=[app.kubernetes.io/name,serving.kamiwaza.ai/deployment-name,kamiwaza.ai/extension]
+    - pods=[app.kubernetes.io/name,serving.kamiwaza.ai/deployment-name,kamiwaza.ai/extension,kamiwaza.ai/component]
   rbac:
     extraRules:
       - apiGroups: [platform.kamiwaza.ai]
@@ -200,13 +200,15 @@ kube-state-metrics:
                       reason: [reason]
                     valueFrom: [status]
               - name: info
-                help: Requested extension state and type.
+                help: Requested extension state and type, and the product and version it installs.
                 each:
                   type: Info
                   info:
                     labelsFromPath:
                       state: [spec, state]
                       extension_type: [spec, type]
+                      product: [metadata, labels, extensions.kamiwaza.ai/name]
+                      version: [metadata, labels, extensions.kamiwaza.ai/version]
           - groupVersionKind:
               group: extensions.kamiwaza.ai
               version: v1alpha1

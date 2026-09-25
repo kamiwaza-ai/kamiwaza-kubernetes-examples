@@ -41,3 +41,6 @@ configMapGenerator:
   - name: kam-08-log-explorer
     files:
       - kam-08-log-explorer.json
+  - name: kam-09-tomo
+    files:
+      - kam-09-tomo.json

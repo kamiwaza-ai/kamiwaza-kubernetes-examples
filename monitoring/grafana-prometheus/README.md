@@ -1,18 +1,19 @@
 # Grafana + Prometheus monitoring for Kamiwaza
 
-**Scenario:** deploy a Prometheus + Grafana + Loki + Alloy monitoring stack for a platform reconciled by the Kamiwaza platform operator, with scrape configuration, exporters, and 8 pre-built dashboards. Each component is independently usable.
+**Scenario:** deploy a Prometheus + Grafana + Loki + Alloy monitoring stack for a platform reconciled by the Kamiwaza platform operator, with scrape configuration, exporters, and 9 pre-built dashboards. Each component is independently usable.
 
 **Tags:** #monitoring #prometheus #grafana #loki #dashboards
 
 ## What you get
 
-| Component                | Path                                                                         | Purpose                                                                                                                                                                                                        |
-| ------------------------ | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Dashboards**           | `dashboards/`                                                                | 8 Grafana dashboards (kam-01 through kam-08) covering platform capabilities, inference and compute, the application API, data infrastructure, extensions and the operator, auth, events, and logs              |
-| **Scrape configuration** | `servicemonitors/`                                                           | ServiceMonitors and PodMonitors for etcd, delegated compute, the metadata catalog, the authorization decision service, and cert-manager, plus the NetworkPolicies that admit Prometheus to those metrics ports |
-| **Operator metrics**     | `operator-metrics/`                                                          | Serving certificate and Helm values that turn on the operator's authenticated metrics endpoint, ServiceMonitor, and alert rules                                                                                |
-| **Postgres exporter**    | `exporters/`                                                                 | Helm values for `prometheus-postgres-exporter` against `core-postgres`                                                                                                                                         |
-| **Full stack values**    | `kube-prometheus-stack-values.yaml`, `loki-values.yaml`, `alloy-values.yaml` | Helm values to deploy Prometheus, Grafana, Loki, and Alloy from scratch                                                                                                                                        |
+| Component                | Path                                                                         | Purpose                                                                                                                                                                                                                                                    |
+| ------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dashboards**           | `dashboards/`                                                                | 9 Grafana dashboards: kam-01 through kam-08 cover platform capabilities, inference and compute, the application API, data infrastructure, extensions and the operator, auth, events, and logs; kam-09 covers the Tomo extension's models, turns, and tools |
+| **Tomo connection**      | `tomo/`                                                                      | Script that adds Tomo's metrics scrape and a read-only, content-free **Tomo database** datasource for kam-09                                                                                                                                               |
+| **Scrape configuration** | `servicemonitors/`                                                           | ServiceMonitors and PodMonitors for etcd, delegated compute, the metadata catalog, the authorization decision service, and cert-manager, plus the NetworkPolicies that admit Prometheus to those metrics ports                                             |
+| **Operator metrics**     | `operator-metrics/`                                                          | Serving certificate and Helm values that turn on the operator's authenticated metrics endpoint, ServiceMonitor, and alert rules                                                                                                                            |
+| **Postgres exporter**    | `exporters/`                                                                 | Helm values for `prometheus-postgres-exporter` against `core-postgres`                                                                                                                                                                                     |
+| **Full stack values**    | `kube-prometheus-stack-values.yaml`, `loki-values.yaml`, `alloy-values.yaml` | Helm values to deploy Prometheus, Grafana, Loki, and Alloy from scratch                                                                                                                                                                                    |
 
 ## How the stack reads the platform
 
@@ -90,6 +91,12 @@ helm upgrade --install kamiwaza-platform-operator <operator chart> \
 
 The operator chart creates its own ServiceMonitor and PrometheusRule in the operator namespace. It requires the Prometheus Operator CRDs, so install kube-prometheus-stack first.
 
+If the Tomo extension is installed, connect it for kam-09 once its API is ready. See [tomo/README.md](tomo/README.md) for what it grants:
+
+```bash
+monitoring/grafana-prometheus/tomo/connect-tomo.sh
+```
+
 ## Already have Prometheus + Grafana?
 
 Apply only what you need:
@@ -107,7 +114,7 @@ kubectl apply -k monitoring/grafana-prometheus/dashboards/
 Three settings from `kube-prometheus-stack-values.yaml` must also exist in your installation, or the matching panels stay empty:
 
 - the kube-state-metrics `customResourceState` block and its `rbac.extraRules`, which produce every `kamiwaza_*` condition series;
-- the kube-state-metrics `metricLabelsAllowlist`, which groups resource usage by workload, model, and extension;
+- the kube-state-metrics `metricLabelsAllowlist`, which groups resource usage by workload, model, extension, and extension component;
 - ServiceMonitor and PodMonitor selection across namespaces (`*SelectorNilUsesHelmValues: false`).
 
 `scrape-networkpolicies.yaml` admits pods labelled `app.kubernetes.io/name: prometheus` in namespace `monitoring`. Change both selectors to match your Prometheus. Set `monitoring.scraperServiceAccount` in `operator-metrics/values.yaml` to the ServiceAccount your Prometheus runs as.
@@ -159,6 +166,7 @@ The dashboards are Grafana v2 dashboard resources and need Grafana 13 or later. 
 | **kam-06 Auth & Identity**                 | Can users sign in, are decisions fast and correct, are certificates valid? |
 | **kam-07 Kubernetes Events & Stability**   | Which pods are failing or short of resources?                              |
 | **kam-08 Log Explorer**                    | What are the workloads saying?                                             |
+| **kam-09 Tomo**                            | Is Tomo answering members, and how are its models and tools doing?         |
 
 See [dashboards/README.md](dashboards/README.md) for the design rules they follow, how to install them without the sidecar, and which panels hide themselves when their data cannot exist.
 
@@ -169,10 +177,11 @@ See [dashboards/README.md](dashboards/README.md) for the design rules they follo
 | `kube-prometheus-stack-values.yaml`           | Helm values for Prometheus + Grafana + Alertmanager, and kube-state-metrics custom resource state for the operator's resources |
 | `loki-values.yaml`                            | Helm values for Loki (single-binary, filesystem storage)                                                                       |
 | `alloy-values.yaml`                           | Helm values for Alloy DaemonSet log collector, labelling logs by workload, extension, and served model                         |
-| `dashboards/*.json`                           | 8 Grafana v2 dashboard resources, loaded by the sidecar or created through the Grafana API                                     |
+| `dashboards/*.json`                           | 9 Grafana v2 dashboard resources, loaded by the sidecar or created through the Grafana API                                     |
 | `dashboards/kustomization.yaml`               | Wraps JSON files as ConfigMaps for sidecar auto-loading                                                                        |
 | `servicemonitors/*monitor.yaml`               | ServiceMonitors and PodMonitors for etcd, delegated compute, metadata catalog, authorization, and cert-manager                 |
 | `servicemonitors/scrape-networkpolicies.yaml` | NetworkPolicies admitting Prometheus to the platform's metrics ports and the exporter to PostgreSQL                            |
 | `operator-metrics/certificate.yaml`           | Self-signed serving certificate for the operator's metrics endpoint                                                            |
 | `operator-metrics/values.yaml`                | Operator Helm values enabling authenticated metrics, ServiceMonitor, and PrometheusRule                                        |
 | `exporters/postgres-exporter-values.yaml`     | Helm values for postgres-exporter against `core-postgres`                                                                      |
+| `tomo/connect-tomo.sh`                        | Connects an installed Tomo extension: scrape, NetworkPolicies, read-only database role, and the Tomo database datasource       |
