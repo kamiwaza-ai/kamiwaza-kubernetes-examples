@@ -147,18 +147,20 @@ The chart stores the generated Grafana admin password in `Secret/monitoring/kube
 
 ## Dashboards
 
-| Dashboard                                  | Focus                                                                                                                              |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| **kam-01 Platform Overview**               | Platform Ready condition, each capability's state and reason, pod stability, resource usage by workload, PVC usage, warning events |
-| **kam-02 Inference & Delegated Compute**   | ModelDeployment readiness and replicas, serving resource usage, delegated-compute head and workers, GPU usage                      |
-| **kam-03 Application API & Web Interface** | Application capabilities, API, retrieval, protocol data plane, and web interface replicas, container resources, error log rate     |
-| **kam-04 Data Infrastructure**             | etcd leader/DB size/WAL fsync, PostgreSQL connections/cache hit/transactions, metadata catalog JVM                                 |
-| **kam-05 Extensions & Platform Operator**  | Extension conditions, sandbox pools, operator leader, reconcile rate/duration, condition transitions, CA expiry                    |
-| **kam-06 Auth & Identity**                 | Identity capability, authorization request rate/latency/errors, certificate expiry, auth failure logs                              |
-| **kam-07 Kubernetes Events**               | Pod restarts, OOMKilled, CrashLoopBackOff, Pending, ImagePullBackOff, operator events                                              |
-| **kam-08 Log Explorer**                    | Log volume and error rate by workload, filtered log stream, pre-built LogQL queries                                                |
+The dashboards are Grafana v2 dashboard resources and need Grafana 13 or later. They use tabs, auto-grid layouts, show/hide rules, state timelines, time comparison, and the revamped gauge.
 
-See [dashboards/README.md](dashboards/README.md) for import options, data sources, and panels that are empty by design.
+| Dashboard                                  | Tabs                                                               |
+| ------------------------------------------ | ------------------------------------------------------------------ |
+| **kam-01 Platform Overview**               | Health, Stability, Resources, Events                               |
+| **kam-02 Inference & Delegated Compute**   | Model serving, Delegated compute                                   |
+| **kam-03 Application API & Web Interface** | Overview, Resources, Logs                                          |
+| **kam-04 Data Infrastructure**             | Overview, Coordination store, Durable data, Metadata catalog, Logs |
+| **kam-05 Extensions & Platform Operator**  | Extensions, Platform operator, Logs                                |
+| **kam-06 Auth & Identity**                 | Overview, Authorization, Authentication                            |
+| **kam-07 Kubernetes Events & Stability**   | Stability, Events                                                  |
+| **kam-08 Log Explorer**                    | Explore, Diagnostics                                               |
+
+See [dashboards/README.md](dashboards/README.md) for what each dashboard shows, how to install them without the sidecar, and which panels hide themselves when their data does not exist.
 
 ## Files
 
@@ -167,7 +169,7 @@ See [dashboards/README.md](dashboards/README.md) for import options, data source
 | `kube-prometheus-stack-values.yaml`           | Helm values for Prometheus + Grafana + Alertmanager, and kube-state-metrics custom resource state for the operator's resources |
 | `loki-values.yaml`                            | Helm values for Loki (single-binary, filesystem storage)                                                                       |
 | `alloy-values.yaml`                           | Helm values for Alloy DaemonSet log collector, labelling logs by workload, extension, and served model                         |
-| `dashboards/*.json`                           | 8 Grafana dashboard JSON files (importable or auto-loaded via sidecar)                                                         |
+| `dashboards/*.json`                           | 8 Grafana v2 dashboard resources, loaded by the sidecar or created through the Grafana API                                     |
 | `dashboards/kustomization.yaml`               | Wraps JSON files as ConfigMaps for sidecar auto-loading                                                                        |
 | `servicemonitors/*monitor.yaml`               | ServiceMonitors and PodMonitors for etcd, delegated compute, metadata catalog, authorization, and cert-manager                 |
 | `servicemonitors/scrape-networkpolicies.yaml` | NetworkPolicies admitting Prometheus to the platform's metrics ports and the exporter to PostgreSQL                            |
