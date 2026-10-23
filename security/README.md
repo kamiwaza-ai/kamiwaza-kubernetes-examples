@@ -21,6 +21,7 @@ This folder follows a scenario-first layout: one subdirectory per runnable secur
 | [rebac](rebac)                   | Keycloak JWT claims          | ReBAC (tenant-scoped tuples) | TLS                    | `core.rebac.*`, `core.scheduler.rebac.*`, optional tenant registry enforcement | Values snippets + tenant manifest examples                                                 |
 | [ldap](ldap)                     | LDAP via Keycloak federation | RBAC/ReBAC compatible        | TLS                    | `auth.enabled: true` + declarative Keycloak federation bundle                  | Kustomize stack (OpenLDAP, UI, Jobs) + declarative Keycloak bundle + optional LDIF samples |
 | [tls-trust](tls-trust)           | N/A (transport trust)        | N/A                          | Custom CA + BYO TLS     | `core.trustManager.enabled`, `AWS_CA_BUNDLE`/`SSL_CERT_FILE`, `build-trust-bundle-configmap.sh` | Values snippet + CA Secret (kustomize/template) + build-trust-bundle-configmap.sh + BYO ingress manifests + verify.sh |
+| [tls-trust/external-model-poc](tls-trust/external-model-poc) | N/A (transport trust) | N/A | Verification off for listed external model hosts (trial only) | `core.scheduler.externalTlsInsecureWithDnsRetargetingRisk` (1.4+) | Values snippet |
 
 ## Structure expectations for new scenarios
 

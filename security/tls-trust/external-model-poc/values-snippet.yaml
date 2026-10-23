@@ -1,0 +1,24 @@
+# Trial / proof-of-concept ONLY: skip TLS verification for external model hosts.
+#
+# Kamiwaza 1.4 and later. Merge into your site values file. Off by default.
+#
+# RISK (it is in the name): without verification, Kamiwaza sends the API keys it
+# holds for that provider to whoever answers DNS for the host or sits on the
+# network path (DNS retargeting). For anything you keep, add the provider's CA to
+# global.trust.extraAnchors (see ../README.md) and delete this setting.
+#
+# This is separate from core.scheduler.tlsInsecure, which covers only the
+# platform's own origins and never an external model host.
+
+core:
+  scheduler:
+    # Narrowest form: exact hostnames only. No wildcards, no subdomain matching,
+    # no scheme, port or path (the chart refuses those at render time).
+    externalTlsInsecureWithDnsRetargetingRisk:
+      - models.example.com
+
+    # Broadest form: every external model host.
+    # externalTlsInsecureWithDnsRetargetingRisk: true
+
+    # Default (verify every external host):
+    # externalTlsInsecureWithDnsRetargetingRisk: false
