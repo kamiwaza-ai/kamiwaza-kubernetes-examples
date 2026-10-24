@@ -1,6 +1,7 @@
 # Trial / proof-of-concept ONLY: skip TLS verification for external model hosts.
 #
-# Kamiwaza 1.4 and later. Merge into your site values file. Off by default.
+# Kamiwaza 1.4 and later. Merge into your site values file. The chart default is
+# off; merging this snippet turns it on for the listed host.
 #
 # RISK (it is in the name): without verification, Kamiwaza sends the API keys it
 # holds for that provider to whoever answers DNS for the host or sits on the

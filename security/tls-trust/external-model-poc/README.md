@@ -24,8 +24,10 @@ verification for those external hosts only, loudly, until the CA is in place.
 > ```
 >
 > Each entry is a PEM string or `{name, pem}`. Include the root, not only an
-> issuing CA. Rerun `helm upgrade --install`, then redeploy extensions such as
-> Kaizen so they pick up the new trust bundle.
+> issuing CA. Rerun `helm upgrade --install`. Core's pods build their trust
+> store at startup and changing only the anchors does not restart them, so run
+> `kubectl -n kamiwaza rollout restart deployment/core-api deployment/core-scheduler`.
+> Then redeploy extensions such as Kaizen so they pick up the new trust bundle.
 
 ## Prerequisites
 
@@ -69,14 +71,18 @@ covers only the exact platform URLs it is configured with.
    the endpoint. List each host separately: `models.example.com` does not cover
    `eu.models.example.com`. An IPv4 address such as `10.0.0.5` can be listed.
    A short hostname or an IPv6 address cannot: use a fully qualified name
-   (outside `*.svc` / `*.cluster.local`) if one resolves, or `true`. Core then
-   covers it; Kaizen never relaxes a short hostname or an IPv6 address, so for
-   Kaizen use the fully qualified name or the CA.
+   (outside `*.svc` / `*.cluster.local`) if one resolves, or `true`. `true`
+   turns verification off for **every** external model host, present and
+   future, so prefer the CA. To use it, replace the list with `true`; do not
+   keep both keys. Core then covers the host; Kaizen never relaxes a short
+   hostname or an IPv6 address, so for Kaizen use the fully qualified name or
+   the CA.
 2. Run your usual `helm upgrade --install`. The chart refuses an entry with a
    wildcard, scheme, port, or path, a single-label name, or an IPv6 address,
    and says why.
-3. Redeploy the extensions that call the endpoint (for example, Kaizen) so
-   they pick up the setting.
+3. Redeploy the extensions that call the endpoint (for example, Kaizen, from
+   App Garden) so they pick up the setting. Core's own pods roll on the
+   upgrade, because the setting changes `core-config`.
 
 ## Verification
 
@@ -100,7 +106,13 @@ delete the key: an upgrade with `--reuse-values` (or
 Kaizen). Extensions receive the setting only when they are deployed, so a
 running extension keeps skipping verification until it is redeployed. After
 that, verification is back on for every external host. Confirm with the
-`core-config` check above: the value must read `false`.
+`core-config` check above (the value must read `false`), and in each
+redeployed extension pod:
+
+```bash
+kubectl -n <extension-namespace> exec <kaizen-pod> -- \
+  printenv KAMIWAZA_EXTERNAL_TLS_INSECURE_WITH_DNS_RETARGETING_RISK
+```
 
 ## Not affected
 
