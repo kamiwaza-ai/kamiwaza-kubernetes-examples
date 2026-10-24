@@ -26,7 +26,9 @@ verification for those external hosts only, loudly, until the CA is in place.
 > Each entry is a PEM string or `{name, pem}`. Include the root, not only an
 > issuing CA. Rerun `helm upgrade --install`. Core's pods build their trust
 > store at startup and changing only the anchors does not restart them, so run
-> `kubectl -n kamiwaza rollout restart deployment/core-api deployment/core-scheduler`.
+> `kubectl -n kamiwaza rollout restart deployment/core-scheduler deployment/core-raycluster-head deployment/core-raycluster-worker`
+> (also `core-api` and `core-retrieval-streamer` if you enabled them as
+> separate deployments).
 > Then redeploy extensions such as Kaizen so they pick up the new trust bundle.
 
 ## Prerequisites
@@ -73,8 +75,8 @@ covers only the exact platform URLs it is configured with.
    A short hostname or an IPv6 address cannot: use a fully qualified name
    (outside `*.svc` / `*.cluster.local`) if one resolves, or `true`. `true`
    turns verification off for **every** external model host, present and
-   future, so prefer the CA. To use it, replace the list with `true`; do not
-   keep both keys. Core then covers the host; Kaizen never relaxes a short
+   future, so prefer the CA. To use it, set the key to `true` in place of the
+   list. Core then covers the host; Kaizen never relaxes a short
    hostname or an IPv6 address, so for Kaizen use the fully qualified name or
    the CA.
 2. Run your usual `helm upgrade --install`. The chart refuses an entry with a
@@ -118,6 +120,9 @@ kubectl -n <extension-namespace> exec <kaizen-pod> -- \
 
 - Plain `http://` model endpoints have no TLS; neither this setting nor
   `tlsInsecure` changes anything for them.
+- Core's External Models engines (Bedrock, OpenAI-compatible registrations)
+  always verify and ignore both this setting and `tlsInsecure`; trust their CA
+  through `global.trust.extraAnchors`.
 - OAuth token endpoints that receive a client secret always verify unless
   they are a platform origin. Trust their CA through
   `global.trust.extraAnchors`.
