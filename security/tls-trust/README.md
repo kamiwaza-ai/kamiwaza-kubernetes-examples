@@ -1,5 +1,8 @@
 # Custom TLS trust + BYO ingress cert
 
+> Kamiwaza 1.4: for an external model endpoint whose CA you cannot trust yet
+> during a trial, see [external-model-poc](external-model-poc/README.md).
+
 **Scenario:** make Kamiwaza platform pods trust a custom / enterprise / corporate PKI
 for **outbound** TLS (private Bedrock endpoints, internal HuggingFace mirrors, private
 registries, private object stores) **with verification left ON**, and serve the

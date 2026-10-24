@@ -8,9 +8,30 @@ verification for those external hosts only, loudly, until the CA is in place.
 **Kamiwaza 1.4 and later.** **Tags:** #security #tls #poc #helm-values
 
 > **Use the CA instead whenever you can.** Add the provider's root CA, and any
-> issuing CA, to `global.trust.extraAnchors`, as described in
-> [Custom TLS trust](../README.md). That keeps verification on and needs no
-> setting with a risk in its name.
+> issuing CA, to `global.trust.extraAnchors`. That keeps verification on and
+> needs no setting with a risk in its name. On 1.4 this is a chart value (the
+> [Custom TLS trust](../README.md) recipe describes the older 0.13.x path):
+>
+> ```yaml
+> global:
+>   trust:
+>     extraAnchors:
+>       - name: provider-root
+>         pem: |
+>           -----BEGIN CERTIFICATE-----
+>           ...
+>           -----END CERTIFICATE-----
+> ```
+>
+> Each entry is a PEM string or `{name, pem}`. Include the root, not only an
+> issuing CA. Rerun `helm upgrade --install`, then redeploy extensions such as
+> Kaizen so they pick up the new trust bundle.
+
+## Prerequisites
+
+- Kamiwaza 1.4 or later, installed with Helm.
+- The exact hostname (or IPv4 address) of each external model endpoint.
+- Permission to redeploy App Garden extensions such as Kaizen.
 
 ## The risk
 
@@ -34,13 +55,20 @@ on upgrade, add the CA to `global.trust.extraAnchors` or list the host here.
 This setting does not reach OmniParse translation endpoints, which always
 verify an external host; trust their CA through `global.trust.extraAnchors`.
 
+Kaizen classifies hosts more strictly than Core. It never relaxes a short
+hostname or an in-cluster `*.svc` / `*.cluster.local` name through this
+setting, even with `true`, and its `tlsInsecure` (`KAMIWAZA_VERIFY_SSL=false`)
+covers only the exact platform URLs it is configured with.
+
 ## Steps
 
 1. Merge [`values-snippet.yaml`](values-snippet.yaml) into your values file,
    replacing `models.example.com` with the exact, fully qualified hostname of
    the endpoint. List each host separately: `models.example.com` does not cover
-   `eu.models.example.com`. An IPv4 address such as `10.0.0.5` can be listed;
-   to cover an IPv6 address, use `true`.
+   `eu.models.example.com`. An IPv4 address such as `10.0.0.5` can be listed.
+   A short hostname or an IPv6 address cannot: use the fully qualified name if
+   it resolves, or `true`. Core then covers it; Kaizen never relaxes a short
+   hostname, so for Kaizen use the fully qualified name or the CA.
 2. Run your usual `helm upgrade --install`. The chart refuses an entry with a
    wildcard, scheme, port, or path, a single-label name, or an IPv6 address,
    and says why.
@@ -71,5 +99,8 @@ that, verification is back on for every external host.
 
 ## Not affected
 
-Plain `http://` model endpoints have no TLS; neither this setting nor
-`tlsInsecure` changes anything for them.
+- Plain `http://` model endpoints have no TLS; neither this setting nor
+  `tlsInsecure` changes anything for them.
+- OAuth token endpoints that receive a client secret always verify unless
+  they are a platform origin. Trust their CA through
+  `global.trust.extraAnchors`.

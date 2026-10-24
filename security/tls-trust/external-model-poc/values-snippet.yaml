@@ -22,7 +22,8 @@ core:
     externalTlsInsecureWithDnsRetargetingRisk:
       - models.example.com
 
-    # Broadest form: every external model host (also covers IPv6 literals).
+    # Broadest form: every external model host (also covers IPv6 literals and,
+    # in Core only, short hostnames; Kaizen never relaxes a short hostname).
     # externalTlsInsecureWithDnsRetargetingRisk: true
 
     # Default (verify every external host):
