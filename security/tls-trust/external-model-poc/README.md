@@ -61,4 +61,12 @@ on upgrade, add the CA to `global.trust.extraAnchors` or list the host here.
 ## Rollback
 
 Delete the setting (or set it to `false`) and rerun `helm upgrade --install`,
-then redeploy the extensions. Verification is back on for every external host.
+then **redeploy every extension that calls an external model** (for example,
+Kaizen). Extensions receive the setting only when they are deployed, so a
+running extension keeps skipping verification until it is redeployed. After
+that, verification is back on for every external host.
+
+## Not affected
+
+Plain `http://` model endpoints have no TLS; neither this setting nor
+`tlsInsecure` changes anything for them.

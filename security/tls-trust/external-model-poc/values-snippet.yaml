@@ -10,6 +10,9 @@
 # This is separate from core.scheduler.tlsInsecure, which covers only the
 # platform's own origins and never an external model host. From 1.4 it is the
 # only setting that relaxes an external model host.
+#
+# Extensions (e.g. Kaizen) pick up a change, on OR off, only when redeployed.
+# Plain http:// endpoints have no TLS and are unaffected.
 
 core:
   scheduler:
