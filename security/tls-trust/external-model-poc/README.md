@@ -5,6 +5,10 @@ external model endpoint (chat, embedding, reranking, vision) whose certificate
 it cannot verify yet, and nobody has set up the CA. This turns off certificate
 verification for those external hosts only, loudly, until the CA is in place.
 
+It covers the Context Service's, OmniParse's, and Kaizen's model calls. It
+does **not** cover models registered through Core's External Models engines
+(Bedrock, OpenAI-compatible), which always verify: trust their CA instead.
+
 **Kamiwaza 1.4 and later.** **Tags:** #security #tls #poc #helm-values
 
 > **Use the CA instead whenever you can.** Add the provider's root CA, and any
@@ -26,9 +30,8 @@ verification for those external hosts only, loudly, until the CA is in place.
 > Each entry is a PEM string or `{name, pem}`. Include the root, not only an
 > issuing CA. Rerun `helm upgrade --install`. Core's pods build their trust
 > store at startup and changing only the anchors does not restart them, so run
-> `kubectl -n kamiwaza rollout restart deployment/core-scheduler deployment/core-raycluster-head deployment/core-raycluster-worker`
-> (also `core-api` and `core-retrieval-streamer` if you enabled them as
-> separate deployments).
+> `kubectl -n kamiwaza rollout restart deployment/core-api deployment/core-scheduler deployment/core-raycluster-head deployment/core-raycluster-worker`
+> (also `core-retrieval-streamer` if you enabled it).
 > Then redeploy extensions such as Kaizen so they pick up the new trust bundle.
 
 ## Prerequisites
