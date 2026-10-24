@@ -24,7 +24,7 @@ can redirect those keys. The setting is named for this:
 
 | Setting | Covers | Never covers |
 | --- | --- | --- |
-| `core.scheduler.tlsInsecure` | The platform's own origins: its domain, in-cluster services, paired federation clusters | External model hosts (from 1.4, in Core as well as Kaizen) |
+| `core.scheduler.tlsInsecure` | The platform's own origins: its domain, names Kamiwaza is configured with, loopback, `localhost`, in-cluster `*.svc` / `*.cluster.local` services, paired federation clusters | External model hosts (from 1.4, in Core as well as Kaizen), including servers addressed by a private IP or a short hostname |
 | `core.scheduler.externalTlsInsecureWithDnsRetargetingRisk` | External model hosts: `true` for all, or a list of exact hostnames | The platform's own origins |
 
 From 1.4, Core verifies every external model host it calls unless this
@@ -37,7 +37,8 @@ on upgrade, add the CA to `global.trust.extraAnchors` or list the host here.
 1. Merge [`values-snippet.yaml`](values-snippet.yaml) into your values file,
    replacing `models.example.com` with the exact, fully qualified hostname of
    the endpoint. List each host separately: `models.example.com` does not cover
-   `eu.models.example.com`. To cover an IPv6 address, use `true`.
+   `eu.models.example.com`. An IPv4 address such as `10.0.0.5` can be listed;
+   to cover an IPv6 address, use `true`.
 2. Run your usual `helm upgrade --install`. The chart refuses an entry with a
    wildcard, scheme, port, or path, a single-label name, or an IPv6 address,
    and says why.
