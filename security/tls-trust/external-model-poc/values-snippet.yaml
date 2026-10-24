@@ -16,15 +16,16 @@
 
 core:
   scheduler:
-    # Narrowest form: exact, fully qualified hostnames only (at least one dot).
-    # No wildcards, subdomain matching, scheme, port, path, single-label names
-    # or IPv6 literals (the chart refuses those at render time).
+    # Default (verify every external host):
+    #   externalTlsInsecureWithDnsRetargetingRisk: false
+    #
+    # Broadest form: every external model host (also covers IPv6 literals and,
+    # in Core only, short hostnames; Kaizen never relaxes a short hostname):
+    #   externalTlsInsecureWithDnsRetargetingRisk: true
+    #
+    # Narrowest form (below): exact, fully qualified hostnames (at least one
+    # dot) or IPv4 addresses. No wildcards, subdomain matching, scheme, port,
+    # path, single-label names, or IPv6 literals (the chart refuses those at
+    # render time).
     externalTlsInsecureWithDnsRetargetingRisk:
       - models.example.com
-
-    # Broadest form: every external model host (also covers IPv6 literals and,
-    # in Core only, short hostnames; Kaizen never relaxes a short hostname).
-    # externalTlsInsecureWithDnsRetargetingRisk: true
-
-    # Default (verify every external host):
-    # externalTlsInsecureWithDnsRetargetingRisk: false

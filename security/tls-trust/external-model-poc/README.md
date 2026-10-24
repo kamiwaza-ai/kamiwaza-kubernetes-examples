@@ -43,10 +43,10 @@ can redirect those keys. The setting is named for this:
 
 ## How it relates to `tlsInsecure`
 
-| Setting | Covers | Never covers |
-| --- | --- | --- |
-| `core.scheduler.tlsInsecure` | The platform's own origins: its domain, names Kamiwaza is configured with, loopback, `localhost`, in-cluster `*.svc` / `*.cluster.local` services, paired federation clusters | External model hosts (from 1.4, in Core as well as Kaizen), including servers addressed by a private IP or a short hostname |
-| `core.scheduler.externalTlsInsecureWithDnsRetargetingRisk` | External model hosts: `true` for all, or a list of exact hostnames | The platform's own origins |
+| Setting                                                    | Covers                                                                                                                                                                        | Never covers                                                                                                                |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `core.scheduler.tlsInsecure`                               | The platform's own origins: its domain, names Kamiwaza is configured with, loopback, `localhost`, in-cluster `*.svc` / `*.cluster.local` services, paired federation clusters | External model hosts (from 1.4, in Core as well as Kaizen), including servers addressed by a private IP or a short hostname |
+| `core.scheduler.externalTlsInsecureWithDnsRetargetingRisk` | External model hosts: `true` for all, or a list of exact hostnames                                                                                                            | The platform's own origins                                                                                                  |
 
 From 1.4, Core verifies every external model host it calls unless this
 setting names it. Neither `tlsInsecure` nor the Context Service or OmniParse
@@ -82,7 +82,7 @@ covers only the exact platform URLs it is configured with.
 - The Core ConfigMap carries the normalized value:
 
   ```bash
-  kubectl -n kamiwaza get configmap -o yaml | \
+  kubectl -n kamiwaza get configmap core-config -o yaml | \
     grep KAMIWAZA_EXTERNAL_TLS_INSECURE_WITH_DNS_RETARGETING_RISK
   ```
 
