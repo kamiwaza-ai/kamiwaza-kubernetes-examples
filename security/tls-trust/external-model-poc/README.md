@@ -31,6 +31,8 @@ From 1.4, Core verifies every external model host it calls unless this
 setting names it. Neither `tlsInsecure` nor the Context Service or OmniParse
 TLS settings relax an external host any more. A site that relied on them must,
 on upgrade, add the CA to `global.trust.extraAnchors` or list the host here.
+This setting does not reach OmniParse translation endpoints, which always
+verify an external host; trust their CA through `global.trust.extraAnchors`.
 
 ## Steps
 
