@@ -5,7 +5,8 @@
 # RISK (it is in the name): without verification, Kamiwaza sends the API keys it
 # holds for that provider to whoever answers DNS for the host or sits on the
 # network path (DNS retargeting). For anything you keep, add the provider's CA to
-# global.trust.extraAnchors (see ../README.md) and delete this setting.
+# global.trust.extraAnchors (example in README.md next to this file) and set
+# this setting to false.
 #
 # This is separate from core.scheduler.tlsInsecure, which covers only the
 # platform's own origins and never an external model host. From 1.4 it is the
@@ -19,8 +20,8 @@ core:
     # Default (verify every external host):
     #   externalTlsInsecureWithDnsRetargetingRisk: false
     #
-    # Broadest form: every external model host (also covers IPv6 literals and,
-    # in Core only, short hostnames; Kaizen never relaxes a short hostname):
+    # Broadest form: every external model host (in Core, also IPv6 literals and
+    # short hostnames; Kaizen never relaxes either):
     #   externalTlsInsecureWithDnsRetargetingRisk: true
     #
     # Narrowest form (below): exact, fully qualified hostnames (at least one

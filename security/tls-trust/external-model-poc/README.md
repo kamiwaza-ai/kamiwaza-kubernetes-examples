@@ -46,7 +46,7 @@ can redirect those keys. The setting is named for this:
 | Setting                                                    | Covers                                                                                                                                                                        | Never covers                                                                                                                |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `core.scheduler.tlsInsecure`                               | The platform's own origins: its domain, names Kamiwaza is configured with, loopback, `localhost`, in-cluster `*.svc` / `*.cluster.local` services, paired federation clusters | External model hosts (from 1.4, in Core as well as Kaizen), including servers addressed by a private IP or a short hostname |
-| `core.scheduler.externalTlsInsecureWithDnsRetargetingRisk` | External model hosts: `true` for all, or a list of exact hostnames                                                                                                            | The platform's own origins                                                                                                  |
+| `core.scheduler.externalTlsInsecureWithDnsRetargetingRisk` | External model hosts: `true` for all, or a list of exact hostnames or IPv4                                                                                                    | The platform's own origins                                                                                                  |
 
 From 1.4, Core verifies every external model host it calls unless this
 setting names it. Neither `tlsInsecure` nor the Context Service or OmniParse
@@ -54,10 +54,12 @@ TLS settings relax an external host any more. A site that relied on them must,
 on upgrade, add the CA to `global.trust.extraAnchors` or list the host here.
 This setting does not reach OmniParse translation endpoints, which always
 verify an external host; trust their CA through `global.trust.extraAnchors`.
+After the upgrade, open and save each OmniParse instance that uses an external
+model endpoint so Core rebuilds its TLS setting.
 
 Kaizen classifies hosts more strictly than Core. It never relaxes a short
-hostname or an in-cluster `*.svc` / `*.cluster.local` name through this
-setting, even with `true`, and its `tlsInsecure` (`KAMIWAZA_VERIFY_SSL=false`)
+hostname, an IPv6 address, or an in-cluster `*.svc` / `*.cluster.local` name
+through this setting, even with `true`, and its `tlsInsecure` (`KAMIWAZA_VERIFY_SSL=false`)
 covers only the exact platform URLs it is configured with.
 
 ## Steps
@@ -66,9 +68,10 @@ covers only the exact platform URLs it is configured with.
    replacing `models.example.com` with the exact, fully qualified hostname of
    the endpoint. List each host separately: `models.example.com` does not cover
    `eu.models.example.com`. An IPv4 address such as `10.0.0.5` can be listed.
-   A short hostname or an IPv6 address cannot: use the fully qualified name if
-   it resolves, or `true`. Core then covers it; Kaizen never relaxes a short
-   hostname, so for Kaizen use the fully qualified name or the CA.
+   A short hostname or an IPv6 address cannot: use a fully qualified name
+   (outside `*.svc` / `*.cluster.local`) if one resolves, or `true`. Core then
+   covers it; Kaizen never relaxes a short hostname or an IPv6 address, so for
+   Kaizen use the fully qualified name or the CA.
 2. Run your usual `helm upgrade --install`. The chart refuses an entry with a
    wildcard, scheme, port, or path, a single-label name, or an IPv6 address,
    and says why.
@@ -91,11 +94,13 @@ covers only the exact platform URLs it is configured with.
 
 ## Rollback
 
-Delete the setting (or set it to `false`) and rerun `helm upgrade --install`,
-then **redeploy every extension that calls an external model** (for example,
+Set it to `false` explicitly and rerun `helm upgrade --install`. Do not just
+delete the key: an upgrade with `--reuse-values` (or
+`--reset-then-reuse-values`) keeps the previous value. Then **redeploy every extension that calls an external model** (for example,
 Kaizen). Extensions receive the setting only when they are deployed, so a
 running extension keeps skipping verification until it is redeployed. After
-that, verification is back on for every external host.
+that, verification is back on for every external host. Confirm with the
+`core-config` check above: the value must read `false`.
 
 ## Not affected
 
