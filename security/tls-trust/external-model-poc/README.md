@@ -27,18 +27,20 @@ can redirect those keys. The setting is named for this:
 | `core.scheduler.tlsInsecure` | The platform's own origins: its domain, in-cluster services, paired federation clusters | External model hosts (from 1.4, in Core as well as Kaizen) |
 | `core.scheduler.externalTlsInsecureWithDnsRetargetingRisk` | External model hosts: `true` for all, or a list of exact hostnames | The platform's own origins |
 
-Before 1.4, `tlsInsecure` also skipped verification for Core's own calls to
-external model hosts. A site that relied on that must, on upgrade, add the CA
-to `global.trust.extraAnchors` or list the host here.
+From 1.4, Core verifies every external model host it calls unless this
+setting names it. Neither `tlsInsecure` nor the Context Service or OmniParse
+TLS settings relax an external host any more. A site that relied on them must,
+on upgrade, add the CA to `global.trust.extraAnchors` or list the host here.
 
 ## Steps
 
 1. Merge [`values-snippet.yaml`](values-snippet.yaml) into your values file,
-   replacing `models.example.com` with the exact hostname of the endpoint. List
-   each host separately: `models.example.com` does not cover
-   `eu.models.example.com`.
+   replacing `models.example.com` with the exact, fully qualified hostname of
+   the endpoint. List each host separately: `models.example.com` does not cover
+   `eu.models.example.com`. To cover an IPv6 address, use `true`.
 2. Run your usual `helm upgrade --install`. The chart refuses an entry with a
-   wildcard, scheme, port, or path, and says why.
+   wildcard, scheme, port, or path, a single-label name, or an IPv6 address,
+   and says why.
 3. Redeploy the extensions that call the endpoint (for example, Kaizen) so
    they pick up the setting.
 

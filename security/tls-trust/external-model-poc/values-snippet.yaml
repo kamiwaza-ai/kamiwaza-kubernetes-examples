@@ -8,16 +8,18 @@
 # global.trust.extraAnchors (see ../README.md) and delete this setting.
 #
 # This is separate from core.scheduler.tlsInsecure, which covers only the
-# platform's own origins and never an external model host.
+# platform's own origins and never an external model host. From 1.4 it is the
+# only setting that relaxes an external model host.
 
 core:
   scheduler:
-    # Narrowest form: exact hostnames only. No wildcards, no subdomain matching,
-    # no scheme, port or path (the chart refuses those at render time).
+    # Narrowest form: exact, fully qualified hostnames only (at least one dot).
+    # No wildcards, subdomain matching, scheme, port, path, single-label names
+    # or IPv6 literals (the chart refuses those at render time).
     externalTlsInsecureWithDnsRetargetingRisk:
       - models.example.com
 
-    # Broadest form: every external model host.
+    # Broadest form: every external model host (also covers IPv6 literals).
     # externalTlsInsecureWithDnsRetargetingRisk: true
 
     # Default (verify every external host):
