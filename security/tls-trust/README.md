@@ -22,6 +22,50 @@ corporate CA.
 
 **Tags:** #security #tls #pki #ca-trust #bedrock #helm-values #ingress
 
+> **Kamiwaza 1.3.4 and later: use `global.trust.extraAnchors` instead.** The chart
+> takes the corporate root (and any issuing CA) as a value and adds it to the
+> trust store of Core, Ray and App Garden extension pods (and Keycloak, from
+> 1.4), beside the public roots; extensions receive it through `SSL_CERT_FILE` and the related CA
+> bundle variables. This covers external model endpoints behind a private CA
+> (private Bedrock, chat, embedding or reranking endpoints) with verification
+> left ON. The ConfigMap-builder recipe below is for 0.13.x; on 1.3.0 to 1.3.3,
+> upgrade to 1.3.4 or later for this value. The CA that signs the platform's own
+> domain goes in `global.trust.edgeAnchor.pem`; the chart publishes it and the
+> extra anchors into the `kamiwaza-edge-trust` ConfigMap, so do not create that
+> ConfigMap by hand. Exceptions: if your values set
+> `global.trust.edgeAnchor.publishedBySubstrate: true` (tenant BYO-Istio,
+> no-Istio or EZUA lanes; deprecated in 1.4) or `network.enabled: false`, the
+> chart publishes nothing, so put the root in the substrate's
+> `kamiwaza-edge-trust` (key `ca-certificates.crt`) instead.
+>
+> ```yaml
+> global:
+>   trust:
+>     extraAnchors:
+>       - name: corporate-root
+>         pem: |
+>           -----BEGIN CERTIFICATE-----
+>           ...
+>           -----END CERTIFICATE-----
+> ```
+>
+> Rerun `helm upgrade --install`. Changing only the anchors does not restart
+> Core's pods, so then run
+> `kubectl -n kamiwaza rollout restart deployment/core-api deployment/core-scheduler deployment/core-raycluster-head deployment/core-raycluster-worker`
+> (plus `deployment/core-retrieval-streamer` if you enabled it) and redeploy
+> extensions such as Kaizen.
+>
+> Do **not** set `core.scheduler.tlsInsecure` (`AUTH_GATEWAY_TLS_INSECURE`) to
+> work around a private CA. On 1.3.x it turns off verification on many of
+> Core's outbound calls; from 1.4, Core's outbound model calls verify every
+> external host regardless of it. It is passed to extensions as `KAMIWAZA_VERIFY_SSL=false`, which
+> Kaizen applies only to the platform's own origins, so it does not fix an
+> external endpoint (for a 1.4 trial, see
+> [external-model-poc](external-model-poc/README.md)). Without verification, anyone
+> who can make the platform hostname resolve elsewhere (site or corporate DNS,
+> or a foothold inside the cluster) can intercept the calls, including the
+> member tokens Kaizen forwards to the platform.
+
 ---
 
 ## Read this first: 0.13.0 offline reinstall prep
