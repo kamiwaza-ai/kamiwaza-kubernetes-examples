@@ -32,7 +32,11 @@ corporate CA.
 > upgrade to 1.3.4 or later for this value. The CA that signs the platform's own
 > domain goes in `global.trust.edgeAnchor.pem`; the chart publishes it and the
 > extra anchors into the `kamiwaza-edge-trust` ConfigMap, so do not create that
-> ConfigMap by hand.
+> ConfigMap by hand. Exceptions: if your values set
+> `global.trust.edgeAnchor.publishedBySubstrate: true` (tenant BYO-Istio,
+> no-Istio or EZUA lanes; deprecated in 1.4) or `network.enabled: false`, the
+> chart publishes nothing, so put the root in the substrate's
+> `kamiwaza-edge-trust` (key `ca-certificates.crt`) instead.
 >
 > ```yaml
 > global:
@@ -48,7 +52,8 @@ corporate CA.
 > Rerun `helm upgrade --install`. Changing only the anchors does not restart
 > Core's pods, so then run
 > `kubectl -n kamiwaza rollout restart deployment/core-api deployment/core-scheduler deployment/core-raycluster-head deployment/core-raycluster-worker`
-> and redeploy extensions such as Kaizen.
+> (plus `deployment/core-retrieval-streamer` if you enabled it) and redeploy
+> extensions such as Kaizen.
 >
 > Do **not** set `core.scheduler.tlsInsecure` (`AUTH_GATEWAY_TLS_INSECURE`) to
 > work around a private CA. On 1.3.x it turns off verification on many of
