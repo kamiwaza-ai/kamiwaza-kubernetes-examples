@@ -2,8 +2,9 @@
 #
 # From 1.4.0 the Context Service verifies TLS on its model calls to the
 # platform's own domain. When the edge certificate is minted outside the chart
-# (OpenShift with GreyMatter, or Istio/Envoy with network.tls.mode: byo, the
-# default) and no edge CA is published, the install or upgrade stops with
+# (OpenShift with GreyMatter; Istio/Envoy with network.tls.mode: byo, the
+# default and EZUA's; customerCA; or cert-manager with an issuer other than
+# app-ca) and no edge CA is published, the install or upgrade stops with
 # "ENG-14728 preflight: ...". Merge ONE of the options below into your site
 # values file.
 
@@ -13,7 +14,8 @@ global:
       # Option 1 (recommended): the CA chain that signs https://<global.domain>,
       # root included, not the leaf. For a self-signed edge certificate, the
       # certificate itself. On GreyMatter: the ca.crt of Secret
-      # greymatter-edge-ingress. Needs network.enabled (the default).
+      # greymatter-edge-ingress. customerCA: the customer CA. Custom
+      # cert-manager issuer: that issuer's CA. Needs network.enabled (the default).
       pem: |
         -----BEGIN CERTIFICATE-----
         ...

@@ -1,8 +1,10 @@
 # Edge anchor for GreyMatter and BYO edge certificates
 
 **Scenario:** you are installing or upgrading to Kamiwaza 1.4 on OpenShift with
-GreyMatter, or on Istio or Envoy with your own edge certificate
-(`network.tls.mode: byo`, the default). The install stops with:
+GreyMatter, or on Istio or Envoy with an edge certificate the chart did not
+issue from a CA it holds: your own certificate (`network.tls.mode: byo`, the
+default, which includes EZUA), `customerCA`, or `cert-manager` with an issuer
+other than the platform's `app-ca`. The install stops with:
 
 ```text
 ENG-14728 preflight: Context runtime model calls verify TLS by default since 1.4.0 (core.context.embedding.verifySsl: true), but the certificate for https://<domain> is minted outside this chart ...
@@ -34,9 +36,15 @@ oc -n kamiwaza get secret greymatter-edge-ingress \
   -o jsonpath='{.data.ca\.crt}' | base64 -d > edge-ca.crt
 ```
 
-**Istio or Envoy, BYO:** use the CA chain that issued your edge certificate,
-root included, not the leaf. For a self-signed certificate, use the certificate
-itself.
+**Istio or Envoy, BYO (EZUA included):** use the CA chain that issued your
+edge certificate, root included, not the leaf; on EZUA, the EZUA gateway's CA.
+For a self-signed certificate, use the certificate itself.
+
+**`customerCA`:** the customer CA. If you also added it to the `ca` chart's
+trust bundle, put the same CA here; the product chart cannot see that one.
+
+**`cert-manager` with a custom issuer** (`global.certificates.issuers.app.name`
+not `app-ca`): that issuer's CA.
 
 Pass it with `--set-file global.trust.edgeAnchor.pem=edge-ca.crt`, or paste it
 into the values file. The chart publishes it in the `kamiwaza-edge-trust`
