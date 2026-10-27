@@ -1,0 +1,33 @@
+# Edge anchor for GreyMatter and BYO edge certificates (Kamiwaza 1.4 and later).
+#
+# From 1.4.0 the Context Service verifies TLS on its model calls to the
+# platform's own domain. When the edge certificate is minted outside the chart
+# (OpenShift with GreyMatter, or Istio/Envoy with network.tls.mode: byo, the
+# default) and no edge CA is published, the install or upgrade stops with
+# "ENG-14728 preflight: ...". Merge ONE of the options below into your site
+# values file.
+
+global:
+  trust:
+    edgeAnchor:
+      # Option 1 (recommended): the CA chain that signs https://<global.domain>,
+      # root included, not the leaf. For a self-signed edge certificate, the
+      # certificate itself. On GreyMatter: the ca.crt of Secret
+      # greymatter-edge-ingress. Needs network.enabled (the default).
+      pem: |
+        -----BEGIN CERTIFICATE-----
+        ...
+        -----END CERTIFICATE-----
+
+      # Option 2: ONLY if the edge certificate chains to a public CA.
+      # Verification stays on; a wrong declaration makes Context calls fail.
+      # publiclyTrusted: true
+
+# Option 3 (stopgap only): turn verification off for Context model calls, as
+# before 1.4.0. Anyone who can redirect the platform's domain (site DNS, an
+# in-cluster foothold) can read those calls and their tokens. Named in the
+# install notes and at every Core start until removed.
+# core:
+#   context:
+#     embedding:
+#       verifySsl: false

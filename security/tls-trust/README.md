@@ -2,6 +2,10 @@
 
 > Kamiwaza 1.4: for an external model endpoint whose CA you cannot trust yet
 > during a trial, see [external-model-poc](external-model-poc/README.md).
+>
+> Kamiwaza 1.4 on GreyMatter, or with your own (BYO) edge certificate: the
+> install stops with `ENG-14728 preflight: ...` until you publish the edge CA.
+> See [edge-anchor](edge-anchor/README.md).
 
 **Scenario:** make Kamiwaza platform pods trust a custom / enterprise / corporate PKI
 for **outbound** TLS (private Bedrock endpoints, internal HuggingFace mirrors, private
