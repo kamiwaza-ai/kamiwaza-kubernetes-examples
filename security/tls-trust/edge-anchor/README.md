@@ -56,6 +56,14 @@ kubectl -n kamiwaza rollout restart deployment/core-api deployment/core-schedule
   deployment/core-raycluster-head deployment/core-raycluster-worker
 ```
 
+## GreyMatter on a custom cluster domain
+
+From 1.4, the in-cluster GreyMatter edge host and TLS server name that Core
+gives extensions follow your cluster's DNS domain (`<svc>.<ns>.svc.<domain>`)
+instead of a fixed `.svc.cluster.local`. On a cluster with a custom domain, make sure the edge
+certificate carries that name, or set `KAMIWAZA_CLUSTER_DOMAIN` (or the edge
+server name) on Core explicitly. `cluster.local` clusters need no change.
+
 ## Risks
 
 - **Option 2** keeps verification on. If the certificate is not actually
