@@ -56,6 +56,31 @@ kubectl -n kamiwaza rollout restart deployment/core-api deployment/core-schedule
   deployment/core-raycluster-head deployment/core-raycluster-worker
 ```
 
+## Custom cluster domain: gateway certificate names
+
+From 1.4, extensions reach the platform in-cluster through
+`KAMIWAZA_PLATFORM_GATEWAY_URL`, and Core builds default gateway hosts on your
+cluster's DNS domain instead of a fixed `.svc.cluster.local`. A gateway host
+you configure yourself (`global.ingress.gateway.serviceHostname` on Istio,
+`KAMIWAZA_INTERNAL_GATEWAY_URL` on Envoy) is used as given; update it. A
+certificate the chart did not issue must carry the name each caller verifies:
+
+- **GreyMatter:** `KAMIWAZA_GATEWAY_TLS_SERVER_NAME`. On a chart install that
+  is `global.greymatter.edge.tlsServerName`, or the public domain when that is
+  unset, so the edge certificate needs no new name; only the dialed edge host
+  follows the cluster domain. Only without the chart, when
+  `KAMIWAZA_GREYMATTER_EDGE_TLS_SERVER_NAME` is unset on Core, is it
+  `<edge-service>.<namespace>.svc.<cluster-domain>`. Extensions managed by the
+  extension operator get no server name and verify the public domain.
+- **Envoy:** the public domain, plus
+  `kamiwaza-envoy.<namespace>.svc.<cluster-domain>`. Core points
+  `KAMIWAZA_API_URL` at that Service.
+- **Istio:** the public domain. Extensions send it as the TLS server name.
+
+On a cluster whose domain is not `cluster.local`, set `global.clusterDomain`
+so that the chart and Core agree. Certificates the chart issues already carry
+these names. Clusters on `cluster.local` need no change.
+
 ## Risks
 
 - **Option 2** keeps verification on. If the certificate is not actually
