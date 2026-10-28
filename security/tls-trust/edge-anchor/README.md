@@ -59,22 +59,22 @@ kubectl -n kamiwaza rollout restart deployment/core-api deployment/core-schedule
 ## Custom cluster domain: gateway certificate names
 
 From 1.4, extensions reach the platform in-cluster through
-`KAMIWAZA_PLATFORM_GATEWAY_URL`, and Core builds that host on your cluster's
-DNS domain instead of a fixed `.svc.cluster.local`. A certificate the chart
-did not issue must carry the name extensions verify:
+`KAMIWAZA_PLATFORM_GATEWAY_URL`, and Core builds gateway hosts on your
+cluster's DNS domain instead of a fixed `.svc.cluster.local`. A certificate the
+chart did not issue must carry the name each caller verifies:
 
-- **Envoy:** `kamiwaza-envoy.<namespace>.svc.<cluster-domain>`.
-- **Istio:** the gateway Service host, `global.ingress.gateway.serviceHostname`
-  (default `istio-ingressgateway.istio-system.svc.<cluster-domain>`).
-- **GreyMatter:** `<edge-service>.<namespace>.svc.<cluster-domain>`, or set
+- **GreyMatter:** `<edge-service>.<namespace>.svc.<cluster-domain>`, which is
+  `KAMIWAZA_GATEWAY_TLS_SERVER_NAME`. Alternatively, set
   `KAMIWAZA_GREYMATTER_EDGE_TLS_SERVER_NAME` on Core to a name the edge
   certificate carries.
+- **Envoy:** the public domain, plus
+  `kamiwaza-envoy.<namespace>.svc.<cluster-domain>`. Core points
+  `KAMIWAZA_API_URL` at that Service.
+- **Istio:** the public domain. Extensions send it as the TLS server name.
 
-Include the short forms too (`<service>`, `<service>.<namespace>`,
-`<service>.<namespace>.svc`). On a cluster whose domain is not
-`cluster.local`, set `global.clusterDomain` so the chart and Core agree.
-Certificates the chart issues already carry these names. `cluster.local`
-clusters need no change.
+On a cluster whose domain is not `cluster.local`, set `global.clusterDomain`
+so that the chart and Core agree. Certificates the chart issues already carry
+these names. Clusters on `cluster.local` need no change.
 
 ## Risks
 
