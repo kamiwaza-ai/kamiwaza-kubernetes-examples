@@ -56,13 +56,25 @@ kubectl -n kamiwaza rollout restart deployment/core-api deployment/core-schedule
   deployment/core-raycluster-head deployment/core-raycluster-worker
 ```
 
-## GreyMatter on a custom cluster domain
+## Custom cluster domain: gateway certificate names
 
-From 1.4, the in-cluster GreyMatter edge host and TLS server name that Core
-gives extensions follow your cluster's DNS domain (`<svc>.<ns>.svc.<domain>`)
-instead of a fixed `.svc.cluster.local`. On a cluster with a custom domain, make sure the edge
-certificate carries that name, or set `KAMIWAZA_CLUSTER_DOMAIN` (or the edge
-server name) on Core explicitly. `cluster.local` clusters need no change.
+From 1.4, extensions reach the platform in-cluster through
+`KAMIWAZA_PLATFORM_GATEWAY_URL`, and Core builds that host on your cluster's
+DNS domain instead of a fixed `.svc.cluster.local`. A certificate the chart
+did not issue must carry the name extensions verify:
+
+- **Envoy:** `kamiwaza-envoy.<namespace>.svc.<cluster-domain>`.
+- **Istio:** the gateway Service host, `global.ingress.gateway.serviceHostname`
+  (default `istio-ingressgateway.istio-system.svc.<cluster-domain>`).
+- **GreyMatter:** `<edge-service>.<namespace>.svc.<cluster-domain>`, or set
+  `KAMIWAZA_GREYMATTER_EDGE_TLS_SERVER_NAME` on Core to a name the edge
+  certificate carries.
+
+Include the short forms too (`<service>`, `<service>.<namespace>`,
+`<service>.<namespace>.svc`). On a cluster whose domain is not
+`cluster.local`, set `global.clusterDomain` so the chart and Core agree.
+Certificates the chart issues already carry these names. `cluster.local`
+clusters need no change.
 
 ## Risks
 
