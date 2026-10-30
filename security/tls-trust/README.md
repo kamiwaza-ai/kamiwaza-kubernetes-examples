@@ -6,6 +6,11 @@
 > Kamiwaza 1.4 on GreyMatter, or with your own (BYO) edge certificate: the
 > install stops with `ENG-14728 preflight: ...` until you publish the edge CA.
 > See [edge-anchor](edge-anchor/README.md).
+>
+> Kamiwaza 1.4 with the extension operator: a `kamiwaza-trust-bundle` without
+> public roots (for example one built with `--no-baseline`) makes extensions
+> report `TrustBundleReady=False` / `TrustBundleIncomplete`. That is a warning
+> by default; see [Extension operator trust check](#extension-operator-trust-check-14).
 
 **Scenario:** make Kamiwaza platform pods trust a custom / enterprise / corporate PKI
 for **outbound** TLS (private Bedrock endpoints, internal HuggingFace mirrors, private
@@ -440,6 +445,44 @@ Secret `root-ca` (ns `kamiwaza`, key `ca.crt`) and is included by default.
 > The script is **idempotent** — re-running it re-harvests, re-dedupes, and re-applies
 > the ConfigMap, which is exactly what you do on CA rotation (then roll the pods; see
 > [Recovery](#recovery--rollback-bad-ca)).
+
+### Extension operator trust check (1.4)
+
+With the extension operator running extensions (`extensionOperator.enabled: true`
+and `core.extensionRuntime.mode: operator`; in the default `direct` mode the
+operator does not reconcile extensions and this check does not run), extension pods
+mount `kamiwaza-trust-bundle` as `SSL_CERT_FILE`, which replaces the image trust
+store. The operator checks the bundle and sets `TrustBundleReady=False` on the
+extension when it holds no public roots (`TrustBundleIncomplete`, for example a
+`--no-baseline` build), when only `kamiwaza-edge-trust` exists
+(`TrustBundleMissing`), or when `ca-certificates.crt` is missing or not valid PEM
+(`TrustBundleInvalid`).
+
+- **Default: warn.** The extension stays `Ready`. Keep this on a sealed air gap,
+  where a `--no-baseline` bundle is legitimate and missing public roots cost
+  nothing.
+- **Strict:** set the value below to fail the extension (phase `Failed`,
+  `Ready=False`) instead. The chart sets `KAMIWAZA_REQUIRE_COMPLETE_TRUST_BUNDLE`
+  on the operator. Installing the `extension-operator` chart on its own, the key
+  is `extensions.trust.requireCompleteBundle`.
+
+```yaml
+extensionOperator:
+  extensions:
+    trust:
+      requireCompleteBundle: true # default false (warn)
+```
+
+To clear the condition, rebuild the bundle with the public baseline: drop
+`--no-baseline` and pass `--baseline-file <mozilla/system CA PEM>`. Do not rely on
+the default harvest here: once `core.trustManager.enabled` mounts the old bundle on
+`core-scheduler`, the harvest reads that bundle back and the public roots stay
+missing. The operator reconciles trust changes on its own. Check an extension with:
+
+```bash
+kubectl get kamiwazaextension -n <namespace> <name> \
+  -o jsonpath='{.status.conditions[?(@.type=="TrustBundleReady")]}'
+```
 
 ### 3. Merge the values snippet into `cluster/values/overrides.yaml`
 
