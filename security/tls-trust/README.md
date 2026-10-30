@@ -448,12 +448,14 @@ Secret `root-ca` (ns `kamiwaza`, key `ca.crt`) and is included by default.
 
 ### Extension operator trust check (1.4)
 
-With the extension operator (`extensionOperator.enabled: true`), extension pods
+With the extension operator running extensions (`extensionOperator.enabled: true`
+and `core.extensionRuntime.mode: operator`; in the default `direct` mode the
+operator does not reconcile extensions and this check does not run), extension pods
 mount `kamiwaza-trust-bundle` as `SSL_CERT_FILE`, which replaces the image trust
 store. The operator checks the bundle and sets `TrustBundleReady=False` on the
 extension when it holds no public roots (`TrustBundleIncomplete`, for example a
 `--no-baseline` build), when only `kamiwaza-edge-trust` exists
-(`TrustBundleMissing`), or when `ca-certificates.crt` is not valid PEM
+(`TrustBundleMissing`), or when `ca-certificates.crt` is missing or not valid PEM
 (`TrustBundleInvalid`).
 
 - **Default: warn.** The extension stays `Ready`. Keep this on a sealed air gap,
@@ -471,8 +473,11 @@ extensionOperator:
       requireCompleteBundle: true # default false (warn)
 ```
 
-To clear the condition, rebuild the bundle with the public baseline (drop
-`--no-baseline`). Check an extension with:
+To clear the condition, rebuild the bundle with the public baseline: drop
+`--no-baseline` and pass `--baseline-file <mozilla/system CA PEM>`. Do not rely on
+the default harvest here: once `core.trustManager.enabled` mounts the old bundle on
+`core-scheduler`, the harvest reads that bundle back and the public roots stay
+missing. The operator reconciles trust changes on its own. Check an extension with:
 
 ```bash
 kubectl get kamiwazaextension -n <namespace> <name> \
