@@ -484,6 +484,27 @@ kubectl get kamiwazaextension -n <namespace> <name> \
   -o jsonpath='{.status.conditions[?(@.type=="TrustBundleReady")]}'
 ```
 
+### Extension operator layout (1.4)
+
+Operator mode also needs Core and the extension operator to agree on
+namespaces, and the operator must reach Core's workload registrar through the
+edge. The chart checks this at render and stops with the value to set. On a
+substrate hand-off that collapses every product namespace onto one
+(`global.namespaces.*: kamiwaza`):
+
+```yaml
+global:
+  namespaces:
+    sandboxes: kamiwaza-sandboxes # the operator's sandbox namespace
+extensionOperator:
+  enabled: true
+  extensionsNamespace: kamiwaza # must equal global.namespaces.extensions
+  workloadRegistrar:
+    # On Istio an https URL must name the platform domain; the gateway
+    # Service name resets the TLS handshake.
+    apiUrl: https://<global.domain>/api/v1/delegated-workloads
+```
+
 ### 3. Merge the values snippet into `cluster/values/overrides.yaml`
 
 Copy [`trust-bundle-values-snippet.yaml`](trust-bundle-values-snippet.yaml) into your
