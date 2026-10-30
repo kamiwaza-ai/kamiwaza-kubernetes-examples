@@ -72,9 +72,16 @@ certificate the chart did not issue must carry the name each caller verifies:
   `KAMIWAZA_GREYMATTER_EDGE_TLS_SERVER_NAME` is unset on Core, is it
   `<edge-service>.<namespace>.svc.<cluster-domain>`. Extensions managed by the
   extension operator get no server name and verify the public domain.
-- **Envoy:** the public domain, plus
+- **Envoy:** the public domain, plus every name of the `kamiwaza-envoy`
+  Service: `kamiwaza-envoy`, `kamiwaza-envoy.<namespace>`,
+  `kamiwaza-envoy.<namespace>.svc` and
   `kamiwaza-envoy.<namespace>.svc.<cluster-domain>`. Core points
-  `KAMIWAZA_API_URL` at that Service.
+  `KAMIWAZA_API_URL` at that Service and dials it for its own embedding API
+  calls and App Garden readiness probes. A certificate you provide
+  (`network.tls.mode: byo`) that names only the public domain fails those
+  calls with `Hostname mismatch`, even with its CA in
+  `global.trust.edgeAnchor.pem`. Core checks the certificate at startup and
+  logs an error naming any missing name; the install notes list them too.
 - **Istio:** the public domain. Extensions send it as the TLS server name.
 
 On a cluster whose domain is not `cluster.local`, set `global.clusterDomain`
@@ -86,6 +93,11 @@ these names. Clusters on `cluster.local` need no change.
 - **Option 2** keeps verification on. If the certificate is not actually
   publicly trusted, Context calls fail with a certificate error, and Core logs
   `TLS certificate verification failed for platform origin <host> ...`.
+- **A certificate without the gateway Service names** (Envoy, `byo`) fails
+  in-cluster calls even when its CA is trusted, and Core logs
+  `TLS hostname verification failed for platform origin <host> ...`. Reissue
+  it with the names above, update the Secret, restart Envoy and redeploy
+  running extensions.
 - **Option 3** turns verification off for the Context Service's calls to the
   platform's own domain. Anyone who can redirect that domain, through site DNS
   or from inside the cluster, can read those calls and the tokens they carry.
