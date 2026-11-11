@@ -23,8 +23,8 @@ core:
     # A GGUF model for llama.cpp (CPU).
     - name: qwen3-0-6b                  # DNS-1123, at most 36 chars, unique; names the Job
       image:
-        registry: ghcr.io
-        repository: kamiwaza-internal/models/qwen3-0.6b-gguf
+        registry: registry.example.com
+        repository: models/qwen3-0.6b-gguf
         tag: "<tag you packed with>"
         digest: ""
         pullPolicy: IfNotPresent
@@ -36,8 +36,8 @@ core:
     # and the tokenizer files.
     # - name: qwen3-8b
     #   image:
-    #     registry: ghcr.io
-    #     repository: kamiwaza-internal/models/qwen3-8b
+    #     registry: registry.example.com
+    #     repository: models/qwen3-8b
     #     tag: "<tag>"
     #     digest: ""
     #   manifestSha256: "<64 hex>"

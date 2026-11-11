@@ -3,7 +3,7 @@
 **Scenario:** an air-gapped install that receives only container images needs
 to run a Hugging Face model on the platform's own engines (llama.cpp, vLLM).
 Without internet access, a model download fails with HTTP 503 and a message
-`Model hub (huggingface.co) unreachable`. Pack the model into an image on a connected
+`Model hub (huggingface.co) unreachable: ...`. Pack the model into an image on a connected
 machine, move the image with your other images, and import it with one Helm
 value.
 
@@ -17,7 +17,8 @@ Full procedure, sizing and every error: the Kamiwaza docs page
 - Kamiwaza 1.4.1 or later, installed with Helm, using the built-in model
   registry (neither `global.modelRegistry` nor `core.scheduler.registryExternalHost` set).
 - The 1.4.1 field kit, with `kz-model-pack.sh`, on a machine that reaches
-  `huggingface.co`.
+  `huggingface.co`, with `python3` and a Docker `buildx` that builds
+  multi-platform images, signed in (`docker login`) to the registry you push to.
 - Free space in the platform's model registry: at least 1.1 times the model
   size. The import checks this before it pushes anything.
 
@@ -35,7 +36,8 @@ Full procedure, sizing and every error: the Kamiwaza docs page
    `<global.imageRegistryPrefix>/images/qwen3-0.6b-gguf:<tag>`. A transfer that
    changes the digest is fine.
 
-3. **Verify** (site side):
+3. **Verify** (site side, from the field kit directory; it uses `site.env`'s
+   registry account when the image host is its `HARBOR_URL`):
 
    ```bash
    bash kz-model-pack.sh verify <prefix>/images/qwen3-0.6b-gguf:<tag> --manifest-sha256 <sha256>
@@ -44,13 +46,15 @@ Full procedure, sizing and every error: the Kamiwaza docs page
 4. **Configure.** Merge the entry the pack printed into your values file.
    [`values-snippet.yaml`](values-snippet.yaml) shows its shape.
 
-5. **Import.** Run `helm upgrade` with all your values files, in the usual order.
+5. **Import.** Run your usual `helm upgrade --install` (all values files, same
+   order, same `--timeout`).
 
 ## Verification
 
 ```bash
 kubectl -n kamiwaza get jobs -l kamiwaza.ai/offline-model-import=qwen3-0-6b
-kubectl -n kamiwaza logs job/<job name from the line above> -c import --tail=1
+kubectl -n kamiwaza wait --for=condition=complete job/<job name from the line above> --timeout=60m
+kubectl -n kamiwaza logs job/<job name> -c import --tail=1
 ```
 
 The last line is a JSON receipt. `"changed": true` means the model was imported
@@ -65,5 +69,6 @@ the same `helm upgrade`.
 ## Alternative
 
 If your site already serves the model from an HTTPS endpoint, register it as an
-external model instead (docs: **OpenAI-Compatible Chat**). For a private CA,
+external model instead (docs: **OpenAI-Compatible Chat**; a private address
+needs `core.scheduler.allowInsecureModelEndpoints: true`). For a private CA,
 see [security/tls-trust](../../security/tls-trust).
