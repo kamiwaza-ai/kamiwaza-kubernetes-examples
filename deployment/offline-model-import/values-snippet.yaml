@@ -1,0 +1,47 @@
+# Offline model import: load Hugging Face models into an air-gapped install.
+#
+# Kamiwaza 1.4.1 and later. Merge into your site values file, under your existing
+# `core:` key (do not add a second one). Each entry imports one model from a
+# weights image that the field kit's `kz-model-pack.sh pack` built on a connected
+# machine. The pack prints this entry for you, stagingSize included.
+#
+# The import runs as one Job per entry (core-model-import-<name>-<hash>). The hash
+# covers the entry and the Core image: changing either reruns it, which is safe
+# (an unchanged model is a no-op, "changed": false in the receipt). Retry a failed
+# import without a values change: delete its Job, rerun the same helm upgrade.
+#
+# Trust anchor: manifestSha256, printed by kz-model-pack. The image digest is not
+# trusted, so a transfer that re-pushes the image (new digest) is fine. Leave
+# `digest` empty then; set it only if your transfer keeps digests.
+#
+# With global.imageRegistryPrefix set (every air-gapped install), the chart pulls
+# the image from <prefix>/images/<last segment of repository>:<tag>, so push it
+# there. `registry` and the rest of `repository` are then not used.
+
+core:
+  offlineModelImports:
+    # A GGUF model for llama.cpp (CPU).
+    - name: qwen3-0-6b                  # DNS-1123, at most 36 chars, unique; names the Job
+      image:
+        registry: registry.example.com
+        repository: models/qwen3-0.6b-gguf
+        tag: "<tag you packed with>"
+        digest: ""
+        pullPolicy: IfNotPresent
+      manifestSha256: "<64 hex printed by kz-model-pack.sh>"   # required
+      stagingSize: 2Gi                  # required; at least the model size (the pack computes it)
+      # activeDeadlineSeconds: 3600     # optional (min 300, below the Helm --timeout)
+
+    # A safetensors model for vLLM (GPU). Pack every file: weights, config.json
+    # and the tokenizer files.
+    # - name: qwen3-8b
+    #   image:
+    #     registry: registry.example.com
+    #     repository: models/qwen3-8b
+    #     tag: "<tag>"
+    #     digest: ""
+    #   manifestSha256: "<64 hex>"
+    #   stagingSize: 20Gi
+    #   resources:                      # optional, the import container
+    #     requests: {cpu: 500m, memory: 1Gi}
+    #     limits: {cpu: "2", memory: 2Gi}
