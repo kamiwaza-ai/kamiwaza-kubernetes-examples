@@ -49,13 +49,18 @@ Full procedure, sizing and every error: the Kamiwaza docs page
 ## Verification
 
 ```bash
-kubectl -n kamiwaza get jobs | grep offline-model-import
-kubectl -n kamiwaza logs job/<job name> -c import | tail -1
+kubectl -n kamiwaza get jobs -l kamiwaza.ai/offline-model-import=qwen3-0-6b
+kubectl -n kamiwaza logs job/<job name from the line above> -c import --tail=1
 ```
 
 The last line is a JSON receipt. `"changed": true` means the model was imported
 now; `"changed": false` means it was already there. Then open **Models** in the
 UI: the model shows as downloaded. Deploy it.
+
+The Job is `core-model-import-<name>-<hash>`; the hash covers the entry and the
+Core image, so an unchanged upgrade does not rerun it. To retry a failed import
+without changing values, `kubectl -n kamiwaza delete job <job name>` and rerun
+the same `helm upgrade`.
 
 ## Alternative
 
